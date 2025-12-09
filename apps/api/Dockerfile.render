@@ -27,7 +27,7 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 COPY composer.json composer.lock* ./
 
 # Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist || true
 
 # Copy application files
 COPY . /var/www
@@ -44,5 +44,6 @@ EXPOSE 10000
 
 # Start Laravel development server
 # Render inyecta PORT como variable de entorno
-CMD sh -c "php artisan serve --host=0.0.0.0 --port=\${PORT:-10000}"
+# El startCommand en render.yaml maneja las migraciones y optimizaciones
+CMD sh -c "php artisan serve --host=0.0.0.0 --port=$PORT"
 

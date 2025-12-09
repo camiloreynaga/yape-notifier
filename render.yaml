@@ -3,9 +3,11 @@ services:
     name: yape-notifier-api
     region: oregon
     plan: free
-    rootDir: apps/api
-    buildCommand: composer install --no-dev --optimize-autoloader && php artisan key:generate --force
-    startCommand: php artisan serve --host=0.0.0.0 --port=$PORT
+    dockerfilePath: apps/api/Dockerfile.render
+    dockerContext: apps/api
+    buildCommand: ""
+    startCommand: sh -c "(php artisan key:generate --force 2>/dev/null || true) && php artisan migrate --force && php artisan config:cache && php artisan route:cache && php artisan serve --host=0.0.0.0 --port=$PORT"
+    healthCheckPath: /up
     envVars:
       - key: APP_NAME
         value: Yape Notifier API
