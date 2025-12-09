@@ -30,6 +30,7 @@ yape-notifier/
 ## 🛠️ Stack Tecnológico
 
 ### Backend
+
 - **PHP 8.2+**
 - **Laravel 11**
 - **PostgreSQL** o **MySQL**
@@ -37,6 +38,7 @@ yape-notifier/
 - **Docker** (para desarrollo y producción)
 
 ### Frontend Móvil
+
 - **Kotlin**
 - **Android SDK** (mínimo API 24)
 - **MVVM Architecture**
@@ -45,12 +47,14 @@ yape-notifier/
 - **DataStore** (almacenamiento local)
 
 ### Dashboard Web
+
 - **React 18**
 - **TypeScript**
 - **Vite**
 - **Tailwind CSS**
 
 ### Infraestructura
+
 - **Render** (MVP - deploy recomendado)
 - **Railway** (alternativa)
 - **DigitalOcean Droplet** (producción futura)
@@ -78,6 +82,7 @@ chmod +x setup.sh
 El API estará disponible en: **http://localhost:8000**
 
 El script automáticamente:
+
 - ✅ Crea archivos `.env` necesarios
 - ✅ Construye las imágenes Docker
 - ✅ Inicia los contenedores
@@ -178,14 +183,15 @@ make clean
 
 ### Autenticación
 
-| Método | Endpoint | Descripción | Autenticación |
-|--------|----------|-------------|---------------|
-| POST | `/api/register` | Registrar nuevo usuario | No |
-| POST | `/api/login` | Iniciar sesión | No |
-| POST | `/api/logout` | Cerrar sesión | Sí |
-| GET | `/api/me` | Obtener usuario autenticado | Sí |
+| Método | Endpoint        | Descripción                 | Autenticación |
+| ------ | --------------- | --------------------------- | ------------- |
+| POST   | `/api/register` | Registrar nuevo usuario     | No            |
+| POST   | `/api/login`    | Iniciar sesión              | No            |
+| POST   | `/api/logout`   | Cerrar sesión               | Sí            |
+| GET    | `/api/me`       | Obtener usuario autenticado | Sí            |
 
 **Ejemplo de registro:**
+
 ```bash
 curl -X POST http://localhost:8000/api/register \
   -H "Content-Type: application/json" \
@@ -198,6 +204,7 @@ curl -X POST http://localhost:8000/api/register \
 ```
 
 **Ejemplo de login:**
+
 ```bash
 curl -X POST http://localhost:8000/api/login \
   -H "Content-Type: application/json" \
@@ -209,16 +216,17 @@ curl -X POST http://localhost:8000/api/login \
 
 ### Dispositivos
 
-| Método | Endpoint | Descripción | Autenticación |
-|--------|----------|-------------|---------------|
-| GET | `/api/devices` | Listar dispositivos | Sí |
-| POST | `/api/devices` | Crear dispositivo | Sí |
-| GET | `/api/devices/{id}` | Obtener dispositivo | Sí |
-| PUT | `/api/devices/{id}` | Actualizar dispositivo | Sí |
-| DELETE | `/api/devices/{id}` | Eliminar dispositivo | Sí |
-| POST | `/api/devices/{id}/toggle-status` | Activar/desactivar | Sí |
+| Método | Endpoint                          | Descripción            | Autenticación |
+| ------ | --------------------------------- | ---------------------- | ------------- |
+| GET    | `/api/devices`                    | Listar dispositivos    | Sí            |
+| POST   | `/api/devices`                    | Crear dispositivo      | Sí            |
+| GET    | `/api/devices/{id}`               | Obtener dispositivo    | Sí            |
+| PUT    | `/api/devices/{id}`               | Actualizar dispositivo | Sí            |
+| DELETE | `/api/devices/{id}`               | Eliminar dispositivo   | Sí            |
+| POST   | `/api/devices/{id}/toggle-status` | Activar/desactivar     | Sí            |
 
 **Ejemplo de crear dispositivo:**
+
 ```bash
 curl -X POST http://localhost:8000/api/devices \
   -H "Content-Type: application/json" \
@@ -231,15 +239,16 @@ curl -X POST http://localhost:8000/api/devices \
 
 ### Notificaciones
 
-| Método | Endpoint | Descripción | Autenticación |
-|--------|----------|-------------|---------------|
-| POST | `/api/notifications` | Crear notificación | Sí |
-| GET | `/api/notifications` | Listar notificaciones | Sí |
-| GET | `/api/notifications/{id}` | Obtener notificación | Sí |
-| GET | `/api/notifications/statistics` | Estadísticas | Sí |
-| PATCH | `/api/notifications/{id}/status` | Actualizar estado | Sí |
+| Método | Endpoint                         | Descripción           | Autenticación |
+| ------ | -------------------------------- | --------------------- | ------------- |
+| POST   | `/api/notifications`             | Crear notificación    | Sí            |
+| GET    | `/api/notifications`             | Listar notificaciones | Sí            |
+| GET    | `/api/notifications/{id}`        | Obtener notificación  | Sí            |
+| GET    | `/api/notifications/statistics`  | Estadísticas          | Sí            |
+| PATCH  | `/api/notifications/{id}/status` | Actualizar estado     | Sí            |
 
 **Ejemplo de crear notificación:**
+
 ```bash
 curl -X POST http://localhost:8000/api/notifications \
   -H "Content-Type: application/json" \
@@ -256,6 +265,7 @@ curl -X POST http://localhost:8000/api/notifications \
 ```
 
 **Filtros disponibles para GET /api/notifications:**
+
 - `device_id` - Filtrar por dispositivo
 - `source_app` - Filtrar por app (yape, plin, bcp, etc.)
 - `start_date` - Fecha inicial
@@ -281,10 +291,12 @@ Authorization: Bearer {token}
 El inicio de sesión es **NECESARIO** porque:
 
 1. **Autenticación de Usuario (Laravel Sanctum)**
+
    - Todas las rutas de notificaciones están protegidas con `auth:sanctum`
    - Sin autenticación, la API rechazaría todas las peticiones con error 401
 
 2. **Asociación de Notificaciones con Usuario**
+
    - Cada notificación se guarda con un `user_id` en la base de datos
    - Permite que múltiples usuarios tengan sus propios dispositivos y notificaciones
 
@@ -297,10 +309,12 @@ El inicio de sesión es **NECESARIO** porque:
 La app Android identifica el dispositivo usando un **sistema de dos niveles**:
 
 1. **Generación/Obtención del UUID**
+
    - Al iniciar sesión, la app genera o recupera un UUID único del dispositivo
    - Se guarda localmente en `PreferencesManager` (DataStore encriptado)
 
 2. **Registro en el Backend**
+
    - Al hacer login, la app envía el UUID al backend para crear/actualizar el dispositivo
    - El backend crea un registro en la tabla `devices` asociado al usuario autenticado
 
@@ -309,9 +323,10 @@ La app Android identifica el dispositivo usando un **sistema de dos niveles**:
    - El backend valida que el dispositivo pertenezca al usuario del token
 
 **Flujo completo:**
+
 ```
-Usuario inicia sesión → Obtiene token → Genera UUID → Registra dispositivo → 
-Guarda token y device_id → Detecta notificación → Envía con device_id y token → 
+Usuario inicia sesión → Obtiene token → Genera UUID → Registra dispositivo →
+Guarda token y device_id → Detecta notificación → Envía con device_id y token →
 Backend valida y procesa
 ```
 
@@ -331,11 +346,13 @@ Backend valida y procesa
 Edita `apps/android-client/app/src/main/java/com/yapenotifier/android/data/api/RetrofitClient.kt`:
 
 **Para emulador:**
+
 ```kotlin
 private const val BASE_URL = "http://10.0.2.2:8000/"
 ```
 
 **Para dispositivo físico (misma red WiFi):**
+
 ```kotlin
 private const val BASE_URL = "http://192.168.1.XXX:8000/"  // Tu IP local
 ```
@@ -355,14 +372,17 @@ La app requiere permisos especiales para leer notificaciones:
 ### Probar en Dispositivo Físico
 
 1. **Habilitar Modo Desarrollador:**
+
    - Configuración → Acerca del teléfono
    - Toca 7 veces en "Número de compilación"
 
 2. **Habilitar Depuración USB:**
+
    - Configuración → Opciones de desarrollador
    - Activa "Depuración USB"
 
 3. **Conectar y verificar:**
+
    ```bash
    adb devices
    ```
@@ -380,6 +400,7 @@ Si el teléfono Android y el backend están en redes WiFi diferentes, tienes var
 ### Opción 1: Túnel Local (Recomendado para desarrollo rápido)
 
 **Cloudflare Tunnel (gratis, sin límites):**
+
 ```bash
 # Instalar
 choco install cloudflared  # Windows
@@ -392,17 +413,20 @@ cloudflared tunnel --url http://localhost:8000
 ```
 
 **ngrok:**
+
 ```bash
 ngrok http 8000
 # Usar la URL HTTPS que aparece
 ```
 
 **Ventajas:**
+
 - ✅ Rápido de configurar (5 minutos)
 - ✅ Funciona desde cualquier red
 - ✅ Gratis para desarrollo
 
 **Desventajas:**
+
 - ❌ URL cambia cada vez que reinicias (versión gratuita)
 - ❌ Requiere conexión a internet
 
@@ -411,12 +435,14 @@ ngrok http 8000
 Despliega el backend en **Render** o **Railway** para tener una URL permanente.
 
 **Ventajas:**
+
 - ✅ URL permanente (no cambia)
 - ✅ HTTPS incluido automáticamente
 - ✅ Disponible 24/7
 - ✅ Mejor para pruebas con múltiples dispositivos
 
 **Desventajas:**
+
 - ❌ Requiere configuración inicial (15-30 minutos)
 - ❌ Puede tener costos (aunque muchos tienen planes gratuitos)
 
@@ -467,18 +493,21 @@ docker-compose exec app php artisan test
 ### Solución de Problemas
 
 **Error: "Port already in use"**
+
 ```bash
 # Cambiar puerto en infra/docker/.env
 APP_PORT=8001
 ```
 
 **Error: "Permission denied" en storage**
+
 ```bash
 docker-compose exec app chmod -R 775 storage bootstrap/cache
 docker-compose exec app chown -R www-data:www-data storage bootstrap/cache
 ```
 
 **Reconstruir todo desde cero**
+
 ```bash
 docker-compose down -v
 docker-compose build --no-cache
@@ -537,16 +566,17 @@ git push -u origin master
 #### 5. Configurar el Web Service
 
 **Configuración básica:**
+
 - **Name**: `yape-notifier-api`
 - **Region**: `Oregon` (o la misma que la base de datos)
 - **Branch**: `master`
 - **Root Directory**: `apps/api`
 - **Runtime**: `PHP`
-- **Build Command**: 
+- **Build Command**:
   ```bash
   composer install --no-dev --optimize-autoloader && php artisan key:generate --force
   ```
-- **Start Command**: 
+- **Start Command**:
   ```bash
   php artisan serve --host=0.0.0.0 --port=$PORT
   ```
@@ -591,6 +621,7 @@ Después del primer deploy:
 #### 7. Obtener la URL
 
 Una vez que el deploy termine, Render te dará una URL como:
+
 ```
 https://yape-notifier-api.onrender.com
 ```
@@ -616,19 +647,23 @@ Render automáticamente hace deploy cada vez que haces push a la rama `master` d
 ### Solución de Problemas en Render
 
 **Error: "Application failed to respond"**
+
 - Verifica que el `Start Command` sea correcto
 - Revisa los logs en Render Dashboard → Logs
 
 **Error: "Database connection failed"**
+
 - Verifica que las variables de entorno `DB_*` sean correctas
 - Asegúrate de que la base de datos esté en la misma región que el servicio web
 
 **Error: "500 Internal Server Error"**
+
 - Revisa los logs en Render Dashboard → Logs
 - Verifica que las migraciones se hayan ejecutado
 - Verifica que `APP_KEY` esté configurado (se genera automáticamente con el build command)
 
 **El servicio tarda mucho en responder**
+
 - Esto es normal en el plan gratuito (se "duerme" después de 15 min)
 - Considera usar un servicio de "ping" para mantenerlo activo
 - O actualiza a un plan de pago
@@ -642,6 +677,7 @@ Render automáticamente hace deploy cada vez que haces push a la rama `master` d
 #### Ejecutar Tests
 
 **Usando Docker:**
+
 ```bash
 cd infra/docker
 
@@ -662,6 +698,7 @@ docker-compose exec app php artisan test --coverage
 ```
 
 **Localmente:**
+
 ```bash
 cd apps/api
 php artisan test
@@ -682,6 +719,7 @@ tests/
 #### Escribir Tests
 
 **Test de Feature (API):**
+
 ```php
 <?php
 
@@ -709,6 +747,7 @@ class MyFeatureTest extends TestCase
 ```
 
 **Test Unitario:**
+
 ```php
 <?php
 
@@ -732,11 +771,13 @@ class MyServiceTest extends TestCase
 #### Factories
 
 Las factories se encuentran en `database/factories/`:
+
 - `UserFactory` - Crear usuarios de prueba
 - `DeviceFactory` - Crear dispositivos de prueba
 - `NotificationFactory` - Crear notificaciones de prueba
 
 **Ejemplo:**
+
 ```php
 $user = User::factory()->create();
 $device = Device::factory()->create(['user_id' => $user->id]);
@@ -775,6 +816,7 @@ cd apps/android-client
 Laravel Pint es el linter oficial de Laravel basado en PHP-CS-Fixer.
 
 **Verificar estilo de código:**
+
 ```bash
 cd apps/api
 
@@ -786,6 +828,7 @@ docker-compose exec app ./vendor/bin/pint --test
 ```
 
 **Corregir automáticamente:**
+
 ```bash
 # Usando Docker
 docker-compose exec app ./vendor/bin/pint
@@ -795,6 +838,7 @@ docker-compose exec app ./vendor/bin/pint
 ```
 
 **Usando Makefile:**
+
 ```bash
 make lint        # Verificar
 make lint:fix    # Corregir
@@ -803,12 +847,14 @@ make lint:fix    # Corregir
 ### Android (ktlint)
 
 **Verificar:**
+
 ```bash
 cd apps/android-client
 ./gradlew ktlint
 ```
 
 **Corregir automáticamente:**
+
 ```bash
 ./gradlew ktlintFormat
 ```
@@ -828,6 +874,7 @@ El backend sigue una arquitectura limpia:
 - **Models**: Eloquent ORM
 
 **Estructura:**
+
 ```
 app/
 ├── Http/
@@ -849,6 +896,7 @@ Arquitectura **MVVM**:
 - **Services**: NotificationListenerService para capturar notificaciones
 
 **Estructura:**
+
 ```
 app/src/main/java/com/yapenotifier/android/
 ├── data/
@@ -890,6 +938,7 @@ Arquitectura basada en React con TypeScript:
 Para la primera versión funcional:
 
 ### Backend
+
 - ✅ Autenticación básica (login/registro)
 - ✅ Registro de dispositivos
 - ✅ Endpoint `POST /api/notifications`
@@ -899,12 +948,14 @@ Para la primera versión funcional:
 - ✅ Estadísticas de notificaciones
 
 ### Android
+
 - ✅ Lectura de notificaciones (Yape/Bancos)
 - ✅ Parseo básico de monto y texto
 - ✅ Envío automático a la API
 - ✅ Almacenamiento local de tokens
 
 ### Dashboard Web
+
 - ✅ Autenticación (Login/Registro)
 - ✅ Dashboard con estadísticas
 - ✅ Gestión de notificaciones
@@ -912,6 +963,7 @@ Para la primera versión funcional:
 - ✅ Exportación a CSV
 
 ### Infraestructura
+
 - ✅ Deploy en Docker
 - ✅ Base de datos PostgreSQL
 - ✅ Redis para cache
@@ -1051,31 +1103,37 @@ Este es un proyecto privado. Para contribuciones, contacta al equipo de desarrol
 ## 🐛 Solución de Problemas
 
 ### Error: "Class 'App\Models\User' not found"
+
 ```bash
 cd apps/api
 composer dump-autoload
 ```
 
 ### Error: "SQLSTATE[HY000] [2002] Connection refused"
+
 Verifica que la base de datos esté corriendo y las credenciales en `.env` sean correctas
 
 ### La app Android no captura notificaciones
+
 - Verifica que el servicio de notificaciones esté activado en Configuración
 - Verifica que la app de pago (Yape, banco, etc.) tenga permisos de notificación
 - Revisa los logs en Android Studio (Logcat)
 
 ### Error de conexión en la app Android
+
 - Verifica que la URL de la API sea correcta
 - Verifica que el dispositivo/emulador tenga acceso a internet
 - Verifica que el servidor API esté corriendo
 - Si están en redes diferentes, usa un túnel o despliega en un servidor
 
 ### Error: "Network Error" o "CORS Error" (Dashboard)
+
 - Verifica que la API esté corriendo
 - Verifica la configuración de CORS en Laravel
 - Verifica la URL en `.env` o `src/config/api.ts`
 
 ### Error en Render: "Application failed to respond"
+
 - Verifica que el `Start Command` sea correcto
 - Revisa los logs en Render Dashboard → Logs
 - Verifica que las variables de entorno estén configuradas
