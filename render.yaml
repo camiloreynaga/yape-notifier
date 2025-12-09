@@ -1,6 +1,7 @@
 services:
   - type: web
     name: yape-notifier-api
+    runtime: docker
     region: oregon
     plan: free
     dockerfilePath: apps/api/Dockerfile.render
