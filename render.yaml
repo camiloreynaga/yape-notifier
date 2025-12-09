@@ -1,12 +1,11 @@
 services:
   - type: web
     name: yape-notifier-api
+    runtime: docker # 👈 CLAVE
     region: oregon
     plan: free
     dockerfilePath: apps/api/Dockerfile.render
     dockerContext: apps/api
-    buildCommand: ""
-    startCommand: sh -c "(php artisan key:generate --force 2>/dev/null || true) && php artisan migrate --force && php artisan config:cache && php artisan route:cache && php artisan serve --host=0.0.0.0 --port=$PORT"
     healthCheckPath: /up
     envVars:
       - key: APP_NAME
