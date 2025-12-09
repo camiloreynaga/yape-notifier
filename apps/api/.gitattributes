@@ -1,0 +1,13 @@
+* text=auto
+
+*.blade.php text eol=lf
+*.diff text eol=lf
+*.html text eol=lf
+*.md text eol=lf
+*.php text eol=lf
+*.sh text eol=lf
+*.yml text eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
