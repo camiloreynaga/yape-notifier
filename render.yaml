@@ -1,11 +1,12 @@
 services:
   - type: web
     name: yape-notifier-api
-    runtime: docker # 👈 CLAVE
+    env: php
     region: oregon
     plan: free
-    dockerfilePath: apps/api/Dockerfile.render
-    dockerContext: apps/api
+    rootDir: apps/api
+    buildCommand: composer install --no-dev --optimize-autoloader && php artisan key:generate --force
+    startCommand: php artisan serve --host=0.0.0.0 --port=$PORT
     healthCheckPath: /up
     envVars:
       - key: APP_NAME
