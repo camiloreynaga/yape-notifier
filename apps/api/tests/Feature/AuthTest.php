@@ -92,3 +92,4 @@ class AuthTest extends TestCase
             ]);
     }
 }
+

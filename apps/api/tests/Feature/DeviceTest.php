@@ -89,3 +89,4 @@ class DeviceTest extends TestCase
         $this->assertDatabaseMissing('devices', ['id' => $device->id]);
     }
 }
+

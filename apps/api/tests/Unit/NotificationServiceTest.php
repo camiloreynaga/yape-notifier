@@ -61,3 +61,4 @@ class NotificationServiceTest extends TestCase
         $this->assertTrue($notification->is_duplicate);
     }
 }
+
