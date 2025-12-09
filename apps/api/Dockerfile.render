@@ -39,9 +39,10 @@ RUN mkdir -p /var/www/storage/framework/{sessions,views,cache} \
     && chmod -R 775 /var/www/storage \
     && chmod -R 775 /var/www/bootstrap/cache
 
-# Expose port (Render will inject $PORT at runtime)
+# Expose port (Render will inject PORT at runtime)
 EXPOSE 10000
 
 # Start Laravel development server
-CMD php artisan serve --host=0.0.0.0 --port=${PORT:-10000}
+# Render inyecta PORT como variable de entorno
+CMD sh -c "php artisan serve --host=0.0.0.0 --port=\${PORT:-10000}"
 
