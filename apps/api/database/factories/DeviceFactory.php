@@ -35,3 +35,4 @@ class DeviceFactory extends Factory
         ]);
     }
 }
+
