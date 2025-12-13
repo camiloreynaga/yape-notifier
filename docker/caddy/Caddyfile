@@ -1,0 +1,47 @@
+# Caddyfile para Yape Notifier
+# Maneja HTTPS automático con Let's Encrypt
+
+# API - api.notificaciones.space
+api.notificaciones.space {
+    # Reverse proxy a Nginx
+    reverse_proxy nginx:80 {
+        # Headers para Laravel
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up Host {host}
+        
+        # Health check
+        health_uri /up
+        health_interval 30s
+        health_timeout 5s
+    }
+
+    # Logging
+    log {
+        output file /var/log/caddy/api.log
+        format json
+    }
+
+    # Compression
+    encode gzip zstd
+}
+
+# Panel/Dashboard (opcional) - panel.notificaciones.space
+panel.notificaciones.space {
+    # Si hay frontend, descomentar y configurar
+    # reverse_proxy dashboard:80 {
+    #     header_up X-Real-IP {remote_host}
+    #     header_up X-Forwarded-For {remote_host}
+    #     header_up X-Forwarded-Proto {scheme}
+    # }
+    
+    # Por ahora, redirigir a API o mostrar mensaje
+    respond "Dashboard no configurado" 503
+
+    log {
+        output file /var/log/caddy/panel.log
+        format json
+    }
+}
+

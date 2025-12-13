@@ -1,0 +1,86 @@
+# Caddyfile para Staging/Desarrollo
+# Opción 1: HTTP simple (más fácil para testing local)
+# Opción 2: HTTPS con certificados autofirmados
+# Opción 3: HTTPS real si tienes dominio de staging
+
+# ============================================
+# OPCIÓN 1: HTTP Simple (Recomendado para testing local)
+# ============================================
+# Acceder en: http://localhost:8080 o http://TU_IP:8080
+
+:80 {
+    # Reverse proxy a Nginx
+    reverse_proxy nginx:80 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up Host {host}
+        
+        health_uri /up
+        health_interval 30s
+        health_timeout 5s
+    }
+
+    # Logging
+    log {
+        output stdout
+        format console
+    }
+
+    # Compression
+    encode gzip
+}
+
+# ============================================
+# OPCIÓN 2: HTTPS con dominio de staging (si tienes api-staging.notificaciones.space)
+# ============================================
+# Descomentar y usar si tienes un subdominio de staging configurado
+
+# api-staging.notificaciones.space {
+#     reverse_proxy nginx:80 {
+#         header_up X-Real-IP {remote_host}
+#         header_up X-Forwarded-For {remote_host}
+#         header_up X-Forwarded-Proto {scheme}
+#         header_up Host {host}
+#         
+#         health_uri /up
+#         health_interval 30s
+#         health_timeout 5s
+#     }
+# 
+#     log {
+#         output file /var/log/caddy/api-staging.log
+#         format json
+#     }
+# 
+#     encode gzip zstd
+# }
+
+# ============================================
+# OPCIÓN 3: HTTPS con certificado autofirmado (para testing local con HTTPS)
+# ============================================
+# Descomentar si quieres probar HTTPS localmente (tendrás que aceptar el certificado)
+
+# localhost:8443 {
+#     tls internal
+#     
+#     reverse_proxy nginx:80 {
+#         header_up X-Real-IP {remote_host}
+#         header_up X-Forwarded-For {remote_host}
+#         header_up X-Forwarded-Proto {scheme}
+#         header_up Host {host}
+#         
+#         health_uri /up
+#         health_interval 30s
+#         health_timeout 5s
+#     }
+# 
+#     log {
+#         output stdout
+#         format console
+#     }
+# 
+#     encode gzip
+# }
+
+
