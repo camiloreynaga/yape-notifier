@@ -27,7 +27,8 @@ services:
     container_name: yape-notifier-php-fpm
     restart: always
     working_dir: /var/www
-    user: www-data
+    # Nota: PHP-FPM ya corre como www-data internamente (configurado en Dockerfile)
+    # No especificar 'user:' aquí evita warnings y problemas con healthcheck
     volumes:
       - ../../apps/api:/var/www
       # Nota: storage y cache se mantienen en el bind mount para facilitar backups
@@ -42,7 +43,12 @@ services:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "php -r 'exit(0);'"]
+      # Verificar que PHP-FPM está corriendo (funciona con user www-data)
+      test:
+        [
+          "CMD-SHELL",
+          "pgrep php-fpm > /dev/null && php -r 'exit(0);' || exit 1",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
