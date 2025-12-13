@@ -55,3 +55,4 @@ Caddy (HTTPS) → Nginx API → PHP-FPM (Laravel)
 **Todo centralizado en `infra/docker/`** 🎯
 
 
+

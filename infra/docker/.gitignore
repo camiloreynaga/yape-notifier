@@ -1,0 +1,41 @@
+# Environment files - NUNCA commitees estos archivos
+.env
+.env.*
+!.env.example
+*.env.local
+*.env.*.local
+
+# Docker volumes and data
+**/postgres_data/
+**/caddy_data/
+**/caddy_config/
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Temporary files
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Secrets (si se usan archivos de secretos)
+secrets/
+*.pem
+*.key
+*.crt
+

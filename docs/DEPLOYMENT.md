@@ -277,6 +277,7 @@ ls -la infra/docker/
 **Cómo funciona Docker Compose con variables de entorno:**
 
 1. **Interpolación de variables** (`${VARIABLE}`): Docker Compose resuelve estas variables **antes** de crear los contenedores. Busca las variables en:
+
    - Variables del shell actual
    - Archivo `.env` en el mismo directorio (carga automática)
    - Variables del sistema

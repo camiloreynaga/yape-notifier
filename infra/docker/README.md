@@ -1,79 +1,95 @@
-# 🐳 Docker Infrastructure - Yape Notifier
+# Yape Notifier - Docker Infrastructure
 
-Infraestructura Docker profesional y centralizada para Yape Notifier.
+Infraestructura Docker organizada por entornos siguiendo estándares profesionales.
 
 ## 📁 Estructura
 
 ```
 infra/docker/
-├── docker-compose.yml              # Producción (API + Dashboard + Caddy + PostgreSQL)
-├── docker-compose.staging.yml      # Staging (para desarrollo/testing)
-├── docker-compose.test.yml         # Testing
-│
-├── dockerfiles/
-│   ├── Dockerfile.php-fpm         # PHP-FPM para Laravel API
-│   └── Dockerfile.dashboard        # Dashboard React/Vite
-│
-├── nginx/
-│   ├── api.conf                    # Configuración Nginx para API
-│   └── dashboard.conf              # Configuración Nginx para Dashboard
-│
-├── caddy/
-│   ├── Caddyfile                   # Caddy producción (HTTPS automático)
-│   └── Caddyfile.staging          # Caddy staging (HTTP)
-│
-├── php/
-│   ├── local.ini                   # Configuración PHP para desarrollo
-│   └── production.ini              # Configuración PHP para producción
-│
-├── deploy.sh                       # Script deployment producción
-├── deploy-staging.sh               # Script deployment staging
-├── setup-production.sh             # Script configuración inicial producción
-├── setup.sh                        # Script configuración inicial desarrollo
-├── .env.production.example         # Plantilla variables producción
-└── .env.staging.example            # Plantilla variables staging
+├── dockerfiles/              # Dockerfiles compartidos
+│   ├── Dockerfile.php-fpm
+│   └── Dockerfile.dashboard
+├── configs/                  # Configuraciones compartidas
+│   ├── nginx/                # Configuraciones de Nginx
+│   │   ├── api.conf
+│   │   └── dashboard.conf
+│   └── php/                  # Configuraciones de PHP
+│       ├── local.ini
+│       └── production.ini
+└── environments/             # Entornos separados
+    ├── development/          # Entorno de desarrollo
+    │   ├── docker-compose.yml
+    │   ├── .env.example
+    │   ├── deploy.sh
+    │   └── setup.sh
+    ├── staging/              # Entorno de staging
+    │   ├── docker-compose.yml
+    │   ├── Caddyfile
+    │   ├── .env.example
+    │   ├── deploy.sh
+    │   └── setup.sh
+    └── production/           # Entorno de producción
+        ├── docker-compose.yml
+        ├── Caddyfile
+        ├── .env.example
+        ├── deploy.sh
+        └── setup.sh
 ```
 
-## 🏗️ Arquitectura
+## 🚀 Inicio Rápido
 
-```
-Internet
-   │
-   ▼
-[ Caddy :80, :443 ]
-   │ (HTTPS automático con Let's Encrypt)
-   ├─► api.notificaciones.space → [ Nginx API :80 ] → [ PHP-FPM :9000 ] → [ Laravel API ]
-   └─► dashboard.notificaciones.space → [ Dashboard :80 ] → [ React App ]
-   │
-   ▼
-[ PostgreSQL :5432 ]
-   (interno, no expuesto)
-```
-
-### Servicios
-
-- **Caddy**: Reverse proxy con HTTPS automático (Let's Encrypt)
-- **Nginx API**: Servidor web para Laravel (PHP-FPM)
-- **PHP-FPM**: Aplicación Laravel 11
-- **Dashboard**: Frontend React servido por Nginx
-- **PostgreSQL**: Base de datos (no expuesta públicamente)
-
-## 🚀 Uso Rápido
-
-### Producción
+### Development (Desarrollo Local)
 
 ```bash
-cd infra/docker
+cd infra/docker/environments/development
 
-# 1. Configurar variables de entorno
-cp .env.production.example .env.production
-nano .env.production  # Configurar DB_PASSWORD, APP_URL, DASHBOARD_API_URL
+# Primera vez: configuración inicial
+./setup.sh
 
-# 2. Verificar Caddyfile (ya configurado para notificaciones.space)
-nano caddy/Caddyfile  # Revisar configuración si es necesario
+# Editar .env si es necesario
+nano .env
 
-# 3. Desplegar
-chmod +x deploy.sh
+# Desplegar
+./deploy.sh
+```
+
+**Acceso:**
+
+- API: `http://localhost:8000/up`
+- Database: `localhost:5432`
+
+### Staging
+
+```bash
+cd infra/docker/environments/staging
+
+# Primera vez: configuración inicial
+./setup.sh
+
+# Editar .env y configurar DB_PASSWORD
+nano .env
+
+# Desplegar
+./deploy.sh
+```
+
+**Acceso:**
+
+- API: `http://localhost:8080/up`
+- Dashboard: `http://localhost:8080/`
+
+### Production
+
+```bash
+cd infra/docker/environments/production
+
+# Primera vez: configuración inicial
+./setup.sh
+
+# Editar .env y configurar DB_PASSWORD seguro
+nano .env
+
+# Desplegar
 ./deploy.sh
 ```
 
@@ -82,219 +98,175 @@ chmod +x deploy.sh
 - API: `https://api.notificaciones.space`
 - Dashboard: `https://dashboard.notificaciones.space`
 
-### Staging (Desarrollo/Testing)
-
-```bash
-cd infra/docker
-
-# 1. Configurar variables de entorno
-cp .env.staging.example .env.staging
-nano .env.staging  # Configurar DB_PASSWORD
-
-# 2. Desplegar
-chmod +x deploy-staging.sh
-./deploy-staging.sh
-```
-
-**Acceso:**
-
-- API: `http://localhost:8080/up`
-- Dashboard: `http://localhost:8080/`
-
 ## 📋 Comandos Útiles
 
-### Ver Estado
+### Ver logs
 
 ```bash
-# Producción
-docker compose -f docker-compose.yml ps
+# Development
+cd environments/development
+docker compose --env-file .env logs -f
 
 # Staging
-docker compose -f docker-compose.staging.yml ps
+cd environments/staging
+docker compose --env-file .env logs -f
+
+# Production
+cd environments/production
+docker compose --env-file .env logs -f
 ```
 
-### Ver Logs
+### Detener servicios
 
 ```bash
-# Todos los logs
-docker compose -f docker-compose.yml logs -f
-
-# Logs específicos
-docker compose -f docker-compose.yml logs -f caddy
-docker compose -f docker-compose.yml logs -f php-fpm
-docker compose -f docker-compose.yml logs -f nginx-api
-docker compose -f docker-compose.yml logs -f dashboard
-docker compose -f docker-compose.yml logs -f db
+docker compose --env-file .env down
 ```
 
-### Reiniciar Servicios
+### Detener y eliminar volúmenes
 
 ```bash
-# Todos los servicios
-docker compose -f docker-compose.yml restart
-
-# Servicio específico
-docker compose -f docker-compose.yml restart php-fpm
-docker compose -f docker-compose.yml restart caddy
+docker compose --env-file .env down -v
 ```
 
-### Ejecutar Comandos Laravel
+### Reconstruir imágenes
 
 ```bash
-# Artisan commands
-docker compose -f docker-compose.yml exec php-fpm php artisan migrate
-docker compose -f docker-compose.yml exec php-fpm php artisan tinker
-
-# Composer
-docker compose -f docker-compose.yml exec php-fpm composer install
+docker compose --env-file .env build --no-cache
 ```
 
-### Reconstruir Imágenes
+### Ejecutar comandos en contenedores
 
 ```bash
-# Reconstruir todas las imágenes
-docker compose -f docker-compose.yml build --no-cache
+# PHP-FPM
+docker compose --env-file .env exec php-fpm php artisan migrate
 
-# Reconstruir una imagen específica
-docker compose -f docker-compose.yml build --no-cache php-fpm
-docker compose -f docker-compose.yml build --no-cache dashboard
+# Database
+docker compose --env-file .env exec db psql -U postgres -d yape_notifier
 ```
 
-### Detener y Limpiar
-
-```bash
-# Detener servicios
-docker compose -f docker-compose.yml down
-
-# Detener y eliminar volúmenes (¡CUIDADO! Elimina la base de datos)
-docker compose -f docker-compose.yml down -v
-```
-
-## 🔧 Configuración
+## 🔧 Configuración de Entornos
 
 ### Variables de Entorno
 
-**⚠️ IMPORTANTE - Cómo funcionan las variables de entorno:**
+Cada entorno tiene su propio archivo `.env.example` que debe copiarse a `.env` y configurarse:
 
-Docker Compose necesita resolver variables como `${DB_PASSWORD}` **antes** de crear los contenedores. Para esto, usa `--env-file` explícitamente:
+- **Development**: Configuración básica para desarrollo local
+- **Staging**: Similar a producción pero con HTTP y puertos alternativos
+- **Production**: Configuración completa con HTTPS y optimizaciones
 
-```bash
-# ✅ CORRECTO - Usar --env-file
-docker compose --env-file .env.production -f docker-compose.yml up -d
+### Requisitos por Entorno
 
-# ❌ INCORRECTO - Sin --env-file (DB_PASSWORD no se resolverá)
-docker compose -f docker-compose.yml up -d
+#### Development
+
+- Docker y Docker Compose
+- Puerto 8000 disponible
+- Puerto 5432 disponible (opcional, puede cambiarse)
+
+#### Staging
+
+- Docker y Docker Compose
+- Puerto 8080 disponible
+- Puerto 8443 disponible
+- Archivo `.env` con `DB_PASSWORD` configurado
+
+#### Production
+
+- Docker y Docker Compose
+- Puertos 80 y 443 disponibles
+- DNS configurado:
+  - `api.notificaciones.space`
+  - `dashboard.notificaciones.space`
+- Archivo `.env` con `DB_PASSWORD` seguro configurado
+
+## 🏗️ Arquitectura
+
+### Development
+
+```
+Nginx (puerto 8000) -> PHP-FPM -> PostgreSQL (puerto 5432)
 ```
 
-**Archivos de configuración:**
+### Staging
 
-- `.env.production` - Para producción (crear desde `.env.production.example`)
-- `.env.staging` - Para staging (crear desde `.env.staging.example`)
-
-**Archivos de ejemplo disponibles:**
-
-- `.env.production.example` - Plantilla con todas las variables para producción
-- `.env.staging.example` - Plantilla con todas las variables para staging
-
-**Para crear los archivos .env:**
-
-```bash
-# Producción
-cp .env.production.example .env.production
-nano .env.production  # Configurar valores reales (especialmente DB_PASSWORD)
-
-# Staging
-cp .env.staging.example .env.staging
-nano .env.staging  # Configurar valores reales (especialmente DB_PASSWORD)
+```
+Caddy (HTTP, puerto 8080) -> Nginx -> PHP-FPM -> PostgreSQL
+                            -> Dashboard
 ```
 
-**Verificar que DB_PASSWORD está configurado:**
+### Production
 
-```bash
-# Verificar que existe y no está vacío
-grep "^DB_PASSWORD=" .env.production
-# Debe mostrar: DB_PASSWORD=tu_contraseña_segura
+```
+Caddy (HTTPS, puertos 80/443) -> Nginx -> PHP-FPM -> PostgreSQL
+                              -> Dashboard
 ```
 
-**Uso en comandos:**
+## 🔒 Seguridad
 
-Todos los scripts de deployment (`deploy.sh`, `deploy-production.sh`, `deploy-staging.sh`) usan automáticamente `--env-file`. Si ejecutas comandos manualmente, siempre incluye `--env-file`:
+### Gestión de Secretos
 
-```bash
-# Construir
-docker compose --env-file .env.production -f docker-compose.yml build
+**⚠️ IMPORTANTE:** Los archivos `.env` están en `.gitignore` y **NUNCA** deben committearse.
 
-# Levantar
-docker compose --env-file .env.production -f docker-compose.yml up -d
+Para producción, considera usar:
 
-# Ver logs
-docker compose --env-file .env.production -f docker-compose.yml logs
+- **Docker Secrets** (con Docker Swarm)
+- **Variables de entorno del sistema**
+- **Secret management tools** (HashiCorp Vault, AWS Secrets Manager)
 
-# Ejecutar comandos
-docker compose --env-file .env.production -f docker-compose.yml exec php-fpm php artisan migrate
-```
+Ver `docker-compose.secrets.yml.example` para ejemplo con Docker Secrets.
 
-Ver `docs/DEPLOYMENT.md` para la lista completa de variables requeridas y sus descripciones.
+## 📝 Notas Importantes
 
-### Caddyfile
+1. **Seguridad**: Nunca commitees archivos `.env` al repositorio. Solo los `.env.example` deben estar en el control de versiones.
 
-El `Caddyfile` maneja el enrutamiento y HTTPS automático. Configura tus subdominios en:
+2. **Base de Datos**: Cada entorno tiene su propia base de datos:
 
-- `caddy/Caddyfile` - Para producción
-- `caddy/Caddyfile.staging` - Para staging
+   - Development: `yape_notifier_dev`
+   - Staging: `yape_notifier_staging`
+   - Production: `yape_notifier`
 
-### Nginx
+3. **Volúmenes**: Los volúmenes de Docker son específicos por entorno para evitar conflictos.
 
-Las configuraciones de Nginx están en:
+4. **Redes**: Cada entorno tiene su propia red Docker para aislamiento.
 
-- `nginx/api.conf` - Para la API Laravel
-- `nginx/dashboard.conf` - Para el Dashboard React
+5. **Healthchecks**: Todos los servicios tienen healthchecks configurados para garantizar disponibilidad.
 
-## 📚 Documentación Completa
+## 🔍 Troubleshooting
 
-Para una guía completa de deployment, configuración y solución de problemas, consulta:
+### Error: "DB_PASSWORD no está configurado"
 
-- **Guía Principal**: [`docs/DEPLOYMENT.md`](../../docs/DEPLOYMENT.md)
-- **Quick Start**: [`docs/QUICKSTART.md`](../../docs/QUICKSTART.md)
+- Asegúrate de que el archivo `.env` existe y tiene `DB_PASSWORD` configurado con un valor no vacío.
 
-## 🐛 Troubleshooting
+### Error: "Port already in use"
 
-### Error: "Certificate not obtained" (Caddy)
+- Verifica que los puertos requeridos estén disponibles o cambia los puertos en `.env`.
 
-Verifica que los DNS estén propagados y que los subdominios en `Caddyfile` coincidan con los registros DNS.
+### Error: "Container unhealthy"
 
-### Error: "502 Bad Gateway"
+- Revisa los logs: `docker compose --env-file .env logs [service-name]`
+- Verifica que las dependencias estén correctamente configuradas.
 
-Verifica que Nginx y PHP-FPM estén corriendo:
+### Error: "Network conflict"
 
-```bash
-docker compose -f docker-compose.yml ps
-docker compose -f docker-compose.yml restart nginx-api php-fpm
-```
+- Elimina redes Docker no utilizadas: `docker network prune`
 
-### Error: "Database connection failed"
+## 📚 Documentación Adicional
 
-Verifica las variables de entorno `DB_*` en `.env.production` o `.env.staging`.
+Para más detalles sobre el despliegue, consulta:
 
-### Ver Logs Detallados
+- `docs/DEPLOYMENT.md` - Guía completa de despliegue
+- `docs/QUICKSTART.md` - Guía rápida de inicio
+- `ANALISIS_ESTANDARES.md` - Análisis de estándares profesionales y mejoras recomendadas
+- `environments/production/BACKUP.md` - Estrategia de backup y disaster recovery
+- `environments/production/MONITORING.md` - Guía de monitoreo y observabilidad
 
-```bash
-docker compose -f docker-compose.yml logs -f [servicio]
-```
+## 🚀 Mejoras Recomendadas (Estándares Profesionales)
 
-## 🔄 Actualizaciones
+Para alcanzar estándares profesionales completos, considera implementar:
 
-Para actualizar la aplicación:
+1. **CI/CD Pipeline** - Automatización de deployments
+2. **Monitoreo y Observabilidad** - Logging centralizado, métricas, alertas
+3. **Backup Automatizado** - Estrategia de backup y disaster recovery
+4. **Security Scanning** - Escaneo de vulnerabilidades en CI/CD
+5. **Secret Management** - Gestión profesional de secretos (ver `docker-compose.secrets.yml.example`)
 
-```bash
-cd /var/apps/yape-notifier
-git pull origin main
-cd infra/docker
-docker compose -f docker-compose.yml build
-docker compose -f docker-compose.yml up -d
-docker compose -f docker-compose.yml exec php-fpm php artisan migrate --force
-```
-
----
-
-**Ubicación de archivos:** Toda la infraestructura Docker está centralizada en `infra/docker/` 🎯
+Ver `ANALISIS_ESTANDARES.md` para análisis detallado y roadmap de mejoras.

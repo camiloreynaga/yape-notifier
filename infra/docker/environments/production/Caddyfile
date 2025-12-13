@@ -6,8 +6,6 @@ api.notificaciones.space {
     # Reverse proxy a Nginx API
     reverse_proxy nginx-api:80 {
         header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
         header_up Host {host}
         
         health_uri /up
@@ -30,11 +28,9 @@ dashboard.notificaciones.space {
     # Reverse proxy a Dashboard
     reverse_proxy dashboard:80 {
         header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
         header_up Host {host}
         
-        health_uri /health
+        health_uri /
         health_interval 30s
         health_timeout 5s
     }

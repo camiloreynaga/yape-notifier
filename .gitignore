@@ -27,6 +27,12 @@ dist/
 .env
 .env.local
 .env.*.local
+.env.*
+!.env.example
+# Proteger .env en infra/docker
+infra/docker/**/.env
+infra/docker/**/.env.*
+!infra/docker/**/.env.example
 
 # Database
 *.sqlite

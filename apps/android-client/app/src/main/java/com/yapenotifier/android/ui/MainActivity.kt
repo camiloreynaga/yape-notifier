@@ -213,41 +213,32 @@ class MainActivity : AppCompatActivity() {
                     this,
                     Manifest.permission.POST_NOTIFICATIONS
                 ) == PackageManager.PERMISSION_GRANTED -> {
-                    // Permission is already granted
                     sendTestNotification()
                 }
-                shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS) -> {
-                    // Explain to the user why you need the permission
-                    AlertDialog.Builder(this)
-                        .setTitle("Permiso Requerido")
-                        .setMessage("Necesitamos este permiso para poder mostrar la notificación de prueba.")
-                        .setPositiveButton("Entendido") { _, _ ->
-                            requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        }
-                        .show()
-                }
                 else -> {
-                    // Directly ask for the permission
                     requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
             }
         } else {
-            // For older versions, no special permission is needed
             sendTestNotification()
         }
     }
 
-
     private fun sendTestNotification() {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        val builder = NotificationCompat.Builder(this, TEST_CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher) // Make sure this icon exists
-            .setContentTitle("¡Recibiste un Yape de S/ 1.00!")
-            .setContentText("Juan Pérez te ha enviado dinero.")
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+        val testTitle = "Plin"
+        val testBody = "JOHN DOE te ha plineado S/ 5.50"
 
-        notificationManager.notify(System.currentTimeMillis().toInt(), builder.build())
-        Toast.makeText(this, "Notificación de prueba enviada", Toast.LENGTH_LONG).show()
+        val notification = NotificationCompat.Builder(this, TEST_CHANNEL_ID)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(testTitle)
+            .setContentText(testBody)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(testBody))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .build()
+
+        notificationManager.notify(System.currentTimeMillis().toInt(), notification)
+        Toast.makeText(this, "Notificación de prueba (PLIN) enviada", Toast.LENGTH_LONG).show()
     }
 }

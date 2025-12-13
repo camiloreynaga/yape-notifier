@@ -67,7 +67,9 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-di
 COPY . /var/www
 
 # Create necessary directories and set permissions
-RUN mkdir -p /var/www/storage/framework/{sessions,views,cache} \
+RUN mkdir -p /var/www/storage/framework/sessions \
+    && mkdir -p /var/www/storage/framework/views \
+    && mkdir -p /var/www/storage/framework/cache \
     && mkdir -p /var/www/storage/logs \
     && mkdir -p /var/www/bootstrap/cache \
     && chown -R www-data:www-data /var/www \

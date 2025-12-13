@@ -1,31 +1,28 @@
 # ============================================
-# Yape Notifier - Staging Docker Compose
+# Yape Notifier - Staging Environment
 # ============================================
 # Arquitectura: Caddy (HTTP) -> Nginx -> PHP-FPM + Dashboard + PostgreSQL
 #
 # Uso:
-#   docker compose -f infra/docker/docker-compose.staging.yml up -d
+#   cd infra/docker/environments/staging
+#   docker compose --env-file .env up -d
 #
 # Requisitos:
-#   - Archivo .env debe existir con DB_PASSWORD configurado
-#     (Docker Compose carga automáticamente .env para interpolación)
+#   - Archivo .env con DB_PASSWORD configurado
 #   - Puertos 8080 y 8443 disponibles
-#
-# Nota: Para staging, crea .env desde .env.staging.example:
-#   cp .env.staging.example .env
 # ============================================
 
 services:
   php-fpm:
     build:
-      context: ../../apps/api
-      dockerfile: ../../infra/docker/dockerfiles/Dockerfile.php-fpm
+      context: ../../../../apps/api
+      dockerfile: ../../../dockerfiles/Dockerfile.php-fpm
     container_name: yape-notifier-php-fpm-staging
     restart: always
     working_dir: /var/www
     volumes:
-      - ../../apps/api:/var/www
-      # env_file no es necesario: Laravel lee su .env del filesystem y variables críticas están en environment
+      - ../../../../apps/api:/var/www
+      - ../../../configs/php/local.ini:/usr/local/etc/php/conf.d/local.ini:ro
     environment:
       - APP_ENV=staging
       - APP_DEBUG=true
@@ -41,37 +38,51 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    labels:
+      - "com.yape-notifier.service=php-fpm"
+      - "com.yape-notifier.environment=staging"
 
   nginx-api:
     image: nginx:alpine
     container_name: yape-notifier-nginx-api-staging
     restart: always
     volumes:
-      - ../../apps/api:/var/www
-      - ../../apps/api/public:/var/www/public:ro
-      - ./nginx/api.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../../../../apps/api:/var/www
+      - ../../../../apps/api/public:/var/www/public:ro
+      - ../../../configs/nginx/api.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       - yape-network-staging
     depends_on:
       php-fpm:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "pgrep nginx || exit 1"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost/up",
+        ]
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 3
       start_period: 10s
+    labels:
+      - "com.yape-notifier.service=nginx-api"
+      - "com.yape-notifier.environment=staging"
 
   dashboard:
     build:
-      context: ../../apps/web-dashboard
-      dockerfile: ../../infra/docker/dockerfiles/Dockerfile.dashboard
+      context: ../../../../apps/web-dashboard
+      dockerfile: ../../../dockerfiles/Dockerfile.dashboard
       args:
         VITE_API_BASE_URL: ${DASHBOARD_API_URL:-http://localhost:8080}
     container_name: yape-notifier-dashboard-staging
     restart: always
     volumes:
-      - ./nginx/dashboard.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../../../configs/nginx/dashboard.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       - yape-network-staging
     depends_on:
@@ -90,6 +101,9 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    labels:
+      - "com.yape-notifier.service=dashboard"
+      - "com.yape-notifier.environment=staging"
 
   caddy:
     image: caddy:2-alpine
@@ -100,7 +114,7 @@ services:
       - "8443:443"
       - "8443:443/udp"
     volumes:
-      - ./caddy/Caddyfile.staging:/etc/caddy/Caddyfile:ro
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data_staging:/data
       - caddy_config_staging:/config
     networks:
@@ -114,17 +128,17 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    labels:
+      - "com.yape-notifier.service=caddy"
+      - "com.yape-notifier.environment=staging"
 
   db:
     image: postgres:15-alpine
     container_name: yape-notifier-db-staging
     restart: always
-    # env_file no es necesario: las variables se pasan explícitamente en environment
     environment:
       POSTGRES_DB: ${DB_DATABASE:-yape_notifier_staging}
       POSTGRES_USER: ${DB_USERNAME:-postgres}
-      # POSTGRES_PASSWORD: Resuelto desde .env (carga automática de Docker Compose)
-      # Requerido: DB_PASSWORD debe estar configurado en .env
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       PGDATA: /var/lib/postgresql/data/pgdata
       POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
@@ -163,8 +177,5 @@ volumes:
 networks:
   yape-network-staging:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.21.0.0/16
     labels:
       - "com.yape-notifier.network=yape-network-staging"

@@ -1,0 +1,119 @@
+# ============================================
+# Yape Notifier - Development Environment
+# ============================================
+# Arquitectura: Nginx -> PHP-FPM + PostgreSQL
+# Sin Caddy para desarrollo local simple
+#
+# Uso:
+#   cd infra/docker/environments/development
+#   docker compose --env-file .env up -d
+#
+# Requisitos:
+#   - Archivo .env con DB_PASSWORD configurado
+#   - Puerto 8000 disponible
+# ============================================
+
+services:
+  php-fpm:
+    build:
+      context: ../../../../apps/api
+      dockerfile: ../../../dockerfiles/Dockerfile.php-fpm
+    container_name: yape-notifier-php-fpm-dev
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ../../../../apps/api:/var/www
+      - ../../../configs/php/local.ini:/usr/local/etc/php/conf.d/local.ini:ro
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - APP_URL=${APP_URL:-http://localhost:8000}
+    networks:
+      - yape-network-dev
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "php -r 'exit(0);'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "com.yape-notifier.service=php-fpm"
+      - "com.yape-notifier.environment=development"
+
+  nginx-api:
+    image: nginx:alpine
+    container_name: yape-notifier-nginx-api-dev
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8000}:80"
+    volumes:
+      - ../../../../apps/api:/var/www
+      - ../../../../apps/api/public:/var/www/public:ro
+      - ../../../configs/nginx/api.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - yape-network-dev
+    depends_on:
+      php-fpm:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost/up",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "com.yape-notifier.service=nginx-api"
+      - "com.yape-notifier.environment=development"
+
+  db:
+    image: postgres:15-alpine
+    container_name: yape-notifier-db-dev
+    restart: unless-stopped
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-yape_notifier_dev}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    networks:
+      - yape-network-dev
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-yape_notifier_dev} || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    labels:
+      - "com.yape-notifier.service=postgresql"
+      - "com.yape-notifier.environment=development"
+
+volumes:
+  postgres_data_dev:
+    driver: local
+    labels:
+      - "com.yape-notifier.volume=postgres_data_dev"
+
+networks:
+  yape-network-dev:
+    driver: bridge
+    labels:
+      - "com.yape-notifier.network=yape-network-dev"
