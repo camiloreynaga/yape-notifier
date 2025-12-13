@@ -12,7 +12,12 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'],
+    'allowed_origins' => [
+        env('APP_URL', 'http://localhost:8000'),
+        'https://notificaciones.space',
+        'https://www.notificaciones.space',
+        'http://localhost:3000', // Para desarrollo local
+    ],
 
     'allowed_origins_patterns' => [],
 

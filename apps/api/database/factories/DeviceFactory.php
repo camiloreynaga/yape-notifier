@@ -36,3 +36,9 @@ class DeviceFactory extends Factory
     }
 }
 
+
+
+
+
+
+

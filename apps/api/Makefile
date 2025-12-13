@@ -23,3 +23,9 @@ coverage: ## Generar reporte de cobertura de código
 	php artisan test --coverage --min=80
 
 
+
+
+
+
+
+
