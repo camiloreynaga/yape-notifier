@@ -23,6 +23,7 @@ docker compose -f docker-compose.staging.yml exec php-fpm php artisan migrate --
 ```
 
 **Acceso:**
+
 - API: `http://localhost:8080/up`
 - Dashboard: `http://localhost:8080/`
 
@@ -49,8 +50,9 @@ docker compose -f docker-compose.yml exec php-fpm php artisan route:cache
 ```
 
 **Acceso:**
+
 - API: `https://api.notificaciones.space/up`
-- Dashboard: `https://panel.notificaciones.space/health`
+- Dashboard: `https://dashboard.notificaciones.space`
 
 ## 📋 Comandos Útiles
 
@@ -69,5 +71,3 @@ docker compose -f infra/docker/docker-compose.yml down
 ```
 
 **Documentación completa:** Ver `docs/DEPLOYMENT.md`
-
-

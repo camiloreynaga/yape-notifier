@@ -7,7 +7,7 @@ set -e
 echo "🚀 Configurando entorno Docker para Yape Notifier..."
 
 # Verificar que estamos en el directorio correcto
-if [ ! -f "docker-compose.yml" ]; then
+if [ ! -f "docker-compose.staging.yml" ]; then
     echo "❌ Error: Este script debe ejecutarse desde el directorio infra/docker"
     exit 1
 fi
@@ -100,34 +100,34 @@ EOF
 fi
 
 echo "🐳 Construyendo contenedores Docker..."
-docker-compose build
+docker-compose -f docker-compose.staging.yml build
 
-echo "🚀 Iniciando contenedores..."
-docker-compose up -d
+echo "🚀 Iniciando contenedores (staging)..."
+docker-compose -f docker-compose.staging.yml up -d
 
 echo "⏳ Esperando a que la base de datos esté lista..."
 sleep 10
 
 echo "📦 Instalando dependencias de Composer..."
-docker-compose exec -T app composer install
+docker-compose -f docker-compose.staging.yml exec -T php-fpm composer install
 
 echo "🔑 Generando clave de aplicación..."
-docker-compose exec -T app php artisan key:generate
+docker-compose -f docker-compose.staging.yml exec -T php-fpm php artisan key:generate
 
 echo "🗄️ Ejecutando migraciones..."
-docker-compose exec -T app php artisan migrate --force
+docker-compose -f docker-compose.staging.yml exec -T php-fpm php artisan migrate --force
 
 echo "✅ ¡Configuración completada!"
 echo ""
 echo "📋 Información del entorno:"
-echo "   - API disponible en: http://localhost:8000"
-echo "   - Base de datos PostgreSQL en: localhost:5432"
-echo "   - Redis en: localhost:6379"
+echo "   - API disponible en: http://localhost:8080/up"
+echo "   - Dashboard disponible en: http://localhost:8080"
+echo "   - Base de datos PostgreSQL en: localhost:5432 (interno)"
 echo ""
 echo "📝 Comandos útiles:"
-echo "   - Ver logs: docker-compose logs -f"
-echo "   - Detener: docker-compose down"
-echo "   - Reiniciar: docker-compose restart"
-echo "   - Acceder al contenedor: docker-compose exec app bash"
-echo "   - Ejecutar artisan: docker-compose exec app php artisan [comando]"
+echo "   - Ver logs: docker-compose -f docker-compose.staging.yml logs -f"
+echo "   - Detener: docker-compose -f docker-compose.staging.yml down"
+echo "   - Reiniciar: docker-compose -f docker-compose.staging.yml restart"
+echo "   - Acceder al contenedor: docker-compose -f docker-compose.staging.yml exec php-fpm sh"
+echo "   - Ejecutar artisan: docker-compose -f docker-compose.staging.yml exec php-fpm php artisan [comando]"
 

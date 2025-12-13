@@ -25,8 +25,8 @@ api.notificaciones.space {
     encode gzip zstd
 }
 
-# Dashboard - panel.notificaciones.space
-panel.notificaciones.space {
+# Dashboard - dashboard.notificaciones.space
+dashboard.notificaciones.space {
     # Reverse proxy a Dashboard
     reverse_proxy dashboard:80 {
         header_up X-Real-IP {remote_host}
@@ -41,7 +41,7 @@ panel.notificaciones.space {
 
     # Logging
     log {
-        output file /var/log/caddy/panel.log
+        output file /var/log/caddy/dashboard.log
         format json
     }
 

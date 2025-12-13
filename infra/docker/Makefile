@@ -11,96 +11,90 @@ setup: ## Configurar el entorno por primera vez
 	@chmod +x setup.sh
 	@./setup.sh
 
-up: ## Iniciar los contenedores
-	docker-compose up -d
+up: ## Iniciar los contenedores (staging)
+	docker-compose -f docker-compose.staging.yml up -d
 
 down: ## Detener los contenedores
-	docker-compose down
+	docker-compose -f docker-compose.staging.yml down
 
 restart: ## Reiniciar los contenedores
-	docker-compose restart
+	docker-compose -f docker-compose.staging.yml restart
 
 logs: ## Ver logs de los contenedores
-	docker-compose logs -f
+	docker-compose -f docker-compose.staging.yml logs -f
 
 shell: ## Acceder al shell del contenedor de la app
-	docker-compose exec app bash
+	docker-compose -f docker-compose.staging.yml exec php-fpm sh
 
 artisan: ## Ejecutar comando artisan (uso: make artisan CMD="migrate")
-	docker-compose exec app php artisan $(CMD)
+	docker-compose -f docker-compose.staging.yml exec php-fpm php artisan $(CMD)
 
 migrate: ## Ejecutar migraciones
-	docker-compose exec app php artisan migrate
+	docker-compose -f docker-compose.staging.yml exec php-fpm php artisan migrate
 
 fresh: ## Ejecutar migraciones desde cero (elimina datos)
-	docker-compose exec app php artisan migrate:fresh
+	docker-compose -f docker-compose.staging.yml exec php-fpm php artisan migrate:fresh
 
 seed: ## Ejecutar seeders
-	docker-compose exec app php artisan db:seed
+	docker-compose -f docker-compose.staging.yml exec php-fpm php artisan db:seed
 
 test: ## Ejecutar tests
-	docker-compose exec app php artisan test
+	docker-compose -f docker-compose.staging.yml exec php-fpm php artisan test
 
-clean: ## Limpiar contenedores y volúmenes
-	docker-compose down -v
+clean: ## Limpiar contenedores y volúmenes (staging)
+	docker-compose -f docker-compose.staging.yml down -v
 	docker system prune -f
 
-build: ## Construir las imágenes
-	docker-compose build
+build: ## Construir las imágenes (staging)
+	docker-compose -f docker-compose.staging.yml build
 
 ps: ## Ver estado de los contenedores
-	docker-compose ps
-
-up-dev: ## Iniciar contenedores en modo desarrollo (incluye dashboard-dev)
-	docker-compose --profile dev up -d
+	docker-compose -f docker-compose.staging.yml ps
 
 dashboard-logs: ## Ver logs del dashboard
-	docker-compose logs -f dashboard
-
-dashboard-dev-logs: ## Ver logs del dashboard en desarrollo
-	docker-compose logs -f dashboard-dev
+	docker-compose -f docker-compose.staging.yml logs -f dashboard
 
 dashboard-shell: ## Acceder al shell del contenedor del dashboard
-	docker-compose exec dashboard sh
+	docker-compose -f docker-compose.staging.yml exec dashboard sh
 
 dashboard-build: ## Reconstruir el dashboard
-	docker-compose build dashboard
+	docker-compose -f docker-compose.staging.yml build dashboard
 
 # ============================================
 # Comandos para PRODUCCIÓN
 # ============================================
 
 prod-build: ## Construir las imágenes de producción
-	docker-compose -f docker-compose.prod.yml build --no-cache
+	docker-compose -f docker-compose.yml build --no-cache
 
 prod-up: ## Iniciar los contenedores de producción
-	docker-compose -f docker-compose.prod.yml up -d
+	docker-compose -f docker-compose.yml up -d
 
 prod-down: ## Detener los contenedores de producción
-	docker-compose -f docker-compose.prod.yml down
+	docker-compose -f docker-compose.yml down
 
 prod-restart: ## Reiniciar los contenedores de producción
-	docker-compose -f docker-compose.prod.yml restart
+	docker-compose -f docker-compose.yml restart
 
 prod-logs: ## Ver logs de producción
-	docker-compose -f docker-compose.prod.yml logs -f
+	docker-compose -f docker-compose.yml logs -f
 
 prod-shell: ## Acceder al shell del contenedor de producción
-	docker-compose -f docker-compose.prod.yml exec app bash
+	docker-compose -f docker-compose.yml exec php-fpm sh
 
 prod-migrate: ## Ejecutar migraciones en producción
-	docker-compose -f docker-compose.prod.yml exec app php artisan migrate --force
+	docker-compose -f docker-compose.yml exec php-fpm php artisan migrate --force
 
 prod-optimize: ## Optimizar Laravel en producción
-	docker-compose -f docker-compose.prod.yml exec app php artisan config:cache
-	docker-compose -f docker-compose.prod.yml exec app php artisan route:cache
-	docker-compose -f docker-compose.prod.yml exec app php artisan view:cache
+	docker-compose -f docker-compose.yml exec php-fpm php artisan config:cache
+	docker-compose -f docker-compose.yml exec php-fpm php artisan route:cache
+	docker-compose -f docker-compose.yml exec php-fpm php artisan view:cache
 
 prod-deploy: ## Desplegar en producción (build + up + migrate + optimize)
-	./deploy-production.sh
+	./deploy.sh
 
 prod-ps: ## Ver estado de los contenedores de producción
-	docker-compose -f docker-compose.prod.yml ps
+	docker-compose -f docker-compose.yml ps
 
 # ============================================
 # Comandos para PRUEBAS
@@ -113,7 +107,7 @@ test-down: ## Detener contenedores de pruebas
 	docker-compose -f docker-compose.test.yml down
 
 test-run: ## Ejecutar tests
-	docker-compose -f docker-compose.test.yml exec app php artisan test
+	docker-compose -f docker-compose.test.yml exec php-fpm php artisan test
 
 test-logs: ## Ver logs de pruebas
 	docker-compose -f docker-compose.test.yml logs -f

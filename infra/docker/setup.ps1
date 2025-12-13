@@ -3,7 +3,7 @@
 Write-Host "🚀 Configurando entorno Docker para Yape Notifier..." -ForegroundColor Cyan
 
 # Verificar que estamos en el directorio correcto
-if (-not (Test-Path "docker-compose.yml")) {
+if (-not (Test-Path "docker-compose.staging.yml")) {
     Write-Host "❌ Error: Este script debe ejecutarse desde el directorio infra/docker" -ForegroundColor Red
     exit 1
 }
@@ -91,34 +91,34 @@ SANCTUM_STATEFUL_DOMAINS=localhost,127.0.0.1
 }
 
 Write-Host "🐳 Construyendo contenedores Docker..." -ForegroundColor Cyan
-docker-compose build
+docker-compose -f docker-compose.staging.yml build
 
-Write-Host "🚀 Iniciando contenedores..." -ForegroundColor Cyan
-docker-compose up -d
+Write-Host "🚀 Iniciando contenedores (staging)..." -ForegroundColor Cyan
+docker-compose -f docker-compose.staging.yml up -d
 
 Write-Host "⏳ Esperando a que la base de datos esté lista..." -ForegroundColor Yellow
 Start-Sleep -Seconds 10
 
 Write-Host "📦 Instalando dependencias de Composer..." -ForegroundColor Cyan
-docker-compose exec -T app composer install
+docker-compose -f docker-compose.staging.yml exec -T php-fpm composer install
 
 Write-Host "🔑 Generando clave de aplicación..." -ForegroundColor Cyan
-docker-compose exec -T app php artisan key:generate
+docker-compose -f docker-compose.staging.yml exec -T php-fpm php artisan key:generate
 
 Write-Host "🗄️ Ejecutando migraciones..." -ForegroundColor Cyan
-docker-compose exec -T app php artisan migrate --force
+docker-compose -f docker-compose.staging.yml exec -T php-fpm php artisan migrate --force
 
 Write-Host "✅ ¡Configuración completada!" -ForegroundColor Green
 Write-Host ""
 Write-Host "📋 Información del entorno:" -ForegroundColor Cyan
-Write-Host "   - API disponible en: http://localhost:8000"
-Write-Host "   - Base de datos PostgreSQL en: localhost:5432"
-Write-Host "   - Redis en: localhost:6379"
+Write-Host "   - API disponible en: http://localhost:8080/up"
+Write-Host "   - Dashboard disponible en: http://localhost:8080"
+Write-Host "   - Base de datos PostgreSQL en: localhost:5432 (interno)"
 Write-Host ""
 Write-Host "📝 Comandos útiles:" -ForegroundColor Cyan
-Write-Host "   - Ver logs: docker-compose logs -f"
-Write-Host "   - Detener: docker-compose down"
-Write-Host "   - Reiniciar: docker-compose restart"
-Write-Host "   - Acceder al contenedor: docker-compose exec app bash"
-Write-Host "   - Ejecutar artisan: docker-compose exec app php artisan [comando]"
+Write-Host "   - Ver logs: docker-compose -f docker-compose.staging.yml logs -f"
+Write-Host "   - Detener: docker-compose -f docker-compose.staging.yml down"
+Write-Host "   - Reiniciar: docker-compose -f docker-compose.staging.yml restart"
+Write-Host "   - Acceder al contenedor: docker-compose -f docker-compose.staging.yml exec php-fpm sh"
+Write-Host "   - Ejecutar artisan: docker-compose -f docker-compose.staging.yml exec php-fpm php artisan [comando]"
 

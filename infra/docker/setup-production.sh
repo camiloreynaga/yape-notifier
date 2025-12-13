@@ -28,7 +28,7 @@ error() {
 info "Configurando entorno de producción..."
 
 # Verificar que estamos en el directorio correcto
-if [ ! -f "docker-compose.prod.yml" ]; then
+if [ ! -f "docker-compose.yml" ]; then
     error "Este script debe ejecutarse desde el directorio infra/docker"
     exit 1
 fi
@@ -75,10 +75,13 @@ info "     - APP_URL (URL pública del API con HTTPS)"
 info "     - DB_PASSWORD (misma que en .env.production)"
 info "     - Todas las demás variables de producción"
 info ""
-info "  3. Ejecuta el despliegue:"
-info "     ./deploy-production.sh"
+info "  3. Configura Caddyfile con tus subdominios:"
+info "     nano caddy/Caddyfile"
+info ""
+info "  4. Ejecuta el despliegue:"
+info "     ./deploy.sh"
 info "     o"
-info "     make prod-deploy"
+info "     docker compose -f docker-compose.yml up -d"
 
 
 
