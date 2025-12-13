@@ -7,5 +7,11 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Icon Colors -->
     <color name="ic_launcher_background">#FFFFFF</color>
+
+    <!-- Console Colors -->
+    <color name="console_background">#2B2B2B</color>
+    <color name="console_text">#A9B7C6</color>
 </resources>

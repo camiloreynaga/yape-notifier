@@ -18,9 +18,21 @@
         android:theme="@style/Theme.YapeNotifier"
         tools:targetApi="31">
 
-        <!-- Login Activity -->
+        <!-- Login Activity (No longer the launcher) -->
         <activity
             android:name=".ui.LoginActivity"
+            android:exported="false"
+            android:theme="@style/Theme.YapeNotifier" />
+
+        <!-- Register Activity -->
+        <activity
+            android:name=".ui.RegisterActivity"
+            android:exported="false"
+            android:theme="@style/Theme.YapeNotifier" />
+
+        <!-- Main Activity (New Launcher for Testing) -->
+        <activity
+            android:name=".ui.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.YapeNotifier">
             <intent-filter>
@@ -29,17 +41,19 @@
             </intent-filter>
         </activity>
 
-        <!-- Register Activity -->
+        <!-- Notification Diagnostics Activity -->
         <activity
-            android:name=".ui.RegisterActivity"
+            android:name=".ui.NotificationDiagnosticsActivity"
             android:exported="false"
-            android:theme="@style/Theme.YapeNotifier" />
+            android:theme="@style/Theme.YapeNotifier"
+            android:label="Diagnóstico de Notificaciones" />
 
-        <!-- Main Activity -->
+        <!-- Captured Notifications Activity (Debug) -->
         <activity
-            android:name=".ui.MainActivity"
+            android:name=".ui.CapturedNotificationsActivity"
             android:exported="false"
-            android:theme="@style/Theme.YapeNotifier" />
+            android:theme="@style/Theme.YapeNotifier"
+            android:label="Notificaciones Capturadas" />
 
         <!-- Notification Listener Service -->
         <service
@@ -54,4 +68,3 @@
     </application>
 
 </manifest>
-

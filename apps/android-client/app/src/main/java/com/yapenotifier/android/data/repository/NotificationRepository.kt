@@ -25,13 +25,6 @@ class NotificationRepository(private val context: Context) {
                     uuid
                 }
 
-            // Get auth token
-            val token = preferencesManager.authToken.first()
-            if (token == null) {
-                Log.e(TAG, "No auth token available")
-                return false
-            }
-
             // Use device ID or UUID
             val notificationWithDevice = notificationData.copy(deviceId = deviceId.toString())
 
@@ -54,4 +47,3 @@ class NotificationRepository(private val context: Context) {
         private const val TAG = "NotificationRepository"
     }
 }
-

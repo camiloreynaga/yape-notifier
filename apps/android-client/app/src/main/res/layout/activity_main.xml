@@ -4,20 +4,19 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="24dp"
+    android:padding="16dp"
     tools:context=".ui.MainActivity">
 
     <TextView
         android:id="@+id/tvTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Yape Notifier"
-        android:textSize="28sp"
+        android:text="Panel de Diagnóstico"
+        android:textSize="24sp"
         android:textStyle="bold"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        android:layout_marginTop="32dp" />
+        app:layout_constraintTop_toTopOf="parent" />
 
     <TextView
         android:id="@+id/tvUserInfo"
@@ -25,17 +24,16 @@
         android:layout_height="wrap_content"
         android:text="Usuario: Cargando..."
         android:textSize="14sp"
-        android:textColor="@android:color/darker_gray"
         android:layout_marginTop="8dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/tvTitle" />
 
     <androidx.cardview.widget.CardView
-        android:id="@+id/cardStatus"
+        android:id="@+id/cardPermissions"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
+        android:layout_marginTop="16dp"
         app:cardCornerRadius="8dp"
         app:cardElevation="4dp"
         app:layout_constraintEnd_toEndOf="parent"
@@ -49,68 +47,88 @@
             android:padding="16dp">
 
             <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Estado del Servicio"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
-            <TextView
                 android:id="@+id/tvStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Verificando..."
-                android:textSize="14sp"
-                android:layout_marginTop="8dp" />
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/tvBatteryStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Verificando..."
+                android:layout_marginTop="4dp" />
         </LinearLayout>
     </androidx.cardview.widget.CardView>
-
-    <!-- Test Buttons -->
-    <LinearLayout
-        android:id="@+id/testButtonsLayout"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_marginTop="24dp"
-        app:layout_constraintTop_toBottomOf="@+id/cardStatus"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <Button
-            android:id="@+id/btnRequestPermission"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Activar Permiso de Notificaciones" />
-
-        <Button
-            android:id="@+id/btnSendTestNotification"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="Enviar Notificación de Prueba" />
-
-    </LinearLayout>
 
     <Button
         android:id="@+id/btnEnableNotifications"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="Activar Notificaciones"
-        android:layout_marginTop="24dp"
+        android:layout_marginTop="16dp"
+        android:text="Activar Permiso de Notificaciones"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/testButtonsLayout" />
+        app:layout_constraintTop_toBottomOf="@+id/cardPermissions" />
+
+    <Button
+        android:id="@+id/btnBatteryOptimization"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Desactivar Ahorro de Batería"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/btnEnableNotifications" />
+    
+    <Button
+        android:id="@+id/btnSendTestNotification"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Enviar Notificación de Prueba"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/btnBatteryOptimization"/>
+
+    <TextView
+        android:id="@+id/tvServiceLogTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Registro de Actividad del Servicio:"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:layout_marginTop="24dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/btnSendTestNotification" />
+
+    <TextView
+        android:id="@+id/tvServiceLog"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="8dp"
+        android:background="@color/console_background"
+        android:textColor="@color/console_text"
+        android:padding="8dp"
+        android:scrollbars="vertical"
+        android:gravity="bottom"
+        android:fontFamily="monospace"
+        android:textSize="10sp"
+        tools:text="HH:mm:ss - Log de servicio 1\nHH:mm:ss - Log de servicio 2"
+        app:layout_constraintBottom_toTopOf="@+id/btnLogout"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tvServiceLogTitle" />
 
     <Button
         android:id="@+id/btnLogout"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="Cerrar Sesión"
-        android:layout_marginTop="16dp"
+        android:text="Restaurar Login"
         style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/btnEnableNotifications"
-        app:layout_constraintBottom_toBottomOf="parent" />
+        app:layout_constraintStart_toStartOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

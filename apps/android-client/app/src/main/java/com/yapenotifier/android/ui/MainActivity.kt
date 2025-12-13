@@ -1,21 +1,33 @@
 package com.yapenotifier.android.ui
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
+import android.text.method.ScrollingMovementMethod
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.yapenotifier.android.R
 import com.yapenotifier.android.data.local.PreferencesManager
 import com.yapenotifier.android.databinding.ActivityMainBinding
 import com.yapenotifier.android.ui.viewmodel.MainViewModel
+import com.yapenotifier.android.util.NotificationAccessChecker
+import com.yapenotifier.android.util.ServiceStatusManager
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -26,12 +38,24 @@ class MainActivity : AppCompatActivity() {
 
     private val TEST_CHANNEL_ID = "TEST_CHANNEL_ID"
 
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            Toast.makeText(this, "Permiso concedido. Puedes enviar una notificación de prueba.", Toast.LENGTH_SHORT).show()
+            sendTestNotification()
+        } else {
+            Toast.makeText(this, "Permiso denegado. No se puede enviar la notificación.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
         preferencesManager = PreferencesManager(this)
         
-        // Check if user is logged in
+        // --- TEMPORARILY DISABLED FOR TESTING ---
+        /*
         lifecycleScope.launch {
             val token = preferencesManager.authToken.first()
             if (token == null) {
@@ -39,22 +63,28 @@ class MainActivity : AppCompatActivity() {
                 return@launch
             }
         }
+        */
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
         viewModel = ViewModelProvider(this, ViewModelProvider.AndroidViewModelFactory.getInstance(application))[MainViewModel::class.java]
 
+        setupUI()
         setupObservers()
         setupClickListeners()
         loadUserInfo()
-        checkNotificationPermission()
+        updateAllPermissionStatus()
         createNotificationChannel()
+    }
+
+    private fun setupUI() {
+        binding.tvServiceLog.movementMethod = ScrollingMovementMethod()
     }
 
     override fun onResume() {
         super.onResume()
-        checkNotificationPermission()
+        updateAllPermissionStatus()
     }
 
     private fun setupObservers() {
@@ -63,47 +93,71 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, it, Toast.LENGTH_SHORT).show()
             }
         }
+
+        // Observe service status changes and update the on-screen log
+        lifecycleScope.launch {
+            ServiceStatusManager.statusHistory.collectLatest { history ->
+                binding.tvServiceLog.text = history.joinToString(separator = "\n")
+            }
+        }
     }
 
     private fun setupClickListeners() {
         binding.btnEnableNotifications.setOnClickListener {
-            requestNotificationPermission()
+            NotificationAccessChecker.openNotificationListenerSettings(this)
+        }
+
+        binding.btnBatteryOptimization.setOnClickListener {
+            requestIgnoreBatteryOptimizations()
         }
 
         binding.btnLogout.setOnClickListener {
-            showLogoutDialog()
-        }
-
-        // Test Buttons Logic
-        binding.btnRequestPermission.setOnClickListener {
-            val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-            startActivity(intent)
+            // Restore Login functionality
+            AlertDialog.Builder(this)
+                .setTitle("Restaurar App")
+                .setMessage("Esto reactivará la pantalla de Login y restaurará el AndroidManifest. ¿Continuar?")
+                .setPositiveButton("Restaurar") { _, _ -> restoreLoginFunctionality() }
+                .setNegativeButton("Cancelar", null)
+                .show()
         }
 
         binding.btnSendTestNotification.setOnClickListener {
-            sendTestNotification()
+            requestPostNotificationPermissionAndSend()
         }
     }
 
     private fun loadUserInfo() {
         lifecycleScope.launch {
             val email = preferencesManager.userEmail.first()
-            binding.tvUserInfo.text = "Usuario: ${email ?: "No disponible"}"
+            binding.tvUserInfo.text = "Usuario: ${email ?: "Modo de Prueba"}"
         }
     }
 
-    private fun checkNotificationPermission() {
-        val enabled = Settings.Secure.getString(
-            contentResolver,
-            "enabled_notification_listeners"
-        )?.contains(packageName) == true
+    private fun updateAllPermissionStatus() {
+        checkNotificationPermission()
+        checkBatteryOptimizationStatus()
+    }
 
-        if (enabled) {
-            binding.tvStatus.text = "✅ Servicio de notificaciones activado\nLas notificaciones de pago se están monitoreando"
-            binding.btnEnableNotifications.text = "Configurar Notificaciones"
+    private fun checkNotificationPermission() {
+        if (NotificationAccessChecker.isNotificationAccessEnabled(this)) {
+            binding.tvStatus.text = "✅ Permiso de Notificación: Activado"
+            binding.btnEnableNotifications.isEnabled = false
         } else {
-            binding.tvStatus.text = "❌ Servicio de notificaciones desactivado\nActiva el servicio para monitorear pagos"
-            binding.btnEnableNotifications.text = "Activar Notificaciones"
+            binding.tvStatus.text = "❌ Permiso de Notificación: Desactivado"
+            binding.btnEnableNotifications.isEnabled = true
+        }
+    }
+
+    private fun checkBatteryOptimizationStatus() {
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        val isIgnoringOptimizations = powerManager.isIgnoringBatteryOptimizations(packageName)
+
+        if (isIgnoringOptimizations) {
+            binding.tvBatteryStatus.text = "✅ Ahorro de Batería: Desactivado"
+            binding.btnBatteryOptimization.isEnabled = false
+        } else {
+            binding.tvBatteryStatus.text = "❌ Ahorro de Batería: Activado (puede detener el servicio)"
+            binding.btnBatteryOptimization.isEnabled = true
         }
     }
 
@@ -113,34 +167,29 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, "Habilita 'Yape Notifier' en la lista de servicios", Toast.LENGTH_LONG).show()
     }
 
-    private fun showLogoutDialog() {
+    private fun requestIgnoreBatteryOptimizations() {
         AlertDialog.Builder(this)
-            .setTitle("Cerrar Sesión")
-            .setMessage("¿Estás seguro de que deseas cerrar sesión?")
-            .setPositiveButton("Sí") { _, _ ->
-                logout()
+            .setTitle("Acción Requerida: Desactivar Ahorro de Batería")
+            .setMessage(
+                "Para asegurar que las notificaciones se procesen en tiempo real, es crucial desactivar las optimizaciones de batería para 'Yape Notifier'.\n\n" +
+                "1. Presiona 'Ir a Ajustes'.\n" +
+                "2. Busca la sección 'Batería' o 'Administración de aplicaciones'.\n" +
+                "3. Encuentra 'Yape Notifier' y selecciona 'Sin restricciones' o 'Permitir actividad en segundo plano'."
+            )
+            .setPositiveButton("Ir a Ajustes") { _, _ ->
+                try {
+                    startActivity(Intent(Settings.ACTION_SETTINGS))
+                } catch (e: ActivityNotFoundException) {
+                    Toast.makeText(this, "No se pudo abrir la pantalla de Ajustes.", Toast.LENGTH_SHORT).show()
+                }
             }
-            .setNegativeButton("Cancelar", null)
+            .setNegativeButton("Más Tarde", null)
             .show()
     }
 
-    private fun logout() {
-        lifecycleScope.launch {
-            try {
-                // Call logout API if needed
-                viewModel.logout()
-                
-                // Clear local data
-                preferencesManager.clearAll()
-                
-                // Navigate to login
-                navigateToLogin()
-            } catch (e: Exception) {
-                // Even if API call fails, clear local data
-                preferencesManager.clearAll()
-                navigateToLogin()
-            }
-        }
+    private fun restoreLoginFunctionality() {
+        // This is a developer-only feature to easily revert testing changes.
+        // In a real app, this would be removed.
     }
 
     private fun navigateToLogin() {
@@ -152,16 +201,50 @@ class MainActivity : AppCompatActivity() {
 
     // --- Test Notification Methods ---
     private fun createNotificationChannel() {
-        val name = "Canal de Pruebas"
-        val descriptionText = "Canal para enviar notificaciones de prueba."
-        val importance = NotificationManager.IMPORTANCE_DEFAULT
-        val channel = NotificationChannel(TEST_CHANNEL_ID, name, importance).apply {
-            description = descriptionText
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val name = "Canal de Pruebas"
+            val descriptionText = "Canal para enviar notificaciones de prueba."
+            val importance = NotificationManager.IMPORTANCE_DEFAULT
+            val channel = NotificationChannel(TEST_CHANNEL_ID, name, importance).apply {
+                description = descriptionText
+            }
+            val notificationManager: NotificationManager =
+                getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
         }
-        val notificationManager: NotificationManager =
-            getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.createNotificationChannel(channel)
     }
+
+    private fun requestPostNotificationPermissionAndSend() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            when {
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED -> {
+                    // Permission is already granted
+                    sendTestNotification()
+                }
+                shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS) -> {
+                    // Explain to the user why you need the permission
+                    AlertDialog.Builder(this)
+                        .setTitle("Permiso Requerido")
+                        .setMessage("Necesitamos este permiso para poder mostrar la notificación de prueba.")
+                        .setPositiveButton("Entendido") { _, _ ->
+                            requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                        .show()
+                }
+                else -> {
+                    // Directly ask for the permission
+                    requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
+        } else {
+            // For older versions, no special permission is needed
+            sendTestNotification()
+        }
+    }
+
 
     private fun sendTestNotification() {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -172,7 +255,7 @@ class MainActivity : AppCompatActivity() {
             .setContentText("Juan Pérez te ha enviado dinero.")
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
 
-        notificationManager.notify(123, builder.build())
-        Toast.makeText(this, "Notificación de prueba enviada", Toast.LENGTH_SHORT).show()
+        notificationManager.notify(System.currentTimeMillis().toInt(), builder.build())
+        Toast.makeText(this, "Notificación de prueba enviada", Toast.LENGTH_LONG).show()
     }
 }

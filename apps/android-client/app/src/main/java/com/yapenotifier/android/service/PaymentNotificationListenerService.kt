@@ -5,6 +5,7 @@ import android.service.notification.StatusBarNotification
 import android.util.Log
 import com.yapenotifier.android.data.parser.NotificationParser
 import com.yapenotifier.android.data.repository.NotificationRepository
+import com.yapenotifier.android.util.ServiceStatusManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -18,39 +19,79 @@ class PaymentNotificationListenerService : NotificationListenerService() {
     // Package names of payment apps to monitor
     private val paymentAppPackages = setOf(
         "com.yapenotifier.android", // TEMPORARY for testing
-        "com.interbank.mobilebanking", // Interbank
-        "com.bcp.bancadigital", // BCP
-        "com.bbva.bbvacontinental", // BBVA
-        "com.scotiabank.mobile", // Scotiabank
-        "com.yape.android", // Yape
-        "com.plin.android" // Plin
+        
+        // Interbank
+        "com.interbank.mobilebanking", // Legacy package
+        "pe.com.interbank.mobilebanking", // CORRECT package found in testing
+        
+        // BCP
+        "com.bcp.bancadigital", 
+        
+        // BBVA
+        "com.bbva.bbvacontinental",
+        
+        // Scotiabank
+        "com.scotiabank.mobile",
+        
+        // Yape
+        "com.yape.android", // Legacy package
+        "com.bcp.innovacxion.yapeapp", // CORRECT package found in testing
+        
+        // Plin
+        "com.plin.android"
     )
 
     override fun onCreate() {
         super.onCreate()
         repository = NotificationRepository(applicationContext)
+        ServiceStatusManager.updateStatus("✅ Servicio Creado")
         Log.d(TAG, "PaymentNotificationListenerService created")
+    }
+
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        ServiceStatusManager.updateStatus("🚀 ¡Conectado! Escuchando notificaciones.")
+        Log.i(TAG, "Notification listener connected.")
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         super.onNotificationPosted(sbn)
         
-        val packageName = sbn.packageName ?: return
-        
-        // Only process notifications from payment apps
-        if (!paymentAppPackages.contains(packageName)) {
+        val packageName = sbn.packageName ?: run {
+            Log.w(TAG, "onNotificationPosted: packageName is null, ignoring")
             return
         }
+        
+        val notification = sbn.notification
+        val extras = notification.extras
+        val title = extras?.getCharSequence("android.title")?.toString() ?: "N/A"
+        
+        Log.d(TAG, "Notification POSTED from: $packageName, Title: $title")
+        ServiceStatusManager.updateStatus("📬 Notificación recibida de: $packageName")
+        
+        // Check if it's a payment app
+        if (!paymentAppPackages.contains(packageName)) {
+            ServiceStatusManager.updateStatus("⚠️ Ignorando (paquete no monitoreado): $packageName")
+            return
+        }
+        
+        Log.i(TAG, "Processing payment notification from: $packageName")
+        ServiceStatusManager.updateStatus("✅ Procesando notificación de pago: $packageName")
 
         serviceScope.launch {
             try {
-                val notification = sbn.notification
-                val title = notification.extras?.getCharSequence("android.title")?.toString() ?: return@launch
-                val text = notification.extras?.getCharSequence("android.text")?.toString() ?: ""
-                val bigText = notification.extras?.getCharSequence("android.bigText")?.toString()
+                val currentTitle = extras?.getCharSequence("android.title")?.toString()
+                if (currentTitle.isNullOrEmpty()) {
+                    Log.w(TAG, "Notification from $packageName has no title, skipping")
+                    ServiceStatusManager.updateStatus("⚠️ Notificación sin título, ignorando")
+                    return@launch
+                }
+                
+                val text = extras?.getCharSequence("android.text")?.toString() ?: ""
+                val bigText = extras?.getCharSequence("android.bigText")?.toString()
                 
                 val fullText = buildString {
-                    append(title)
+                    append(currentTitle)
                     if (text.isNotEmpty()) {
                         appendLine()
                         append(text)
@@ -61,28 +102,36 @@ class PaymentNotificationListenerService : NotificationListenerService() {
                     }
                 }.trim()
 
-                Log.d(TAG, "Payment notification received from $packageName: $fullText")
+                ServiceStatusManager.updateStatus("🔍 Procesando: $currentTitle")
 
-                // Parse notification
                 val parsedData = parser.parseNotification(
                     packageName = packageName,
-                    title = title,
+                    title = currentTitle,
                     body = fullText
                 )
 
                 if (parsedData != null) {
-                    // Send to API
                     repository.sendNotification(parsedData)
+                    ServiceStatusManager.updateStatus("📤 Enviando a la API...")
+                } else {
+                    ServiceStatusManager.updateStatus("⚠️ No se pudo procesar la notificación.")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error processing notification", e)
+                ServiceStatusManager.updateStatus("🔥 Error: ${e.message}")
             }
         }
     }
 
-    override fun onNotificationRemoved(sbn: StatusBarNotification) {
-        super.onNotificationRemoved(sbn)
-        // Not needed for our use case
+    override fun onDestroy() {
+        super.onDestroy()
+        ServiceStatusManager.updateStatus("❌ Servicio Destruido")
+        Log.w(TAG, "PaymentNotificationListenerService destroyed.")
+    }
+
+    override fun onListenerDisconnected() {
+        super.onListenerDisconnected()
+        ServiceStatusManager.updateStatus("🔌 Servicio Desconectado")
     }
 
     companion object {
