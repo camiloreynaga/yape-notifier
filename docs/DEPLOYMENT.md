@@ -259,13 +259,14 @@ cd yape-notifier
 
 ```bash
 # Verificar que existe la estructura
-ls -la infra/docker/
+ls -la infra/docker/environments/production/
 
 # Deberías ver:
 # - docker-compose.yml
-# - caddy/
-# - nginx/
-# - etc.
+# - Caddyfile
+# - .env.example
+# - deploy.sh
+# - setup.sh
 ```
 
 ### Paso 6: Configurar Variables de Entorno
@@ -292,24 +293,24 @@ ls -la infra/docker/
 #### 6.2. Crear Archivo .env.production
 
 ```bash
-# Ir al directorio de Docker
-cd /var/apps/yape-notifier/infra/docker
+# Ir al directorio de producción
+cd /var/apps/yape-notifier/infra/docker/environments/production
 
 # Verificar que existe la plantilla
-ls -la .env.production.example
+ls -la .env.example
 
-# Crear archivo .env.production desde la plantilla
-cp .env.production.example .env.production
+# Crear archivo .env desde la plantilla
+cp .env.example .env
 
 # Editar el archivo con tus valores reales
-nano .env.production
+nano .env
 ```
 
 **⚠️ Si no creas este archivo o DB_PASSWORD está vacío, obtendrás el error: "The DB_PASSWORD variable is not set" o "Database is uninitialized and superuser password is not specified"**
 
 #### 6.3. Configurar Variables de Entorno
 
-El archivo `.env.production.example` contiene todas las variables necesarias con valores de ejemplo. Después de copiarlo a `.env.production`, ajusta los siguientes valores:
+El archivo `.env.example` contiene todas las variables necesarias con valores de ejemplo. Después de copiarlo a `.env`, ajusta los siguientes valores:
 
 **Variables que DEBES configurar:**
 
@@ -366,7 +367,7 @@ CORS_ALLOWED_ORIGINS=https://dashboard.notificaciones.space
 3. **`APP_URL`**: Ya está configurado para `https://api.notificaciones.space` (verificar si es correcto)
 4. **`DASHBOARD_API_URL`**: Ya está configurado para `https://api.notificaciones.space` (verificar si es correcto)
 
-**Nota**: El archivo `.env.production.example` contiene todas las variables con valores por defecto. Solo necesitas ajustar las mencionadas arriba.
+**Nota**: El archivo `.env.example` contiene todas las variables con valores por defecto. Solo necesitas ajustar las mencionadas arriba.
 
 #### 6.3. Guardar y Salir
 
@@ -378,95 +379,62 @@ CORS_ALLOWED_ORIGINS=https://dashboard.notificaciones.space
 
 Caddy manejará automáticamente HTTPS con Let's Encrypt para tus subdominios.
 
-#### 7.1. Editar Caddyfile
+#### 7.1. Verificar Caddyfile
+
+El Caddyfile ya está configurado en la nueva estructura. Si necesitas editarlo:
 
 ```bash
 # Editar Caddyfile
-nano /var/apps/yape-notifier/infra/docker/caddy/Caddyfile
+nano /var/apps/yape-notifier/infra/docker/environments/production/Caddyfile
 ```
 
-#### 7.2. Configurar Subdominios
+#### 7.2. Verificar Configuración de Subdominios
 
-Asegúrate de que el Caddyfile tenga esta configuración:
+El Caddyfile ya está configurado correctamente con:
+- `api.notificaciones.space` → Nginx API
+- `dashboard.notificaciones.space` → Dashboard
 
-```caddy
-# API - api.notificaciones.space
-api.notificaciones.space {
-    # Reverse proxy a Nginx API
-    reverse_proxy nginx-api:80 {
-        header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
-        header_up Host {host}
-
-        health_uri /up
-        health_interval 30s
-        health_timeout 5s
-    }
-
-    # Logging
-    log {
-        output file /var/log/caddy/api.log
-        format json
-    }
-
-    # Compression
-    encode gzip zstd
-}
-
-# Dashboard - dashboard.notificaciones.space
-dashboard.notificaciones.space {
-    # Reverse proxy a Dashboard
-    reverse_proxy dashboard:80 {
-        header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
-        header_up Host {host}
-
-        health_uri /health
-        health_interval 30s
-        health_timeout 5s
-    }
-
-    # Logging
-    log {
-        output file /var/log/caddy/dashboard.log
-        format json
-    }
-
-    # Compression
-    encode gzip zstd
-}
-```
-
-**Nota**: El dominio `notificaciones.space` ya está configurado. Si usas otro dominio, actualiza estos valores.
-
-#### 7.3. Guardar y Salir
-
-```bash
-# Guardar: Ctrl+O, Enter, Ctrl+X
-```
+**Nota**: El dominio `notificaciones.space` ya está configurado. Si usas otro dominio, edita el Caddyfile y actualiza los valores.
 
 ### Paso 8: Desplegar la Aplicación
 
-#### 8.1. Construir las Imágenes Docker
+#### 8.1. Usar el Script de Despliegue (Recomendado)
 
 ```bash
 # Asegúrate de estar en el directorio correcto
-cd /var/apps/yape-notifier/infra/docker
+cd /var/apps/yape-notifier/infra/docker/environments/production
 
-# Construir imágenes (esto puede tardar varios minutos)
-docker compose build
+# Hacer el script ejecutable (primera vez)
+chmod +x deploy.sh
+
+# Ejecutar el script de despliegue
+./deploy.sh
 ```
 
-#### 8.2. Iniciar los Servicios
+El script `deploy.sh` automáticamente:
+- Construye las imágenes Docker
+- Inicia todos los servicios
+- Ejecuta migraciones
+- Genera APP_KEY si no existe
+- Configura permisos
+- Optimiza Laravel para producción
+
+#### 8.2. Despliegue Manual (Alternativa)
+
+Si prefieres hacerlo manualmente:
 
 ```bash
+# Ir al directorio de producción
+cd /var/apps/yape-notifier/infra/docker/environments/production
+
+# Construir imágenes (esto puede tardar varios minutos)
+docker compose --env-file .env build
+
 # Iniciar todos los servicios
-docker compose up -d
+docker compose --env-file .env up -d
 
 # Verificar que los contenedores estén corriendo
-docker compose ps
+docker compose --env-file .env ps
 ```
 
 Deberías ver algo como:
@@ -484,11 +452,11 @@ yape-notifier-db            Up
 
 ```bash
 # Ver logs de todos los servicios
-docker compose logs -f
+docker compose --env-file .env logs -f
 
 # O ver logs de un servicio específico
-docker compose logs -f caddy
-docker compose logs -f php-fpm
+docker compose --env-file .env logs -f caddy
+docker compose --env-file .env logs -f php-fpm
 ```
 
 ### Paso 9: Verificar el Despliegue
@@ -497,66 +465,45 @@ docker compose logs -f php-fpm
 
 ```bash
 # Ver estado de contenedores
-docker compose ps
+docker compose --env-file .env ps
 
 # Todos deberían estar "Up" y "healthy"
 ```
 
-#### 9.2. Generar APP_KEY de Laravel
+**Nota**: Si usaste `deploy.sh`, los siguientes pasos (9.2-9.5) ya fueron ejecutados automáticamente. Solo necesitas verificar que todo funcione.
+
+#### 9.2. Verificar APP_KEY de Laravel
 
 ```bash
-# Generar APP_KEY
-docker compose exec php-fpm php artisan key:generate --show
+# Verificar que APP_KEY esté configurado
+docker compose --env-file .env exec php-fpm php artisan key:generate --force
 
-# Copiar la clave generada (ej: base64:xxxxx...)
-# Editar .env.production y actualizar APP_KEY
-nano .env.production
-
-# Reiniciar PHP-FPM
-docker compose restart php-fpm
+# Si necesitas ver el APP_KEY actual:
+docker compose --env-file .env exec php-fpm cat /var/www/.env | grep APP_KEY
 ```
 
-#### 9.3. Ejecutar Migraciones
+#### 9.3. Verificar Migraciones
 
 ```bash
-# Ejecutar migraciones de base de datos
-docker compose exec php-fpm php artisan migrate --force
+# Verificar que las migraciones estén ejecutadas
+docker compose --env-file .env exec php-fpm php artisan migrate:status
 ```
 
-#### 9.4. Configurar Permisos
-
-```bash
-# Configurar permisos de storage
-docker compose exec php-fpm chown -R www-data:www-data /var/www/storage
-docker compose exec php-fpm chown -R www-data:www-data /var/www/bootstrap/cache
-docker compose exec php-fpm chmod -R 775 /var/www/storage
-docker compose exec php-fpm chmod -R 775 /var/www/bootstrap/cache
-```
-
-#### 9.5. Optimizar Laravel
-
-```bash
-# Cachear configuración
-docker compose exec php-fpm php artisan config:cache
-docker compose exec php-fpm php artisan route:cache
-docker compose exec php-fpm php artisan view:cache
-```
-
-#### 9.6. Verificar Health Checks
+#### 9.4. Verificar Health Checks
 
 ```bash
 # Verificar API (desde el servidor)
 curl http://localhost/up
 
-# Deberías ver: OK
+# Deberías ver una respuesta HTML con "Application up"
 
 # Verificar Dashboard (desde el servidor)
-curl http://localhost/health
+curl http://localhost/
 
-# Deberías ver una respuesta de salud
+# Deberías ver el HTML del dashboard
 ```
 
-#### 9.7. Verificar desde el Navegador
+#### 9.5. Verificar desde el Navegador
 
 Espera unos minutos para que Caddy obtenga los certificados SSL automáticamente, luego:
 
@@ -615,25 +562,32 @@ Digital Ocean App Platform es un servicio PaaS que facilita el despliegue autom�
 
 El proyecto incluye archivos de ejemplo con todas las variables necesarias:
 
-- **`infra/docker/.env.production.example`** - Plantilla para producción
-- **`infra/docker/.env.staging.example`** - Plantilla para staging
+- **`infra/docker/environments/production/.env.example`** - Plantilla para producción
+- **`infra/docker/environments/staging/.env.example`** - Plantilla para staging
+- **`infra/docker/environments/development/.env.example`** - Plantilla para desarrollo
 
 ### Crear Archivos .env desde Plantillas
 
 ```bash
 # Producción
-cd infra/docker
-cp .env.production.example .env.production
-nano .env.production  # Configurar valores reales
+cd infra/docker/environments/production
+cp .env.example .env
+nano .env  # Configurar valores reales
 
 # Staging
-cp .env.staging.example .env.staging
-nano .env.staging  # Configurar valores reales
+cd infra/docker/environments/staging
+cp .env.example .env
+nano .env  # Configurar valores reales
+
+# Development
+cd infra/docker/environments/development
+cp .env.example .env
+nano .env  # Configurar valores reales
 ```
 
 ### Variables Requeridas para Producción
 
-El archivo `.env.production.example` contiene todas las variables. Las más importantes a configurar son:
+El archivo `.env.example` en `infra/docker/environments/production/` contiene todas las variables. Las más importantes a configurar son:
 
 ```env
 # Base de Datos (OBLIGATORIO)
@@ -650,15 +604,15 @@ DASHBOARD_API_URL=https://api.notificaciones.space  # Ya configurado
 CORS_ALLOWED_ORIGINS=https://dashboard.notificaciones.space  # Ya configurado
 ```
 
-**Todas las demás variables** ya están configuradas con valores por defecto en el archivo `.env.production.example`.
+**Todas las demás variables** ya están configuradas con valores por defecto en el archivo `.env.example`.
 
 ### Generar APP_KEY
 
 ```bash
 # Desde el contenedor
-docker compose exec php-fpm php artisan key:generate --show
+docker compose --env-file .env exec php-fpm php artisan key:generate --show
 
-# Copia la clave generada y actualiza .env.production
+# Copia la clave generada y actualiza .env
 ```
 
 ---
@@ -672,25 +626,25 @@ docker compose exec php-fpm php artisan key:generate --show
 **Solución**:
 
 ```bash
-# 1. Ir al directorio de Docker
-cd /var/apps/yape-notifier/infra/docker
+# 1. Ir al directorio de producción
+cd /var/apps/yape-notifier/infra/docker/environments/production
 
-# 2. Verificar si existe .env.production
-ls -la .env.production
+# 2. Verificar si existe .env
+ls -la .env
 
 # 3. Si no existe, crearlo desde la plantilla
-cp .env.production.example .env.production
+cp .env.example .env
 
 # 4. Editar y configurar DB_PASSWORD (OBLIGATORIO)
-nano .env.production
+nano .env
 # Busca la línea: DB_PASSWORD=TU_CONTRASEÑA_SEGURA_AQUI
 # Cámbiala por: DB_PASSWORD=tu_contraseña_real_aqui
 
 # 5. Verificar que se guardó correctamente
-grep DB_PASSWORD .env.production
+grep DB_PASSWORD .env
 
 # 6. Ahora intentar de nuevo
-docker compose up -d
+docker compose --env-file .env up -d
 ```
 
 **⚠️ IMPORTANTE**: `DB_PASSWORD` es **OBLIGATORIO** y debe tener un valor. No puede estar vacío.
@@ -707,7 +661,7 @@ nslookup api.notificaciones.space
 nslookup dashboard.notificaciones.space
 
 # Ver logs de Caddy
-docker compose logs caddy
+docker compose --env-file .env logs caddy
 
 # Verificar que los subdominios en Caddyfile coincidan con DNS
 ```
@@ -720,14 +674,14 @@ docker compose logs caddy
 
 ```bash
 # Verificar contenedores
-docker compose ps
+docker compose --env-file .env ps
 
 # Reiniciar servicios
-docker compose restart nginx-api php-fpm
+docker compose --env-file .env restart nginx-api php-fpm
 
 # Ver logs
-docker compose logs nginx-api
-docker compose logs php-fpm
+docker compose --env-file .env logs nginx-api
+docker compose --env-file .env logs php-fpm
 ```
 
 ### Error: "Container yape-notifier-db is unhealthy" o "dependency db failed to start"
@@ -742,35 +696,35 @@ docker compose logs php-fpm
 **Solución paso a paso**:
 
 ```bash
-# 1. Verificar que .env.production existe y tiene DB_PASSWORD
-cd /var/apps/yape-notifier/infra/docker
-cat .env.production | grep DB_PASSWORD
+# 1. Verificar que .env existe y tiene DB_PASSWORD
+cd /var/apps/yape-notifier/infra/docker/environments/production
+cat .env | grep DB_PASSWORD
 
 # Si no existe o está vacío, crearlo/editar:
-cp .env.production.example .env.production
-nano .env.production
+cp .env.example .env
+nano .env
 # Asegúrate de que DB_PASSWORD tenga un valor (ej: DB_PASSWORD=tu_contraseña_segura_123)
 
 # 2. Ver logs del contenedor de base de datos
-docker compose logs db
+docker compose --env-file .env logs db
 
 # 3. Si hay errores de permisos o datos corruptos, eliminar el volumen (CUIDADO: esto borra los datos)
-docker compose down -v
+docker compose --env-file .env down -v
 # Luego volver a levantar
-docker compose up -d db
+docker compose --env-file .env up -d db
 
 # 4. Esperar a que la base de datos esté healthy (puede tardar 30-60 segundos)
-docker compose ps db
+docker compose --env-file .env ps db
 # Debe mostrar "healthy" en el estado
 
 # 5. Si sigue fallando, iniciar solo la base de datos primero
-docker compose up -d db
+docker compose --env-file .env up -d db
 # Esperar 30 segundos
-docker compose logs -f db
+docker compose --env-file .env logs -f db
 # Presiona Ctrl+C cuando veas "database system is ready to accept connections"
 
 # 6. Luego iniciar el resto de servicios
-docker compose up -d
+docker compose --env-file .env up -d
 ```
 
 **Diagnóstico avanzado**:
@@ -794,13 +748,13 @@ docker compose exec db env | grep POSTGRES
 
 ```bash
 # Verificar que la base de datos esté corriendo
-docker compose ps db
+docker compose --env-file .env ps db
 
 # Verificar variables de entorno
-docker compose exec php-fpm env | grep DB_
+docker compose --env-file .env exec php-fpm env | grep DB_
 
 # Probar conexión
-docker compose exec php-fpm php artisan tinker
+docker compose --env-file .env exec php-fpm php artisan tinker
 # Luego en tinker: DB::connection()->getPdo();
 ```
 
@@ -809,8 +763,8 @@ docker compose exec php-fpm php artisan tinker
 **Solución**:
 
 ```bash
-docker compose exec php-fpm chown -R www-data:www-data /var/www/storage
-docker compose exec php-fpm chmod -R 775 /var/www/storage
+docker compose --env-file .env exec php-fpm chown -R www-data:www-data /var/www/storage
+docker compose --env-file .env exec php-fpm chmod -R 775 /var/www/storage
 ```
 
 ### Dashboard no se conecta a la API
@@ -820,30 +774,30 @@ docker compose exec php-fpm chmod -R 775 /var/www/storage
 **Solución**:
 
 ```bash
-# Verificar variable en .env.production
-grep DASHBOARD_API_URL .env.production
+# Verificar variable en .env
+grep DASHBOARD_API_URL .env
 
 # Reconstruir dashboard con la URL correcta
-docker compose build dashboard
-docker compose up -d dashboard
+docker compose --env-file .env build dashboard
+docker compose --env-file .env up -d dashboard
 
 # Verificar CORS en Laravel
-docker compose exec php-fpm php artisan config:clear
-docker compose exec php-fpm php artisan config:cache
+docker compose --env-file .env exec php-fpm php artisan config:clear
+docker compose --env-file .env exec php-fpm php artisan config:cache
 ```
 
 ### Ver Logs Detallados
 
 ```bash
 # Todos los logs
-docker compose logs -f
+docker compose --env-file .env logs -f
 
 # Logs específicos
-docker compose logs -f caddy
-docker compose logs -f php-fpm
-docker compose logs -f nginx-api
-docker compose logs -f dashboard
-docker compose logs -f db
+docker compose --env-file .env logs -f caddy
+docker compose --env-file .env logs -f php-fpm
+docker compose --env-file .env logs -f nginx-api
+docker compose --env-file .env logs -f dashboard
+docker compose --env-file .env logs -f db
 ```
 
 ---
@@ -860,27 +814,27 @@ cd /var/apps/yape-notifier
 git pull origin main
 
 # Reconstruir y reiniciar
-cd infra/docker
-docker compose build
-docker compose up -d
+cd infra/docker/environments/production
+docker compose --env-file .env build
+docker compose --env-file .env up -d
 
 # Ejecutar migraciones si hay nuevas
-docker compose exec php-fpm php artisan migrate --force
+docker compose --env-file .env exec php-fpm php artisan migrate --force
 
 # Limpiar cache
-docker compose exec php-fpm php artisan config:cache
-docker compose exec php-fpm php artisan route:cache
+docker compose --env-file .env exec php-fpm php artisan config:cache
+docker compose --env-file .env exec php-fpm php artisan route:cache
 ```
 
 ### Reiniciar Servicios
 
 ```bash
 # Reiniciar todos los servicios
-docker compose restart
+docker compose --env-file .env restart
 
 # Reiniciar un servicio específico
-docker compose restart php-fpm
-docker compose restart caddy
+docker compose --env-file .env restart php-fpm
+docker compose --env-file .env restart caddy
 ```
 
 ### Ver Uso de Recursos
@@ -906,13 +860,13 @@ set -e
 
 cd /var/apps/yape-notifier
 git pull origin main
-cd infra/docker
+cd infra/docker/environments/production
 
-docker compose build
-docker compose up -d
-docker compose exec php-fpm php artisan migrate --force
-docker compose exec php-fpm php artisan config:cache
-docker compose exec php-fpm php artisan route:cache
+docker compose --env-file .env build
+docker compose --env-file .env up -d
+docker compose --env-file .env exec php-fpm php artisan migrate --force
+docker compose --env-file .env exec php-fpm php artisan config:cache
+docker compose --env-file .env exec php-fpm php artisan route:cache
 
 echo "✅ Actualización completada"
 ```
@@ -930,21 +884,27 @@ chmod +x /var/apps/yape-notifier/update.sh
 ### Backup de Base de Datos
 
 ```bash
+# Ir al directorio de producción
+cd /var/apps/yape-notifier/infra/docker/environments/production
+
 # Crear backup
-docker compose exec db pg_dump -U postgres yape_notifier > backup_$(date +%Y%m%d_%H%M%S).sql
+docker compose --env-file .env exec db pg_dump -U postgres yape_notifier > backup_$(date +%Y%m%d_%H%M%S).sql
 
 # Backup con compresión
-docker compose exec db pg_dump -U postgres yape_notifier | gzip > backup_$(date +%Y%m%d_%H%M%S).sql.gz
+docker compose --env-file .env exec db pg_dump -U postgres yape_notifier | gzip > backup_$(date +%Y%m%d_%H%M%S).sql.gz
 ```
 
 ### Restaurar Backup
 
 ```bash
+# Ir al directorio de producción
+cd /var/apps/yape-notifier/infra/docker/environments/production
+
 # Restaurar backup sin comprimir
-docker compose exec -T db psql -U postgres yape_notifier < backup_20240101_120000.sql
+docker compose --env-file .env exec -T db psql -U postgres yape_notifier < backup_20240101_120000.sql
 
 # Restaurar backup comprimido
-gunzip < backup_20240101_120000.sql.gz | docker compose exec -T db psql -U postgres yape_notifier
+gunzip < backup_20240101_120000.sql.gz | docker compose --env-file .env exec -T db psql -U postgres yape_notifier
 ```
 
 ### Backup Automático (Cron)
@@ -955,9 +915,9 @@ Crea un script `/var/apps/yape-notifier/backup.sh`:
 #!/bin/bash
 BACKUP_DIR="/var/backups/yape-notifier"
 mkdir -p $BACKUP_DIR
-cd /var/apps/yape-notifier/infra/docker
+cd /var/apps/yape-notifier/infra/docker/environments/production
 
-docker compose exec -T db pg_dump -U postgres yape_notifier | gzip > $BACKUP_DIR/backup_$(date +%Y%m%d_%H%M%S).sql.gz
+docker compose --env-file .env exec -T db pg_dump -U postgres yape_notifier | gzip > $BACKUP_DIR/backup_$(date +%Y%m%d_%H%M%S).sql.gz
 
 # Eliminar backups más antiguos de 30 días
 find $BACKUP_DIR -name "backup_*.sql.gz" -mtime +30 -delete
@@ -980,8 +940,8 @@ Agrega a crontab:
 - [ ] DNS configurado y propagado
 - [ ] Docker y Docker Compose instalados
 - [ ] Repositorio clonado
-- [ ] `.env.production` configurado correctamente
-- [ ] `Caddyfile` configurado con subdominios correctos
+- [ ] `.env` configurado correctamente en `infra/docker/environments/production/`
+- [ ] `Caddyfile` configurado con subdominios correctos (ya está configurado)
 
 ### Deployment
 
@@ -1017,7 +977,7 @@ Agrega a crontab:
 
 Si encuentras problemas:
 
-1. Revisa los logs: `docker compose logs -f`
+1. Revisa los logs: `docker compose --env-file .env logs -f` (desde `infra/docker/environments/production/`)
 2. Verifica la configuración DNS
 3. Verifica que los puertos estén abiertos en el firewall
 4. Consulta la sección de [Solución de Problemas](#solución-de-problemas)

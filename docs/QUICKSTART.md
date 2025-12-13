@@ -2,72 +2,123 @@
 
 Guía rápida para levantar el sistema completo (API + Dashboard).
 
-## 🚀 Staging (Testing Local)
-
-```bash
-# 1. Configurar variables
-cd infra/docker
-cp .env.staging.example .env.staging
-nano .env.staging  # Configurar DB_PASSWORD
-
-# 2. Levantar servicios
-chmod +x deploy-staging.sh
-./deploy-staging.sh
-
-# 3. Configurar Laravel
-docker compose -f docker-compose.staging.yml exec php-fpm php artisan key:generate
-# Copiar APP_KEY a .env.staging
-nano .env.staging
-docker compose -f docker-compose.staging.yml restart php-fpm
-docker compose -f docker-compose.staging.yml exec php-fpm php artisan migrate --force
-```
-
-**Acceso:**
-
-- API: `http://localhost:8080/up`
-- Dashboard: `http://localhost:8080/`
-
 ## 🚀 Producción
 
 ```bash
-# 1. Configurar variables
-cd infra/docker
-cp .env.production.example .env.production
-nano .env.production  # Configurar DB_PASSWORD, APP_URL, DASHBOARD_API_URL
+# 1. Ir al directorio de producción
+cd infra/docker/environments/production
 
-# 2. Levantar servicios
-chmod +x deploy.sh
+# 2. Configurar variables (primera vez)
+./setup.sh
+# O manualmente:
+cp .env.example .env
+nano .env  # Configurar DB_PASSWORD seguro
+
+# 3. Desplegar
 ./deploy.sh
-
-# 3. Configurar Laravel
-docker compose -f docker-compose.yml exec php-fpm php artisan key:generate
-# Copiar APP_KEY a .env.production
-nano .env.production
-docker compose -f docker-compose.yml restart php-fpm
-docker compose -f docker-compose.yml exec php-fpm php artisan migrate --force
-docker compose -f docker-compose.yml exec php-fpm php artisan config:cache
-docker compose -f docker-compose.yml exec php-fpm php artisan route:cache
 ```
 
 **Acceso:**
-
 - API: `https://api.notificaciones.space/up`
 - Dashboard: `https://dashboard.notificaciones.space`
 
-## 📋 Comandos Útiles
+## 🧪 Staging (Testing Local)
 
 ```bash
-# Ver estado
-docker compose -f infra/docker/docker-compose.yml ps
+# 1. Ir al directorio de staging
+cd infra/docker/environments/staging
 
-# Ver logs
-docker compose -f infra/docker/docker-compose.yml logs -f
+# 2. Configurar variables (primera vez)
+./setup.sh
+# O manualmente:
+cp .env.example .env
+nano .env  # Configurar DB_PASSWORD
 
-# Reiniciar
-docker compose -f infra/docker/docker-compose.yml restart
-
-# Detener
-docker compose -f infra/docker/docker-compose.yml down
+# 3. Desplegar
+./deploy.sh
 ```
 
-**Documentación completa:** Ver `docs/DEPLOYMENT.md`
+**Acceso:**
+- API: `http://localhost:8080/up`
+- Dashboard: `http://localhost:8080/`
+
+## 💻 Development (Desarrollo Local)
+
+```bash
+# 1. Ir al directorio de desarrollo
+cd infra/docker/environments/development
+
+# 2. Configurar variables (primera vez)
+./setup.sh
+# O manualmente:
+cp .env.example .env
+nano .env  # Configurar si es necesario
+
+# 3. Desplegar
+./deploy.sh
+```
+
+**Acceso:**
+- API: `http://localhost:8000/up`
+- Database: `localhost:5432`
+
+## 📋 Comandos Útiles
+
+### Ver estado
+
+```bash
+# Production
+cd infra/docker/environments/production
+docker compose --env-file .env ps
+
+# Staging
+cd infra/docker/environments/staging
+docker compose --env-file .env ps
+
+# Development
+cd infra/docker/environments/development
+docker compose --env-file .env ps
+```
+
+### Ver logs
+
+```bash
+# Todos los logs
+docker compose --env-file .env logs -f
+
+# Logs específicos
+docker compose --env-file .env logs -f php-fpm
+docker compose --env-file .env logs -f caddy
+```
+
+### Reiniciar servicios
+
+```bash
+docker compose --env-file .env restart
+```
+
+### Detener servicios
+
+```bash
+docker compose --env-file .env down
+```
+
+### Ejecutar comandos Laravel
+
+```bash
+# Migraciones
+docker compose --env-file .env exec php-fpm php artisan migrate
+
+# Tinker
+docker compose --env-file .env exec php-fpm php artisan tinker
+
+# Limpiar cache
+docker compose --env-file .env exec php-fpm php artisan optimize:clear
+```
+
+## 📚 Documentación Completa
+
+Para más detalles, consulta:
+
+- **`docs/DEPLOYMENT.md`** - Guía completa de despliegue en producción
+- **`infra/docker/README.md`** - Documentación técnica detallada
