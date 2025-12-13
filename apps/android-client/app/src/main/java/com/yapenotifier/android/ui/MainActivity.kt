@@ -54,17 +54,6 @@ class MainActivity : AppCompatActivity() {
         
         preferencesManager = PreferencesManager(this)
         
-        // --- TEMPORARILY DISABLED FOR TESTING ---
-        /*
-        lifecycleScope.launch {
-            val token = preferencesManager.authToken.first()
-            if (token == null) {
-                navigateToLogin()
-                return@launch
-            }
-        }
-        */
-
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -94,7 +83,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Observe service status changes and update the on-screen log
         lifecycleScope.launch {
             ServiceStatusManager.statusHistory.collectLatest { history ->
                 binding.tvServiceLog.text = history.joinToString(separator = "\n")
@@ -123,6 +111,10 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnSendTestNotification.setOnClickListener {
             requestPostNotificationPermissionAndSend()
+        }
+
+        binding.btnViewDatabase.setOnClickListener {
+            startActivity(Intent(this, CapturedNotificationsActivity::class.java))
         }
     }
 

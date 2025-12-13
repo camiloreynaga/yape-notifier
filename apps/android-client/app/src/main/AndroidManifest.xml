@@ -41,19 +41,12 @@
             </intent-filter>
         </activity>
 
-        <!-- Notification Diagnostics Activity -->
-        <activity
-            android:name=".ui.NotificationDiagnosticsActivity"
-            android:exported="false"
-            android:theme="@style/Theme.YapeNotifier"
-            android:label="Diagnóstico de Notificaciones" />
-
         <!-- Captured Notifications Activity (Debug) -->
         <activity
             android:name=".ui.CapturedNotificationsActivity"
             android:exported="false"
-            android:theme="@style/Theme.YapeNotifier"
-            android:label="Notificaciones Capturadas" />
+            android:label="Notificaciones Guardadas"
+            android:theme="@style/Theme.YapeNotifier" />
 
         <!-- Notification Listener Service -->
         <service

@@ -38,7 +38,7 @@ class LoginViewModel(application: android.app.Application) : androidx.lifecycle.
                     if (authResponse != null) {
                         // Save token and user info
                         preferencesManager.saveAuthToken(authResponse.token)
-                        authResponse.user.email?.let {
+                        authResponse.user.email.let { // Safe call '?' removed
                             preferencesManager.saveUserEmail(it)
                         }
                         
@@ -90,4 +90,3 @@ class LoginViewModel(application: android.app.Application) : androidx.lifecycle.
         }
     }
 }
-

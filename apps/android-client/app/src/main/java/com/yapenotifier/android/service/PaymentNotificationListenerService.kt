@@ -3,47 +3,39 @@ package com.yapenotifier.android.service
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
-import com.yapenotifier.android.data.parser.NotificationParser
-import com.yapenotifier.android.data.repository.NotificationRepository
+import androidx.work.Constraints
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import com.yapenotifier.android.data.local.db.AppDatabase
+import com.yapenotifier.android.data.local.db.CapturedNotification
+import com.yapenotifier.android.data.repository.SettingsRepository
 import com.yapenotifier.android.util.ServiceStatusManager
+import com.yapenotifier.android.worker.SendNotificationWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class PaymentNotificationListenerService : NotificationListenerService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val parser = NotificationParser()
-    private lateinit var repository: NotificationRepository
+    private lateinit var db: AppDatabase
+    private lateinit var settingsRepository: SettingsRepository
 
-    // Package names of payment apps to monitor
-    private val paymentAppPackages = setOf(
-        "com.yapenotifier.android", // TEMPORARY for testing
-        
-        // Interbank
-        "com.interbank.mobilebanking", // Legacy package
-        "pe.com.interbank.mobilebanking", // CORRECT package found in testing
-        
-        // BCP
-        "com.bcp.bancadigital", 
-        
-        // BBVA
-        "com.bbva.bbvacontinental",
-        
-        // Scotiabank
-        "com.scotiabank.mobile",
-        
-        // Yape
-        "com.yape.android", // Legacy package
-        "com.bcp.innovacxion.yapeapp", // CORRECT package found in testing
-        
-        // Plin
-        "com.plin.android"
-    )
+    private var monitoredPackages: Set<String> = setOf()
 
     override fun onCreate() {
         super.onCreate()
-        repository = NotificationRepository(applicationContext)
+        db = AppDatabase.getDatabase(this)
+        settingsRepository = SettingsRepository(this)
+        
+        // Load monitored packages into memory
+        serviceScope.launch {
+            monitoredPackages = settingsRepository.monitoredPackagesFlow.first()
+            Log.d(TAG, "Initial monitored packages loaded: $monitoredPackages")
+        }
+
         ServiceStatusManager.updateStatus("✅ Servicio Creado")
         Log.d(TAG, "PaymentNotificationListenerService created")
     }
@@ -52,75 +44,58 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         super.onListenerConnected()
         ServiceStatusManager.updateStatus("🚀 ¡Conectado! Escuchando notificaciones.")
         Log.i(TAG, "Notification listener connected.")
+        // Refresh packages on connect
+        serviceScope.launch {
+            settingsRepository.refreshMonitoredPackages()
+            monitoredPackages = settingsRepository.monitoredPackagesFlow.first()
+            Log.d(TAG, "Refreshed monitored packages on connect: $monitoredPackages")
+        }
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         super.onNotificationPosted(sbn)
         
-        val packageName = sbn.packageName ?: run {
-            Log.w(TAG, "onNotificationPosted: packageName is null, ignoring")
-            return
-        }
-        
-        val notification = sbn.notification
-        val extras = notification.extras
-        val title = extras?.getCharSequence("android.title")?.toString() ?: "N/A"
-        
-        Log.d(TAG, "Notification POSTED from: $packageName, Title: $title")
+        val packageName = sbn.packageName ?: return
         ServiceStatusManager.updateStatus("📬 Notificación recibida de: $packageName")
         
-        // Check if it's a payment app
-        if (!paymentAppPackages.contains(packageName)) {
-            ServiceStatusManager.updateStatus("⚠️ Ignorando (paquete no monitoreado): $packageName")
+        // Check against the dynamic list
+        if (!monitoredPackages.contains(packageName) && packageName != "com.yapenotifier.android") {
+            ServiceStatusManager.updateStatus("⚠️ Ignorando (paquete no monitoreado)")
             return
         }
-        
-        Log.i(TAG, "Processing payment notification from: $packageName")
-        ServiceStatusManager.updateStatus("✅ Procesando notificación de pago: $packageName")
+
+        val notification = sbn.notification
+        val title = notification.extras?.getString("android.title") ?: return
+        val text = notification.extras?.getString("android.text") ?: ""
+
+        ServiceStatusManager.updateStatus("✅ Procesando: $title")
 
         serviceScope.launch {
-            try {
-                val currentTitle = extras?.getCharSequence("android.title")?.toString()
-                if (currentTitle.isNullOrEmpty()) {
-                    Log.w(TAG, "Notification from $packageName has no title, skipping")
-                    ServiceStatusManager.updateStatus("⚠️ Notificación sin título, ignorando")
-                    return@launch
-                }
-                
-                val text = extras?.getCharSequence("android.text")?.toString() ?: ""
-                val bigText = extras?.getCharSequence("android.bigText")?.toString()
-                
-                val fullText = buildString {
-                    append(currentTitle)
-                    if (text.isNotEmpty()) {
-                        appendLine()
-                        append(text)
-                    }
-                    if (bigText?.isNotEmpty() == true) {
-                        appendLine()
-                        append(bigText)
-                    }
-                }.trim()
+            val capturedNotification = CapturedNotification(
+                packageName = packageName,
+                title = title,
+                body = text
+            )
+            db.capturedNotificationDao().insert(capturedNotification)
+            Log.i(TAG, "Notification saved locally with status PENDING.")
+            ServiceStatusManager.updateStatus("💾 Guardado localmente.")
 
-                ServiceStatusManager.updateStatus("🔍 Procesando: $currentTitle")
-
-                val parsedData = parser.parseNotification(
-                    packageName = packageName,
-                    title = currentTitle,
-                    body = fullText
-                )
-
-                if (parsedData != null) {
-                    repository.sendNotification(parsedData)
-                    ServiceStatusManager.updateStatus("📤 Enviando a la API...")
-                } else {
-                    ServiceStatusManager.updateStatus("⚠️ No se pudo procesar la notificación.")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error processing notification", e)
-                ServiceStatusManager.updateStatus("🔥 Error: ${e.message}")
-            }
+            scheduleSendNotificationWorker()
+            ServiceStatusManager.updateStatus("👷 Trabajo de envío planificado.")
         }
+    }
+
+    private fun scheduleSendNotificationWorker() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val sendWorkRequest = OneTimeWorkRequestBuilder<SendNotificationWorker>()
+            .setConstraints(constraints)
+            .build()
+
+        WorkManager.getInstance(this).enqueue(sendWorkRequest)
+        Log.d(TAG, "OneTime work request to send notifications has been enqueued.")
     }
 
     override fun onDestroy() {

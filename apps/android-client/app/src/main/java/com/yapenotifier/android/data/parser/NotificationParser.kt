@@ -16,22 +16,42 @@ class NotificationParser {
         title: String?,
         body: String
     ): NotificationData? {
-        // Map package name to source app identifier
+        // --- TEST BYPASS ---
+        // If this is a test notification from our own app, create a mock object and return immediately.
+        if (packageName == "com.yapenotifier.android") {
+            return NotificationData(
+                deviceId = "", // Will be set by repository
+                sourceApp = "yape-test",
+                title = title,
+                body = body,
+                amount = 1.00,
+                currency = "PEN",
+                payerName = "Juan Pérez (Prueba)",
+                receivedAt = dateFormat.format(Date()),
+                rawJson = mapOf(
+                    "package_name" to packageName,
+                    "title" to (title ?: ""),
+                    "body" to body
+                ),
+                status = "pending"
+            )
+        }
+        
+        // --- PRODUCTION LOGIC ---
         val sourceApp = mapPackageToSourceApp(packageName) ?: return null
 
-        // Check if this is a payment notification
         if (!isPaymentNotification(body)) {
             return null
         }
 
-        // Extract amount
         val amount = extractAmount(body)
-
-        // Extract payer name
         val payerName = extractPayerName(body)
-
-        // Extract currency (default to PEN)
         val currency = extractCurrency(body) ?: "PEN"
+
+        // Do not proceed if critical information is missing
+        if (amount == null || payerName == null) {
+            return null
+        }
 
         return NotificationData(
             deviceId = "", // Will be set by repository
@@ -78,7 +98,6 @@ class NotificationParser {
     }
 
     private fun extractAmount(text: String): Double? {
-        // Pattern to match amounts like: S/ 150.00, S/150.00, 150.00, S/. 150.00
         val patterns = listOf(
             Pattern.compile("s/\\s*([\\d,]+(?:\\.[\\d]{1,2})?)", Pattern.CASE_INSENSITIVE),
             Pattern.compile("([\\d,]+(?:\\.[\\d]{1,2})?)\\s*soles?", Pattern.CASE_INSENSITIVE),
@@ -101,7 +120,6 @@ class NotificationParser {
     }
 
     private fun extractPayerName(text: String): String? {
-        // Common patterns for payer names in payment notifications
         val patterns = listOf(
             Pattern.compile("de\\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*)", Pattern.CASE_INSENSITIVE),
             Pattern.compile("([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*)\\s+te", Pattern.CASE_INSENSITIVE),
@@ -129,4 +147,3 @@ class NotificationParser {
         }
     }
 }
-
