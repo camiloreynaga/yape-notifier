@@ -174,7 +174,19 @@ docker compose -f docker-compose.yml down -v
 
 ### Variables de Entorno
 
-Las variables de entorno se configuran en:
+**⚠️ IMPORTANTE - Cómo funcionan las variables de entorno:**
+
+Docker Compose necesita resolver variables como `${DB_PASSWORD}` **antes** de crear los contenedores. Para esto, usa `--env-file` explícitamente:
+
+```bash
+# ✅ CORRECTO - Usar --env-file
+docker compose --env-file .env.production -f docker-compose.yml up -d
+
+# ❌ INCORRECTO - Sin --env-file (DB_PASSWORD no se resolverá)
+docker compose -f docker-compose.yml up -d
+```
+
+**Archivos de configuración:**
 
 - `.env.production` - Para producción (crear desde `.env.production.example`)
 - `.env.staging` - Para staging (crear desde `.env.staging.example`)
@@ -189,11 +201,37 @@ Las variables de entorno se configuran en:
 ```bash
 # Producción
 cp .env.production.example .env.production
-nano .env.production  # Configurar valores reales
+nano .env.production  # Configurar valores reales (especialmente DB_PASSWORD)
 
 # Staging
 cp .env.staging.example .env.staging
-nano .env.staging  # Configurar valores reales
+nano .env.staging  # Configurar valores reales (especialmente DB_PASSWORD)
+```
+
+**Verificar que DB_PASSWORD está configurado:**
+
+```bash
+# Verificar que existe y no está vacío
+grep "^DB_PASSWORD=" .env.production
+# Debe mostrar: DB_PASSWORD=tu_contraseña_segura
+```
+
+**Uso en comandos:**
+
+Todos los scripts de deployment (`deploy.sh`, `deploy-production.sh`, `deploy-staging.sh`) usan automáticamente `--env-file`. Si ejecutas comandos manualmente, siempre incluye `--env-file`:
+
+```bash
+# Construir
+docker compose --env-file .env.production -f docker-compose.yml build
+
+# Levantar
+docker compose --env-file .env.production -f docker-compose.yml up -d
+
+# Ver logs
+docker compose --env-file .env.production -f docker-compose.yml logs
+
+# Ejecutar comandos
+docker compose --env-file .env.production -f docker-compose.yml exec php-fpm php artisan migrate
 ```
 
 Ver `docs/DEPLOYMENT.md` para la lista completa de variables requeridas y sus descripciones.

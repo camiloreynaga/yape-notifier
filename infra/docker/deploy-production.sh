@@ -58,6 +58,13 @@ if [ ! -f ".env.production" ]; then
     fi
 fi
 
+# Verificar que DB_PASSWORD está configurado
+if ! grep -q "^DB_PASSWORD=.*" .env.production || grep -q "^DB_PASSWORD=$" .env.production; then
+    error "DB_PASSWORD no está configurado en .env.production"
+    error "Por favor, edita .env.production y configura DB_PASSWORD con un valor no vacío"
+    exit 1
+fi
+
 # Verificar archivo .env.production del API
 if [ ! -f "../../apps/api/.env.production" ]; then
     warn "Archivo apps/api/.env.production no encontrado"
@@ -65,17 +72,17 @@ if [ ! -f "../../apps/api/.env.production" ]; then
     exit 1
 fi
 
-# Construir imágenes
+# Construir imágenes usando --env-file para interpolación de variables
 info "Construyendo imágenes Docker..."
-docker compose -f docker-compose.yml build --no-cache
+docker compose --env-file .env.production -f docker-compose.yml build --no-cache
 
 # Detener contenedores existentes
 info "Deteniendo contenedores existentes..."
-docker compose -f docker-compose.yml down
+docker compose --env-file .env.production -f docker-compose.yml down
 
 # Iniciar contenedores
 info "Iniciando contenedores..."
-docker compose -f docker-compose.yml up -d
+docker compose --env-file .env.production -f docker-compose.yml up -d
 
 # Esperar a que los servicios estén listos
 info "Esperando a que los servicios estén listos..."
@@ -83,21 +90,21 @@ sleep 15
 
 # Ejecutar migraciones
 info "Ejecutando migraciones..."
-docker compose -f docker-compose.yml exec -T php-fpm php artisan migrate --force
+docker compose --env-file .env.production -f docker-compose.yml exec -T php-fpm php artisan migrate --force
 
 # Generar APP_KEY si no existe
 info "Verificando APP_KEY..."
-docker compose -f docker-compose.yml exec -T php-fpm php artisan key:generate --force || true
+docker compose --env-file .env.production -f docker-compose.yml exec -T php-fpm php artisan key:generate --force || true
 
 # Optimizar Laravel
 info "Optimizando Laravel..."
-docker compose -f docker-compose.yml exec -T php-fpm php artisan config:cache
-docker compose -f docker-compose.yml exec -T php-fpm php artisan route:cache
-docker compose -f docker-compose.yml exec -T php-fpm php artisan view:cache
+docker compose --env-file .env.production -f docker-compose.yml exec -T php-fpm php artisan config:cache
+docker compose --env-file .env.production -f docker-compose.yml exec -T php-fpm php artisan route:cache
+docker compose --env-file .env.production -f docker-compose.yml exec -T php-fpm php artisan view:cache
 
 # Verificar estado
 info "Verificando estado de los contenedores..."
-docker compose -f docker-compose.yml ps
+docker compose --env-file .env.production -f docker-compose.yml ps
 
 info ""
 info "✅ Despliegue completado!"

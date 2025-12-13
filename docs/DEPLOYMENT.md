@@ -214,6 +214,24 @@ docker run hello-world
 # Si ves "Hello from Docker!", todo está bien
 ```
 
+**⚠️ Si obtienes error "Cannot connect to the Docker daemon":**
+
+Si estás en el grupo `docker` pero aún no puedes conectarte:
+
+```bash
+# Opción 1: Reiniciar sesión SSH (recomendado)
+exit
+# Luego vuelve a conectarte
+ssh deploy@TU_SERVIDOR
+
+# Opción 2: Activar el grupo sin cerrar sesión
+newgrp docker
+
+# Opción 3: Verificar que el servicio Docker esté corriendo
+sudo systemctl status docker
+sudo systemctl start docker  # Si no está corriendo
+```
+
 ### Paso 5: Clonar el Repositorio
 
 #### 5.1. Crear Directorio para la Aplicación
@@ -252,11 +270,32 @@ ls -la infra/docker/
 
 ### Paso 6: Configurar Variables de Entorno
 
-#### 6.1. Crear Archivo .env.production
+**⚠️ IMPORTANTE**: Este paso es **OBLIGATORIO** antes de construir las imágenes Docker.
+
+#### 6.1. Entendiendo las Variables de Entorno en Docker Compose
+
+**Cómo funciona Docker Compose con variables de entorno:**
+
+1. **Interpolación de variables** (`${VARIABLE}`): Docker Compose resuelve estas variables **antes** de crear los contenedores. Busca las variables en:
+   - Variables del shell actual
+   - Archivo `.env` en el mismo directorio (carga automática)
+   - Variables del sistema
+   - Archivo especificado con `--env-file` (mejor práctica)
+
+2. **Variables en contenedores** (`env_file`): Estas se cargan **dentro** del contenedor después de la creación.
+
+**Problema común**: Si usas `${DB_PASSWORD}` en `docker-compose.yml`, Docker Compose necesita resolverla **antes** de crear el contenedor. Si solo está en `.env.production` (usado por `env_file`), no la encontrará para la interpolación.
+
+**Solución profesional**: Usar `--env-file .env.production` explícitamente en todos los comandos de Docker Compose. Esto asegura que las variables estén disponibles tanto para interpolación como para los contenedores.
+
+#### 6.2. Crear Archivo .env.production
 
 ```bash
 # Ir al directorio de Docker
 cd /var/apps/yape-notifier/infra/docker
+
+# Verificar que existe la plantilla
+ls -la .env.production.example
 
 # Crear archivo .env.production desde la plantilla
 cp .env.production.example .env.production
@@ -265,7 +304,9 @@ cp .env.production.example .env.production
 nano .env.production
 ```
 
-#### 6.2. Configurar Variables de Entorno
+**⚠️ Si no creas este archivo o DB_PASSWORD está vacío, obtendrás el error: "The DB_PASSWORD variable is not set" o "Database is uninitialized and superuser password is not specified"**
+
+#### 6.3. Configurar Variables de Entorno
 
 El archivo `.env.production.example` contiene todas las variables necesarias con valores de ejemplo. Después de copiarlo a `.env.production`, ajusta los siguientes valores:
 
@@ -623,6 +664,36 @@ docker compose exec php-fpm php artisan key:generate --show
 
 ## 🐛 Solución de Problemas
 
+### Error: "The DB_PASSWORD variable is not set"
+
+**Causa**: El archivo `.env.production` no existe o no tiene la variable `DB_PASSWORD` configurada.
+
+**Solución**:
+
+```bash
+# 1. Ir al directorio de Docker
+cd /var/apps/yape-notifier/infra/docker
+
+# 2. Verificar si existe .env.production
+ls -la .env.production
+
+# 3. Si no existe, crearlo desde la plantilla
+cp .env.production.example .env.production
+
+# 4. Editar y configurar DB_PASSWORD (OBLIGATORIO)
+nano .env.production
+# Busca la línea: DB_PASSWORD=TU_CONTRASEÑA_SEGURA_AQUI
+# Cámbiala por: DB_PASSWORD=tu_contraseña_real_aqui
+
+# 5. Verificar que se guardó correctamente
+grep DB_PASSWORD .env.production
+
+# 6. Ahora intentar de nuevo
+docker compose up -d
+```
+
+**⚠️ IMPORTANTE**: `DB_PASSWORD` es **OBLIGATORIO** y debe tener un valor. No puede estar vacío.
+
 ### Error: "Certificate not obtained" (Caddy)
 
 **Causa**: DNS no propagado o subdominios incorrectos
@@ -656,6 +727,62 @@ docker compose restart nginx-api php-fpm
 # Ver logs
 docker compose logs nginx-api
 docker compose logs php-fpm
+```
+
+### Error: "Container yape-notifier-db is unhealthy" o "dependency db failed to start"
+
+**Causa**: La base de datos PostgreSQL no puede iniciar correctamente, generalmente por:
+
+1. `DB_PASSWORD` no configurado o vacío en `.env.production`
+2. Variables de entorno incorrectas
+3. Volumen de datos corrupto
+4. Healthcheck fallando
+
+**Solución paso a paso**:
+
+```bash
+# 1. Verificar que .env.production existe y tiene DB_PASSWORD
+cd /var/apps/yape-notifier/infra/docker
+cat .env.production | grep DB_PASSWORD
+
+# Si no existe o está vacío, crearlo/editar:
+cp .env.production.example .env.production
+nano .env.production
+# Asegúrate de que DB_PASSWORD tenga un valor (ej: DB_PASSWORD=tu_contraseña_segura_123)
+
+# 2. Ver logs del contenedor de base de datos
+docker compose logs db
+
+# 3. Si hay errores de permisos o datos corruptos, eliminar el volumen (CUIDADO: esto borra los datos)
+docker compose down -v
+# Luego volver a levantar
+docker compose up -d db
+
+# 4. Esperar a que la base de datos esté healthy (puede tardar 30-60 segundos)
+docker compose ps db
+# Debe mostrar "healthy" en el estado
+
+# 5. Si sigue fallando, iniciar solo la base de datos primero
+docker compose up -d db
+# Esperar 30 segundos
+docker compose logs -f db
+# Presiona Ctrl+C cuando veas "database system is ready to accept connections"
+
+# 6. Luego iniciar el resto de servicios
+docker compose up -d
+```
+
+**Diagnóstico avanzado**:
+
+```bash
+# Ver el estado detallado del healthcheck
+docker inspect yape-notifier-db | grep -A 10 Health
+
+# Probar conexión manual a PostgreSQL
+docker compose exec db psql -U postgres -d yape_notifier -c "SELECT version();"
+
+# Verificar variables de entorno del contenedor
+docker compose exec db env | grep POSTGRES
 ```
 
 ### Error: "Database connection failed"

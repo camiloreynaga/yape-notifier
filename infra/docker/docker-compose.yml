@@ -1,10 +1,20 @@
-version: '3.8'
-
 # ============================================
 # Yape Notifier - Production Docker Compose
 # ============================================
 # Arquitectura: Caddy (HTTPS) -> Nginx -> PHP-FPM + Dashboard + PostgreSQL
-# Uso: docker compose -f infra/docker/docker-compose.yml up -d
+#
+# Uso:
+#   docker compose -f infra/docker/docker-compose.yml up -d
+#
+# Requisitos:
+#   - Archivo .env debe existir con DB_PASSWORD configurado
+#     (Docker Compose carga automáticamente .env para interpolación)
+#   - DNS configurado: api.notificaciones.space, dashboard.notificaciones.space
+#   - Puertos 80 y 443 disponibles
+#
+# Nota: Para producción, crea .env desde .env.production.example:
+#   cp .env.production.example .env
+# ============================================
 
 services:
   # ============================================
@@ -17,10 +27,11 @@ services:
     container_name: yape-notifier-php-fpm
     restart: always
     working_dir: /var/www
+    user: www-data
     volumes:
       - ../../apps/api:/var/www
-    env_file:
-      - .env.production
+      # Nota: storage y cache se mantienen en el bind mount para facilitar backups
+      # env_file no es necesario: Laravel lee su .env del filesystem y variables críticas están en environment
     environment:
       - APP_ENV=production
       - APP_DEBUG=false
@@ -36,6 +47,17 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    labels:
+      - "com.yape-notifier.service=php-fpm"
+      - "com.yape-notifier.environment=production"
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 256M
 
   # ============================================
   # Nginx Service (Web Server for API)
@@ -54,10 +76,30 @@ services:
       php-fpm:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/up"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost/up",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
+    labels:
+      - "com.yape-notifier.service=nginx-api"
+      - "com.yape-notifier.environment=production"
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 256M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
 
   # ============================================
   # Dashboard Service (React Frontend)
@@ -78,10 +120,30 @@ services:
       nginx-api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost/health",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
+    labels:
+      - "com.yape-notifier.service=dashboard"
+      - "com.yape-notifier.environment=production"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
 
   # ============================================
   # Caddy Service (Reverse Proxy with HTTPS)
@@ -104,10 +166,23 @@ services:
       - nginx-api
       - dashboard
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      test:
+        ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
+    labels:
+      - "com.yape-notifier.service=caddy"
+      - "com.yape-notifier.environment=production"
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 256M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
 
   # ============================================
   # PostgreSQL Database
@@ -116,22 +191,41 @@ services:
     image: postgres:15-alpine
     container_name: yape-notifier-db
     restart: always
-    env_file:
-      - .env.production
+    # env_file no es necesario: las variables se pasan explícitamente en environment
     environment:
       POSTGRES_DB: ${DB_DATABASE:-yape_notifier}
       POSTGRES_USER: ${DB_USERNAME:-postgres}
+      # POSTGRES_PASSWORD: Resuelto desde .env (carga automática de Docker Compose)
+      # Requerido: DB_PASSWORD debe estar configurado en .env
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       PGDATA: /var/lib/postgresql/data/pgdata
+      # Optimizaciones de PostgreSQL para producción
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - yape-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-yape_notifier}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-yape_notifier} || exit 1",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
+    labels:
+      - "com.yape-notifier.service=postgresql"
+      - "com.yape-notifier.environment=production"
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
     # No exponer puerto al host (solo interno)
 
 # ============================================
@@ -140,10 +234,16 @@ services:
 volumes:
   postgres_data:
     driver: local
+    labels:
+      - "com.yape-notifier.volume=postgres_data"
   caddy_data:
     driver: local
+    labels:
+      - "com.yape-notifier.volume=caddy_data"
   caddy_config:
     driver: local
+    labels:
+      - "com.yape-notifier.volume=caddy_config"
 
 # ============================================
 # Networks
@@ -151,3 +251,8 @@ volumes:
 networks:
   yape-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+    labels:
+      - "com.yape-notifier.network=yape-network"
