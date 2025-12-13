@@ -1,121 +1,153 @@
 version: '3.8'
 
+# ============================================
+# Yape Notifier - Production Docker Compose
+# ============================================
+# Arquitectura: Caddy (HTTPS) -> Nginx -> PHP-FPM + Dashboard + PostgreSQL
+# Uso: docker compose -f infra/docker/docker-compose.yml up -d
+
 services:
-  app:
+  # ============================================
+  # PHP-FPM Service (Laravel API)
+  # ============================================
+  php-fpm:
     build:
       context: ../../apps/api
-      dockerfile: ../../infra/docker/Dockerfile
-    container_name: yape-notifier-app
-    restart: unless-stopped
+      dockerfile: ../../infra/docker/dockerfiles/Dockerfile.php-fpm
+    container_name: yape-notifier-php-fpm
+    restart: always
     working_dir: /var/www
     volumes:
       - ../../apps/api:/var/www
-      - ./php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    env_file:
+      - .env.production
     environment:
-      - APP_ENV=${APP_ENV:-local}
-      - APP_DEBUG=${APP_DEBUG:-true}
-      - DB_CONNECTION=pgsql
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_DATABASE=${DB_DATABASE:-yape_notifier}
-      - DB_USERNAME=${DB_USERNAME:-postgres}
-      - DB_PASSWORD=${DB_PASSWORD:-password}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - APP_URL=${APP_URL:-https://api.notificaciones.space}
     networks:
       - yape-network
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "php -r 'exit(0);'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
-  nginx:
+  # ============================================
+  # Nginx Service (Web Server for API)
+  # ============================================
+  nginx-api:
     image: nginx:alpine
-    container_name: yape-notifier-nginx
-    restart: unless-stopped
-    ports:
-      - "${APP_PORT:-8000}:80"
+    container_name: yape-notifier-nginx-api
+    restart: always
     volumes:
       - ../../apps/api:/var/www
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - ../../apps/api/public:/var/www/public:ro
+      - ./nginx/api.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       - yape-network
     depends_on:
-      - app
+      php-fpm:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/up"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
+  # ============================================
+  # Dashboard Service (React Frontend)
+  # ============================================
   dashboard:
     build:
       context: ../../apps/web-dashboard
-      dockerfile: Dockerfile
+      dockerfile: ../../infra/docker/dockerfiles/Dockerfile.dashboard
       args:
-        VITE_API_BASE_URL: ${DASHBOARD_API_URL:-http://localhost:8000}
+        VITE_API_BASE_URL: ${DASHBOARD_API_URL:-https://api.notificaciones.space}
     container_name: yape-notifier-dashboard
-    restart: unless-stopped
-    ports:
-      - "${DASHBOARD_PORT:-3000}:80"
-    networks:
-      - yape-network
-    depends_on:
-      - nginx
-
-  dashboard-dev:
-    build:
-      context: ../../apps/web-dashboard
-      dockerfile: Dockerfile.dev
-    container_name: yape-notifier-dashboard-dev
-    restart: unless-stopped
-    ports:
-      - "${DASHBOARD_DEV_PORT:-3001}:3000"
+    restart: always
     volumes:
-      - ../../apps/web-dashboard:/app
-      - /app/node_modules
+      - ./nginx/dashboard.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       - yape-network
     depends_on:
-      - nginx
-    environment:
-      - VITE_API_BASE_URL=${DASHBOARD_API_URL:-http://localhost:8000}
-    profiles:
-      - dev
+      nginx-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
+  # ============================================
+  # Caddy Service (Reverse Proxy with HTTPS)
+  # ============================================
+  caddy:
+    image: caddy:2-alpine
+    container_name: yape-notifier-caddy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - yape-network
+    depends_on:
+      - nginx-api
+      - dashboard
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================
+  # PostgreSQL Database
+  # ============================================
   db:
     image: postgres:15-alpine
     container_name: yape-notifier-db
-    restart: unless-stopped
+    restart: always
+    env_file:
+      - .env.production
     environment:
       POSTGRES_DB: ${DB_DATABASE:-yape_notifier}
       POSTGRES_USER: ${DB_USERNAME:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
-    ports:
-      - "${DB_PORT:-5432}:5432"
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - yape-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-yape_notifier}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    # No exponer puerto al host (solo interno)
 
-  redis:
-    image: redis:7-alpine
-    container_name: yape-notifier-redis
-    restart: unless-stopped
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    networks:
-      - yape-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
+# ============================================
+# Volumes
+# ============================================
 volumes:
   postgres_data:
     driver: local
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local
 
+# ============================================
+# Networks
+# ============================================
 networks:
   yape-network:
     driver: bridge
-

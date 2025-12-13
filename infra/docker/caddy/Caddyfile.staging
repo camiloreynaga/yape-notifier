@@ -1,0 +1,42 @@
+# Caddyfile para Staging/Desarrollo
+# HTTP simple para testing local
+
+:80 {
+    # Reverse proxy a Nginx API
+    reverse_proxy nginx-api:80 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up Host {host}
+        
+        health_uri /up
+        health_interval 30s
+        health_timeout 5s
+    }
+
+    # Logging
+    log {
+        output stdout
+        format console
+    }
+
+    # Compression
+    encode gzip
+}
+
+# Si tienes dominio de staging, descomentar:
+# api-staging.notificaciones.space {
+#     reverse_proxy nginx-api:80 {
+#         header_up X-Real-IP {remote_host}
+#         header_up X-Forwarded-For {remote_host}
+#         header_up X-Forwarded-Proto {scheme}
+#         header_up Host {host}
+#     }
+#     log {
+#         output file /var/log/caddy/api-staging.log
+#         format json
+#     }
+#     encode gzip zstd
+# }
+
+
