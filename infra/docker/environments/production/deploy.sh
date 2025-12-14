@@ -3,7 +3,13 @@
 # ============================================
 # Production Deployment Script
 # ============================================
-# Uso: ./deploy.sh
+# Uso: ./deploy.sh [--no-cache]
+#
+# Notas importantes:
+# - En producción, primero se detienen los contenedores, luego se construyen las imágenes
+# - APP_KEY nunca se regenera automáticamente en producción (debe existir en .env)
+# - Se usa wait loop activo para PostgreSQL en lugar de sleep
+# - El script es idempotente y seguro para ejecutarse múltiples veces
 
 set -e
 
@@ -42,6 +48,13 @@ if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/
     exit 1
 fi
 
+# Verificar si se solicita build sin cache
+BUILD_NO_CACHE=""
+if [ "$1" == "--no-cache" ]; then
+    BUILD_NO_CACHE="--no-cache"
+    warn "Modo --no-cache activado (build sin cache)"
+fi
+
 info "Iniciando despliegue en producción..."
 
 # Verificar archivo .env
@@ -65,42 +78,80 @@ if ! grep -q "^DB_PASSWORD=.*" .env || grep -q "^DB_PASSWORD=$" .env || grep -q 
     exit 1
 fi
 
-# Construir imágenes
-info "Construyendo imágenes Docker..."
-docker compose --env-file .env build --no-cache
+# Verificar que APP_KEY existe y no está vacío
+# En producción, APP_KEY NUNCA debe regenerarse automáticamente
+if ! grep -q "^APP_KEY=base64:.*" .env || grep -q "^APP_KEY=$" .env; then
+    error "APP_KEY no está configurado en .env"
+    error "En producción, APP_KEY debe existir y ser válido."
+    error "Por favor, edita .env y configura APP_KEY con un valor seguro"
+    error "Puedes generarlo localmente con: php artisan key:generate"
+    exit 1
+fi
 
-# Detener contenedores existentes
+info "APP_KEY verificado correctamente"
+
+# PASO 1: Detener contenedores existentes (con --remove-orphans para limpiar servicios huérfanos)
+# Esto debe hacerse ANTES de construir nuevas imágenes para evitar conflictos
 info "Deteniendo contenedores existentes..."
-docker compose --env-file .env down
+docker compose --env-file .env down --remove-orphans
 
-# Iniciar contenedores
+# PASO 2: Construir imágenes Docker
+# Se construye después de detener para evitar problemas con contenedores en ejecución
+info "Construyendo imágenes Docker..."
+if [ -n "$BUILD_NO_CACHE" ]; then
+    docker compose --env-file .env build $BUILD_NO_CACHE
+else
+    docker compose --env-file .env build
+fi
+
+# PASO 3: Iniciar contenedores
 info "Iniciando contenedores..."
 docker compose --env-file .env up -d
 
-# Esperar a que los servicios estén listos
-info "Esperando a que los servicios estén listos..."
-sleep 15
+# PASO 4: Esperar activamente a que PostgreSQL esté listo
+# Reemplazamos sleep por un wait loop que valida realmente la disponibilidad
+info "Esperando a que PostgreSQL esté listo..."
+MAX_ATTEMPTS=30
+ATTEMPT=0
+POSTGRES_READY=0
 
-# Ejecutar migraciones
-info "Ejecutando migraciones..."
-docker compose --env-file .env exec -T php-fpm php artisan migrate --force
+while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+    if docker compose --env-file .env exec -T postgres pg_isready -U postgres > /dev/null 2>&1; then
+        POSTGRES_READY=1
+        break
+    fi
+    ATTEMPT=$((ATTEMPT + 1))
+    echo -n "."
+    sleep 2
+done
 
-# Generar APP_KEY si no existe
-info "Verificando APP_KEY..."
-docker compose --env-file .env exec -T php-fpm php artisan key:generate --force || true
+echo ""
 
-# Asegurar permisos y directorios
+if [ $POSTGRES_READY -eq 0 ]; then
+    error "PostgreSQL no está disponible después de $MAX_ATTEMPTS intentos"
+    error "Revisa los logs: docker compose --env-file .env logs postgres"
+    exit 1
+fi
+
+info "PostgreSQL está listo"
+
+# PASO 5: Asegurar permisos y directorios (antes de migraciones)
+# Esto debe hacerse antes de ejecutar migraciones para evitar errores de permisos
 info "Verificando permisos y directorios..."
 docker compose --env-file .env exec -T php-fpm sh -c "mkdir -p /var/www/storage/framework/{sessions,views,cache} /var/www/storage/logs /var/www/bootstrap/cache && chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache && chmod -R 775 /var/www/storage /var/www/bootstrap/cache"
 
-# Optimizar Laravel
+# PASO 6: Ejecutar migraciones (solo después de que PostgreSQL esté listo)
+info "Ejecutando migraciones..."
+docker compose --env-file .env exec -T php-fpm php artisan migrate --force
+
+# PASO 7: Optimizar Laravel
 info "Optimizando Laravel..."
 docker compose --env-file .env exec -T php-fpm php artisan config:cache
 docker compose --env-file .env exec -T php-fpm php artisan route:cache
 # No cachear vistas en producción inicialmente (puede causar problemas si faltan directorios)
 # docker compose --env-file .env exec -T php-fpm php artisan view:cache
 
-# Verificar estado
+# PASO 8: Verificar estado
 info "Verificando estado de los contenedores..."
 docker compose --env-file .env ps
 
