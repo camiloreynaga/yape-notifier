@@ -6,14 +6,149 @@ Guía profesional y consolidada para desplegar Yape Notifier en producción usan
 
 ## 📋 Tabla de Contenidos
 
-1. [Arquitectura del Sistema](#arquitectura-del-sistema)
-2. [Prerrequisitos](#prerrequisitos)
-3. [Opción 1: Digital Ocean Droplet con Subdominios (Recomendado)](#opción-1-digital-ocean-droplet-con-subdominios-recomendado)
-4. [Opción 2: Digital Ocean App Platform (Alternativa)](#opción-2-digital-ocean-app-platform-alternativa)
-5. [Configuración de Variables de Entorno](#configuración-de-variables-de-entorno)
-6. [Solución de Problemas](#solución-de-problemas)
-7. [Mantenimiento y Actualizaciones](#mantenimiento-y-actualizaciones)
-8. [Backup y Recuperación](#backup-y-recuperación)
+1. [Resumen de Pasos para Producción](#resumen-de-pasos-para-producción) ⚡
+2. [Arquitectura del Sistema](#arquitectura-del-sistema)
+3. [Prerrequisitos](#prerrequisitos)
+4. [Opción 1: Digital Ocean Droplet con Subdominios (Recomendado)](#opción-1-digital-ocean-droplet-con-subdominios-recomendado)
+5. [Opción 2: Digital Ocean App Platform (Alternativa)](#opción-2-digital-ocean-app-platform-alternativa)
+6. [Configuración de Variables de Entorno](#configuración-de-variables-de-entorno)
+7. [Solución de Problemas](#solución-de-problemas)
+8. [Mantenimiento y Actualizaciones](#mantenimiento-y-actualizaciones)
+9. [Backup y Recuperación](#backup-y-recuperación)
+
+---
+
+## ⚡ Resumen de Pasos para Producción
+
+**Guía rápida de los pasos esenciales para desplegar en producción:**
+
+### 1️⃣ Preparación del Servidor
+
+```bash
+# 1. Crear Droplet en Digital Ocean (Ubuntu 22.04 LTS, mínimo 2GB RAM)
+# 2. Configurar DNS (api.notificaciones.space y dashboard.notificaciones.space → IP del Droplet)
+# 3. Conectarse al servidor: ssh root@TU_IP_DROPLET
+# 4. Actualizar sistema: apt update && apt upgrade -y
+# 5. Instalar herramientas: apt install -y curl wget git nano ufw
+# 6. Configurar firewall: ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp && ufw enable
+```
+
+### 2️⃣ Instalar Docker
+
+```bash
+# Instalar Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+
+# Instalar Docker Compose Plugin
+apt install docker-compose-plugin -y
+
+# Verificar instalación
+docker --version
+docker compose version
+```
+
+### 3️⃣ Clonar Repositorio
+
+```bash
+# Crear directorio y clonar
+mkdir -p /var/apps
+cd /var/apps
+git clone https://github.com/TU_USUARIO/yape-notifier.git
+cd yape-notifier
+```
+
+### 4️⃣ Configurar Variables de Entorno
+
+```bash
+# Ir al directorio de producción
+cd infra/docker/environments/production
+
+# Crear archivo .env desde plantilla
+cp .env.example .env
+
+# Editar y configurar DB_PASSWORD (OBLIGATORIO - es lo único que DEBES cambiar)
+nano .env
+# Buscar la línea que contiene: DB_PASSWORD=TU_CONTRASEÑA_SEGURA_AQUI
+# O simplemente buscar: DB_PASSWORD
+# Cambiar por: DB_PASSWORD=tu_contraseña_segura_real
+#
+# Ejemplo de línea correcta:
+# DB_PASSWORD=MiContraseñaSegura123!@#
+#
+# ⚠️ IMPORTANTE: No dejes DB_PASSWORD vacío ni con el valor placeholder
+```
+
+**Nota**: El archivo `.env.example` contiene todas las variables necesarias con valores por defecto. **IMPORTANTE**: Antes del primer despliegue, debes configurar:
+
+- `DB_PASSWORD`: Contraseña segura para PostgreSQL (OBLIGATORIO)
+- `APP_KEY`: Clave de aplicación Laravel (OBLIGATORIO - ver sección de generación más abajo)
+
+Las demás variables (APP_URL, DASHBOARD_API_URL, etc.) ya están configuradas correctamente para producción.
+
+### 5️⃣ Generar APP_KEY (OBLIGATORIO)
+
+```bash
+# Generar APP_KEY antes del despliegue
+# Opción 1: Si tienes PHP local
+cd apps/api
+php artisan key:generate --show
+# Copia la clave generada
+
+# Opción 2: Usar contenedor temporal
+cd infra/docker/environments/production
+docker run --rm -v $(pwd)/../../../../apps/api:/var/www -w /var/www php:8.2-cli php artisan key:generate --show
+
+# Editar .env y agregar APP_KEY
+nano .env
+# Busca APP_KEY= y reemplaza con: APP_KEY=base64:tu_clave_generada_aqui
+```
+
+### 6️⃣ Desplegar Aplicación
+
+```bash
+# Hacer scripts ejecutables
+chmod +x setup.sh deploy.sh
+
+# Ejecutar setup (solo primera vez, ya debería estar hecho)
+./setup.sh
+
+# Desplegar (esto valida APP_KEY, detiene contenedores, construye, inicia servicios, ejecuta migraciones, etc.)
+./deploy.sh
+
+# O si necesitas rebuild completo sin cache:
+./deploy.sh --no-cache
+```
+
+### 7️⃣ Verificar Despliegue
+
+```bash
+# Verificar estado de contenedores
+docker compose --env-file .env ps
+
+# Ver logs
+docker compose --env-file .env logs -f
+
+# Verificar desde navegador (esperar 2-5 minutos para certificados SSL)
+# - https://api.notificaciones.space/up
+# - https://dashboard.notificaciones.space
+```
+
+### ✅ Checklist Rápido
+
+- [ ] Droplet creado y accesible
+- [ ] DNS configurado (api y dashboard apuntan a IP del Droplet)
+- [ ] Docker y Docker Compose instalados
+- [ ] Repositorio clonado
+- [ ] Archivo `.env` creado con `DB_PASSWORD` configurado
+- [ ] `APP_KEY` generado y configurado en `.env` (antes de ejecutar deploy.sh)
+- [ ] Script `deploy.sh` ejecutado exitosamente
+- [ ] Contenedores corriendo y saludables
+- [ ] Certificados SSL obtenidos (verificar en navegador)
+- [ ] API accesible en `https://api.notificaciones.space/up`
+- [ ] Dashboard accesible en `https://dashboard.notificaciones.space`
+
+> 📖 **Para detalles completos de cada paso, consulta las secciones detalladas a continuación.**
 
 ---
 
@@ -36,10 +171,20 @@ Internet
 ### Componentes
 
 - **Caddy**: Reverse proxy con HTTPS automático (Let's Encrypt)
-- **Nginx API**: Servidor web para Laravel (PHP-FPM)
-- **PHP-FPM**: Aplicación Laravel 11
+- **Nginx API**: Servidor web para Laravel (PHP-FPM) - Imagen construida con código incluido
+- **PHP-FPM**: Aplicación Laravel 11 - Imagen optimizada con dependencias de Composer instaladas
 - **Dashboard**: Frontend React servido por Nginx
 - **PostgreSQL**: Base de datos (no expuesta públicamente)
+
+### Optimizaciones de Producción
+
+El proyecto utiliza las siguientes optimizaciones para producción:
+
+- ✅ **Imágenes autocontenidas**: El código de la aplicación está incluido en las imágenes Docker, sin dependencias del host
+- ✅ **Composer optimizado**: Las dependencias de Composer se instalan durante el build de la imagen
+- ✅ **Healthchecks configurados**: Todos los servicios tienen healthchecks para monitoreo automático
+- ✅ **Permisos de Laravel**: Los directorios `storage/` y `bootstrap/cache` tienen permisos correctos configurados en la imagen
+- ✅ **Sin volúmenes de código**: En producción, no se montan volúmenes del host para evitar sobrescribir archivos generados durante el build
 
 ---
 
@@ -273,24 +418,41 @@ ls -la infra/docker/environments/production/
 
 **⚠️ IMPORTANTE**: Este paso es **OBLIGATORIO** antes de construir las imágenes Docker.
 
-#### 6.1. Entendiendo las Variables de Entorno en Docker Compose
+**📋 Resumen rápido:**
 
-**Cómo funciona Docker Compose con variables de entorno:**
+- El archivo `.env` en `infra/docker/environments/production/` se usa para **Docker Compose**
+- **OBLIGATORIO antes del primer despliegue**: Configurar `DB_PASSWORD` y `APP_KEY`
+- Las demás variables ya tienen valores por defecto adecuados
+- ⚠️ **IMPORTANTE**: En producción, `APP_KEY` NO se genera automáticamente. Debe existir en `.env` antes de ejecutar `deploy.sh`
 
-1. **Interpolación de variables** (`${VARIABLE}`): Docker Compose resuelve estas variables **antes** de crear los contenedores. Busca las variables en:
+#### 6.1. Entendiendo las Variables de Entorno
 
-   - Variables del shell actual
-   - Archivo `.env` en el mismo directorio (carga automática)
-   - Variables del sistema
-   - Archivo especificado con `--env-file` (mejor práctica)
+**Dos tipos de variables de entorno en este proyecto:**
 
-2. **Variables en contenedores** (`env_file`): Estas se cargan **dentro** del contenedor después de la creación.
+1. **Variables para Docker Compose** (archivo `.env` en `infra/docker/environments/production/`):
 
-**Problema común**: Si usas `${DB_PASSWORD}` en `docker-compose.yml`, Docker Compose necesita resolverla **antes** de crear el contenedor. Si solo está en `.env.production` (usado por `env_file`), no la encontrará para la interpolación.
+   - Se usan **antes** de crear los contenedores
+   - Docker Compose las lee para configurar servicios (PostgreSQL, build args, etc.)
+   - Se especifican con `--env-file .env` en los comandos
+   - Ejemplo: `DB_PASSWORD`, `APP_URL`, `DASHBOARD_API_URL`
 
-**Solución profesional**: Usar `--env-file .env.production` explícitamente en todos los comandos de Docker Compose. Esto asegura que las variables estén disponibles tanto para interpolación como para los contenedores.
+2. **Variables para Laravel** (dentro del contenedor PHP-FPM):
+   - Se pasan al contenedor de Laravel
+   - Laravel las lee desde su archivo `.env` interno
+   - Incluyen todas las variables que Laravel necesita (APP*\*, DB*\_, CACHE\_\_, etc.)
 
-#### 6.2. Crear Archivo .env.production
+**Cómo Docker Compose resuelve variables:**
+
+Cuando usas `${VARIABLE}` en `docker-compose.yml`, Docker Compose busca la variable en:
+
+1. Archivo especificado con `--env-file .env` (recomendado)
+2. Archivo `.env` en el mismo directorio (carga automática si no usas `--env-file`)
+3. Variables del shell actual
+4. Variables del sistema
+
+**Mejor práctica**: Siempre usar `--env-file .env` explícitamente en todos los comandos de Docker Compose para evitar ambigüedades.
+
+#### 6.2. Crear Archivo .env
 
 ```bash
 # Ir al directorio de producción
@@ -306,68 +468,87 @@ cp .env.example .env
 nano .env
 ```
 
-**⚠️ Si no creas este archivo o DB_PASSWORD está vacío, obtendrás el error: "The DB_PASSWORD variable is not set" o "Database is uninitialized and superuser password is not specified"**
+**⚠️ IMPORTANTE**: Si no creas este archivo o `DB_PASSWORD` está vacío, obtendrás el error: "The DB_PASSWORD variable is not set" o "Database is uninitialized and superuser password is not specified"
 
-#### 6.3. Configurar Variables de Entorno
+#### 6.3. Entendiendo las Variables de Entorno
 
-El archivo `.env.example` contiene todas las variables necesarias con valores de ejemplo. Después de copiarlo a `.env`, ajusta los siguientes valores:
+El archivo `.env` en `infra/docker/environments/production/` tiene **dos propósitos**:
 
-**Variables que DEBES configurar:**
+1. **Variables para Docker Compose** (usadas en `docker-compose.yml`):
+
+   - Estas variables se leen **antes** de crear los contenedores
+   - Se usan para configurar servicios Docker (PostgreSQL, build args, etc.)
+
+2. **Variables para Laravel** (necesarias dentro del contenedor PHP-FPM):
+   - Estas variables se pasan al contenedor de Laravel
+   - Laravel las lee desde su propio archivo `.env` dentro del contenedor
+
+#### 6.4. Variables Requeridas para Docker Compose
+
+**Variables OBLIGATORIAS** que Docker Compose necesita (definidas en `docker-compose.yml`):
 
 ```env
-# ============================================
-# Base de Datos PostgreSQL
-# ============================================
-DB_CONNECTION=pgsql
-DB_HOST=db
-DB_PORT=5432
-DB_DATABASE=yape_notifier
-DB_USERNAME=postgres
-DB_PASSWORD=TU_CONTRASEÑA_SEGURA_AQUI
-
-# ============================================
-# Aplicación Laravel
-# ============================================
-APP_NAME="Yape Notifier API"
-APP_ENV=production
-APP_DEBUG=false
-APP_KEY=base64:TU_CLAVE_AQUI  # Se generará después
-APP_URL=https://api.notificaciones.space
-APP_TIMEZONE=UTC
-
-# ============================================
-# Sesiones y Cache
-# ============================================
-SESSION_DRIVER=database
-SESSION_LIFETIME=120
-CACHE_DRIVER=file
-QUEUE_CONNECTION=database
-
-# ============================================
-# Logs
-# ============================================
-LOG_CHANNEL=stderr
-LOG_LEVEL=error
-
-# ============================================
-# Dashboard
-# ============================================
-DASHBOARD_API_URL=https://api.notificaciones.space
-
-# ============================================
-# CORS (si es necesario)
-# ============================================
-CORS_ALLOWED_ORIGINS=https://dashboard.notificaciones.space
+# ⚠️ OBLIGATORIO - Sin esta variable, PostgreSQL no iniciará
+DB_PASSWORD=tu_contraseña_segura_aqui
 ```
 
-**Variables importantes a configurar:**
+**Variables OPCIONALES** con valores por defecto (puedes omitirlas si los defaults son correctos):
 
-1. **`DB_PASSWORD`**: Cambia `TU_CONTRASEÑA_SEGURA_AQUI` por una contraseña fuerte para PostgreSQL
-2. **`APP_KEY`**: Se generará automáticamente después del primer despliegue (puedes dejarlo vacío inicialmente)
-3. **`APP_URL`**: Ya está configurado para `https://api.notificaciones.space` (verificar si es correcto)
-4. **`DASHBOARD_API_URL`**: Ya está configurado para `https://api.notificaciones.space` (verificar si es correcto)
+```env
+# Base de Datos (opcionales, tienen defaults)
+DB_DATABASE=yape_notifier          # Default: yape_notifier
+DB_USERNAME=postgres               # Default: postgres
 
-**Nota**: El archivo `.env.example` contiene todas las variables con valores por defecto. Solo necesitas ajustar las mencionadas arriba.
+# URLs (opcionales, tienen defaults)
+APP_URL=https://api.notificaciones.space                    # Default: https://api.notificaciones.space
+DASHBOARD_API_URL=https://api.notificaciones.space         # Default: https://api.notificaciones.space
+```
+
+**Nota**: Si no defines estas variables opcionales, Docker Compose usará los valores por defecto definidos en `docker-compose.yml`.
+
+#### 6.5. Variables para Laravel (dentro del contenedor)
+
+Laravel necesita su propio archivo `.env` dentro del contenedor. El archivo `.env.example` en `infra/docker/environments/production/` contiene **todas** las variables que Laravel necesita, incluyendo:
+
+- Variables de base de datos (DB\_\*)
+- Variables de aplicación (APP\_\*)
+- Variables de sesión, cache, queue, etc.
+
+**Importante**:
+
+- El archivo `.env.example` ya contiene valores por defecto para todas las variables de Laravel
+- **OBLIGATORIO antes del primer despliegue**: Configurar `DB_PASSWORD` y `APP_KEY`
+- ⚠️ **En producción, `APP_KEY` NO se genera automáticamente**. Debes generarlo manualmente antes del despliegue (ver sección "Generar APP_KEY" más abajo)
+- Las demás variables de Laravel se pueden ajustar después si es necesario
+
+#### 6.6. Resumen: ¿Qué configurar antes del despliegue?
+
+**Mínimo requerido** (antes de ejecutar `./deploy.sh`):
+
+```env
+# 1. Configurar contraseña de base de datos (OBLIGATORIO)
+DB_PASSWORD=tu_contraseña_segura_real_aqui
+
+# 2. Generar y configurar APP_KEY (OBLIGATORIO)
+# Primero genera la clave (ver sección "Generar APP_KEY" más abajo)
+APP_KEY=base64:tu_clave_generada_aqui
+```
+
+**⚠️ IMPORTANTE**: El script `deploy.sh` validará que `APP_KEY` existe antes de continuar. Si no está configurado, el despliegue fallará con un error claro.
+
+**Opcional** (si quieres personalizar):
+
+```env
+# Si tu dominio es diferente:
+APP_URL=https://tu-dominio.com
+DASHBOARD_API_URL=https://tu-dominio.com
+
+# Si quieres cambiar el nombre de la base de datos:
+DB_DATABASE=mi_base_de_datos
+DB_USERNAME=mi_usuario
+```
+
+**Nota**: Puedes ajustar otras variables de Laravel después del despliegue si es necesario.
 
 #### 6.3. Guardar y Salir
 
@@ -391,14 +572,49 @@ nano /var/apps/yape-notifier/infra/docker/environments/production/Caddyfile
 #### 7.2. Verificar Configuración de Subdominios
 
 El Caddyfile ya está configurado correctamente con:
+
 - `api.notificaciones.space` → Nginx API
 - `dashboard.notificaciones.space` → Dashboard
 
 **Nota**: El dominio `notificaciones.space` ya está configurado. Si usas otro dominio, edita el Caddyfile y actualiza los valores.
 
-### Paso 8: Desplegar la Aplicación
+### Paso 8: Generar APP_KEY (OBLIGATORIO antes del despliegue)
 
-#### 8.1. Usar el Script de Despliegue (Recomendado)
+**⚠️ IMPORTANTE**: Antes de ejecutar `deploy.sh`, debes generar y configurar `APP_KEY` en el archivo `.env`. El script validará que existe y abortará si no está configurado.
+
+**Procedimiento rápido:**
+
+```bash
+# Opción 1: Si tienes PHP localmente
+cd /var/apps/yape-notifier/apps/api
+php artisan key:generate --show
+# Copia la clave generada (ej: base64:xxxxxxxxxxxxx)
+
+# Opción 2: Usar contenedor temporal
+cd /var/apps/yape-notifier/infra/docker/environments/production
+docker run --rm -v $(pwd)/../../../../apps/api:/var/www -w /var/www php:8.2-cli php artisan key:generate --show
+# Copia la clave generada
+
+# Editar .env y agregar la clave
+nano .env
+# Busca APP_KEY= y reemplaza con: APP_KEY=base64:tu_clave_generada_aqui
+```
+
+**Verificar que APP_KEY está configurado:**
+
+```bash
+# Verificar que APP_KEY existe y no está vacío
+grep "^APP_KEY=base64:" .env
+
+# Debe mostrar algo como: APP_KEY=base64:xxxxxxxxxxxxx
+# Si muestra APP_KEY= o APP_KEY=, necesitas generarlo
+```
+
+> 📖 **Para más detalles y opciones, consulta la sección [Generar APP_KEY](#generar-app_key) más abajo.**
+
+### Paso 9: Desplegar la Aplicación
+
+#### 9.1. Usar el Script de Despliegue (Recomendado)
 
 ```bash
 # Asegúrate de estar en el directorio correcto
@@ -409,17 +625,25 @@ chmod +x deploy.sh
 
 # Ejecutar el script de despliegue
 ./deploy.sh
+
+# O si necesitas rebuild completo sin cache:
+./deploy.sh --no-cache
 ```
 
 El script `deploy.sh` automáticamente:
-- Construye las imágenes Docker
-- Inicia todos los servicios
-- Ejecuta migraciones
-- Genera APP_KEY si no existe
-- Configura permisos
-- Optimiza Laravel para producción
 
-#### 8.2. Despliegue Manual (Alternativa)
+1. **Valida configuración**: Verifica que `DB_PASSWORD` y `APP_KEY` estén configurados en `.env`
+2. **Detiene contenedores**: Ejecuta `docker compose down --remove-orphans` para limpiar servicios anteriores
+3. **Construye imágenes**: Construye las imágenes Docker (con cache por defecto, o sin cache si usas `--no-cache`)
+4. **Inicia servicios**: Levanta todos los contenedores
+5. **Espera PostgreSQL**: Usa un wait loop activo con `pg_isready` para asegurar que la base de datos esté lista
+6. **Configura permisos**: Crea directorios necesarios y configura permisos de Laravel
+7. **Ejecuta migraciones**: Ejecuta las migraciones de base de datos
+8. **Optimiza Laravel**: Cachea configuración y rutas para producción
+
+**⚠️ IMPORTANTE**: El script validará que `APP_KEY` existe antes de continuar. Si no está configurado, el despliegue fallará. Debes generar `APP_KEY` manualmente antes del primer despliegue (ver sección "Generar APP_KEY" más abajo).
+
+#### 9.2. Despliegue Manual (Alternativa)
 
 Si prefieres hacerlo manualmente:
 
@@ -428,14 +652,24 @@ Si prefieres hacerlo manualmente:
 cd /var/apps/yape-notifier/infra/docker/environments/production
 
 # Construir imágenes (esto puede tardar varios minutos)
+# Nota: Las imágenes incluyen todo el código y dependencias de Composer
 docker compose --env-file .env build
 
 # Iniciar todos los servicios
 docker compose --env-file .env up -d
 
-# Verificar que los contenedores estén corriendo
+# Verificar que los contenedores estén corriendo y saludables
 docker compose --env-file .env ps
+
+# Verificar healthchecks
+docker compose --env-file .env ps --format "table {{.Name}}\t{{.Status}}\t{{.Health}}"
 ```
+
+**Nota importante**: En producción, las imágenes Docker contienen todo el código de la aplicación. No se montan volúmenes del host para el código, lo que asegura que:
+
+- Las dependencias de Composer instaladas durante el build no se sobrescriban
+- Los archivos optimizados de Laravel se mantengan intactos
+- La aplicación sea completamente autocontenida y portable
 
 Deberías ver algo como:
 
@@ -448,7 +682,7 @@ yape-notifier-caddy         Up
 yape-notifier-db            Up
 ```
 
-#### 8.3. Ver Logs (Opcional)
+#### 9.3. Ver Logs (Opcional)
 
 ```bash
 # Ver logs de todos los servicios
@@ -459,7 +693,7 @@ docker compose --env-file .env logs -f caddy
 docker compose --env-file .env logs -f php-fpm
 ```
 
-### Paso 9: Verificar el Despliegue
+### Paso 10: Verificar el Despliegue
 
 #### 9.1. Verificar Contenedores
 
@@ -470,40 +704,61 @@ docker compose --env-file .env ps
 # Todos deberían estar "Up" y "healthy"
 ```
 
-**Nota**: Si usaste `deploy.sh`, los siguientes pasos (9.2-9.5) ya fueron ejecutados automáticamente. Solo necesitas verificar que todo funcione.
+**Nota**: Si usaste `deploy.sh`, los siguientes pasos (10.2-10.5) ya fueron ejecutados automáticamente. Solo necesitas verificar que todo funcione.
 
-#### 9.2. Verificar APP_KEY de Laravel
+#### 10.2. Verificar APP_KEY de Laravel
 
 ```bash
-# Verificar que APP_KEY esté configurado
-docker compose --env-file .env exec php-fpm php artisan key:generate --force
-
-# Si necesitas ver el APP_KEY actual:
+# Verificar que APP_KEY esté configurado (debería estar desde antes del despliegue)
 docker compose --env-file .env exec php-fpm cat /var/www/.env | grep APP_KEY
+
+# Si necesitas generar un nuevo APP_KEY (solo si no existe):
+# ⚠️ CUIDADO: Esto regenerará la clave, lo que invalidará sesiones y datos encriptados existentes
+docker compose --env-file .env exec php-fpm php artisan key:generate --show
+
+# Luego actualiza el .env en el host con la nueva clave generada
+nano .env
+# Busca APP_KEY y reemplaza con el valor mostrado
 ```
 
-#### 9.3. Verificar Migraciones
+**Nota**: En producción, `APP_KEY` debe estar configurado ANTES del despliegue. El script `deploy.sh` validará esto automáticamente.
+
+#### 10.3. Verificar Migraciones
 
 ```bash
 # Verificar que las migraciones estén ejecutadas
 docker compose --env-file .env exec php-fpm php artisan migrate:status
 ```
 
-#### 9.4. Verificar Health Checks
+#### 10.4. Verificar Health Checks
 
 ```bash
-# Verificar API (desde el servidor)
-curl http://localhost/up
+# Verificar healthchecks de todos los servicios
+docker compose --env-file .env ps --format "table {{.Name}}\t{{.Status}}\t{{.Health}}"
 
-# Deberías ver una respuesta HTML con "Application up"
+# Todos los servicios deberían mostrar "healthy" después de unos minutos
+
+# Verificar endpoint de healthcheck de Nginx (estático, no requiere PHP-FPM)
+curl http://127.0.0.1/up
+# Deberías ver: OK
+
+# Verificar API completa (desde el servidor, a través de Caddy)
+curl http://localhost/up
+# O desde fuera: curl https://api.notificaciones.space/up
 
 # Verificar Dashboard (desde el servidor)
 curl http://localhost/
-
 # Deberías ver el HTML del dashboard
 ```
 
-#### 9.5. Verificar desde el Navegador
+**Nota sobre Healthchecks**:
+
+- **Nginx**: Usa endpoint estático `/up` que responde directamente sin pasar por PHP-FPM
+- **PHP-FPM**: Verifica que PHP esté funcionando correctamente
+- **PostgreSQL**: Verifica que la base de datos esté lista para aceptar conexiones
+- Todos los healthchecks están configurados para verificar el estado real de cada servicio
+
+#### 10.5. Verificar desde el Navegador
 
 Espera unos minutos para que Caddy obtenga los certificados SSL automáticamente, luego:
 
@@ -587,43 +842,206 @@ nano .env  # Configurar valores reales
 
 ### Variables Requeridas para Producción
 
-El archivo `.env.example` en `infra/docker/environments/production/` contiene todas las variables. Las más importantes a configurar son:
+#### Variables para Docker Compose (en `infra/docker/environments/production/.env`)
+
+**OBLIGATORIA**:
 
 ```env
-# Base de Datos (OBLIGATORIO)
-DB_PASSWORD=TU_CONTRASEÑA_SEGURA_AQUI  # ⚠️ Cambiar esto
-
-# Aplicación Laravel
-APP_KEY=                              # Se genera automáticamente
-APP_URL=https://api.notificaciones.space  # Ya configurado
-
-# Dashboard
-DASHBOARD_API_URL=https://api.notificaciones.space  # Ya configurado
-
-# CORS
-CORS_ALLOWED_ORIGINS=https://dashboard.notificaciones.space  # Ya configurado
+DB_PASSWORD=tu_contraseña_segura_aqui  # ⚠️ DEBES cambiar esto
 ```
 
-**Todas las demás variables** ya están configuradas con valores por defecto en el archivo `.env.example`.
+**Opcionales** (con valores por defecto en `docker-compose.yml`):
+
+```env
+DB_DATABASE=yape_notifier              # Default: yape_notifier
+DB_USERNAME=postgres                   # Default: postgres
+APP_URL=https://api.notificaciones.space  # Default: https://api.notificaciones.space
+DASHBOARD_API_URL=https://api.notificaciones.space  # Default: https://api.notificaciones.space
+```
+
+#### Variables para Laravel (dentro del contenedor)
+
+El archivo `.env.example` contiene **todas** las variables que Laravel necesita. La mayoría ya tienen valores por defecto adecuados para producción. Las más importantes:
+
+```env
+# Base de Datos (se sincronizan con las de Docker Compose)
+DB_CONNECTION=pgsql
+DB_HOST=db
+DB_PORT=5432
+DB_DATABASE=yape_notifier
+DB_USERNAME=postgres
+DB_PASSWORD=tu_contraseña_segura_aqui  # ⚠️ Mismo valor que DB_PASSWORD de Docker Compose
+
+# Aplicación Laravel
+APP_NAME="Yape Notifier API"
+APP_ENV=production
+APP_DEBUG=false
+APP_KEY=base64:TU_CLAVE_AQUI          # ⚠️ OBLIGATORIO: Debe generarse manualmente antes del despliegue
+APP_URL=https://api.notificaciones.space
+
+# Sesiones, Cache, Queue, etc. (ya configurados con valores por defecto)
+SESSION_DRIVER=database
+CACHE_DRIVER=file
+QUEUE_CONNECTION=database
+LOG_CHANNEL=stderr
+LOG_LEVEL=error
+```
+
+**Nota importante**:
+
+- El archivo `.env.example` ya contiene valores por defecto para todas las variables de Laravel
+- **OBLIGATORIO antes del primer despliegue**: Configurar `DB_PASSWORD` y `APP_KEY`
+- ⚠️ **En producción, `APP_KEY` NO se genera automáticamente**. Debes generarlo manualmente antes del despliegue
+- Las demás variables se pueden ajustar después si es necesario
 
 ### Generar APP_KEY
 
+**⚠️ IMPORTANTE**: `APP_KEY` debe generarse ANTES del primer despliegue. El script `deploy.sh` validará que existe y abortará si no está configurado.
+
+**Opción 1: Generar desde tu máquina local (Recomendado)**
+
+Si tienes PHP y Composer instalados localmente:
+
 ```bash
-# Desde el contenedor
-docker compose --env-file .env exec php-fpm php artisan key:generate --show
+# Desde el directorio de la API
+cd apps/api
+
+# Generar APP_KEY
+php artisan key:generate --show
+
+# Copia la clave generada (ej: base64:xxxxxxxxxxxxx)
+# Luego edita el .env de producción y pega el valor
+```
+
+**Opción 2: Generar desde contenedor temporal**
+
+Si no tienes PHP local, puedes usar un contenedor temporal:
+
+```bash
+# Desde el directorio de producción
+cd /var/apps/yape-notifier/infra/docker/environments/production
+
+# Crear contenedor temporal con PHP
+docker run --rm -v $(pwd)/../../../../apps/api:/var/www -w /var/www php:8.2-cli php artisan key:generate --show
 
 # Copia la clave generada y actualiza .env
+nano .env
+# Busca APP_KEY= y reemplaza con el valor generado
 ```
+
+**Opción 3: Generar manualmente (avanzado)**
+
+Si prefieres generar la clave manualmente:
+
+```bash
+# Generar una clave base64 aleatoria
+php -r "echo 'base64:' . base64_encode(random_bytes(32)) . PHP_EOL;"
+```
+
+**Después de generar APP_KEY:**
+
+1. Edita el archivo `.env` en `infra/docker/environments/production/`
+2. Busca la línea `APP_KEY=`
+3. Reemplaza con el valor generado (ej: `APP_KEY=base64:xxxxxxxxxxxxx`)
+4. Guarda el archivo
+5. Ahora puedes ejecutar `./deploy.sh` de forma segura
 
 ---
 
 ## 🐛 Solución de Problemas
 
-### Error: "The DB_PASSWORD variable is not set"
+### Error: Healthcheck fallando en Nginx o PostgreSQL
 
-**Causa**: El archivo `.env.production` no existe o no tiene la variable `DB_PASSWORD` configurada.
+**Causa**: Los healthchecks pueden fallar si no están configurados correctamente.
 
 **Solución**:
+
+```bash
+# Verificar estado de healthchecks
+docker compose --env-file .env ps --format "table {{.Name}}\t{{.Status}}\t{{.Health}}"
+
+# Ver logs de healthcheck de Nginx
+docker inspect yape-notifier-nginx-api-prod | grep -A 10 Health
+
+# Verificar que el endpoint /up responda
+docker compose --env-file .env exec nginx-api wget -qO- http://127.0.0.1/up
+# Debería mostrar: OK
+
+# Verificar healthcheck de PostgreSQL
+docker compose --env-file .env exec db pg_isready -U postgres -d yape_notifier
+# Debería mostrar: postgres:5432 - accepting connections
+```
+
+**Nota**: Los healthchecks están configurados para:
+
+- **Nginx**: Usar `127.0.0.1` en lugar de `localhost` para evitar problemas con IPv6
+- **PostgreSQL**: Usar variables de entorno del contenedor (`$$POSTGRES_USER`, `$$POSTGRES_DB`) para evitar expansión prematura
+
+### Error: "APP_KEY no está configurado en .env"
+
+**Causa**: El script `deploy.sh` valida que `APP_KEY` existe y está configurado correctamente antes de continuar. Si no está configurado, el despliegue abortará.
+
+**Solución paso a paso**:
+
+```bash
+# 1. Ir al directorio de producción
+cd /var/apps/yape-notifier/infra/docker/environments/production
+
+# 2. Verificar el contenido actual de APP_KEY
+grep "^APP_KEY" .env
+
+# 3. Si está vacío o no existe, generar APP_KEY
+# Opción A: Si tienes PHP local
+cd ../../../../apps/api
+php artisan key:generate --show
+# Copia la clave generada (ej: base64:xxxxxxxxxxxxx)
+
+# Opción B: Usar contenedor temporal
+cd /var/apps/yape-notifier/infra/docker/environments/production
+docker run --rm -v $(pwd)/../../../../apps/api:/var/www -w /var/www php:8.2-cli php artisan key:generate --show
+# Copia la clave generada
+
+# 4. Editar .env y configurar APP_KEY
+nano .env
+
+# Busca la línea que dice:
+# APP_KEY=
+# O
+# APP_KEY=base64:
+#
+# Cámbiala por:
+# APP_KEY=base64:tu_clave_generada_aqui
+#
+# Ejemplo:
+# APP_KEY=base64:2x3y4z5a6b7c8d9e0f1g2h3i4j5k6l7m8n9o0p1q2r3s4t5u6v7w8x9y0z
+
+# 5. Verificar que se guardó correctamente (debe mostrar tu clave)
+grep "^APP_KEY" .env
+
+# 6. Verificar que NO está vacío ni tiene el valor placeholder
+if grep -q "^APP_KEY=$" .env || ! grep -q "^APP_KEY=base64:" .env; then
+    echo "ERROR: APP_KEY aún no está configurado correctamente"
+    echo "Por favor, edita .env y configura APP_KEY con un valor válido"
+    exit 1
+fi
+
+# 7. Ahora intentar de nuevo
+./deploy.sh
+```
+
+**⚠️ IMPORTANTE**:
+
+- `APP_KEY` es **OBLIGATORIO** y debe tener un valor válido en formato `base64:...`
+- No puede estar vacío (`APP_KEY=`)
+- No puede tener solo el prefijo (`APP_KEY=base64:`)
+- Debe generarse ANTES del primer despliegue
+- En producción, NUNCA debe regenerarse automáticamente (invalidaría sesiones y datos encriptados)
+
+### Error: "The DB_PASSWORD variable is not set"
+
+**Causa**: El archivo `.env` no existe o no tiene la variable `DB_PASSWORD` configurada correctamente.
+
+**Solución paso a paso**:
 
 ```bash
 # 1. Ir al directorio de producción
@@ -633,21 +1051,48 @@ cd /var/apps/yape-notifier/infra/docker/environments/production
 ls -la .env
 
 # 3. Si no existe, crearlo desde la plantilla
-cp .env.example .env
+if [ ! -f ".env" ]; then
+    cp .env.example .env
+    echo "Archivo .env creado desde .env.example"
+fi
 
-# 4. Editar y configurar DB_PASSWORD (OBLIGATORIO)
+# 4. Verificar el contenido actual de DB_PASSWORD
+grep "^DB_PASSWORD" .env
+
+# 5. Editar y configurar DB_PASSWORD (OBLIGATORIO)
 nano .env
-# Busca la línea: DB_PASSWORD=TU_CONTRASEÑA_SEGURA_AQUI
-# Cámbiala por: DB_PASSWORD=tu_contraseña_real_aqui
 
-# 5. Verificar que se guardó correctamente
-grep DB_PASSWORD .env
+# Busca la línea que dice:
+# DB_PASSWORD=TU_CONTRASEÑA_SEGURA_AQUI
+# O
+# DB_PASSWORD=
+#
+# Cámbiala por:
+# DB_PASSWORD=tu_contraseña_segura_real_aqui
+#
+# Ejemplo:
+# DB_PASSWORD=MiContraseñaSegura123!@#
 
-# 6. Ahora intentar de nuevo
+# 6. Verificar que se guardó correctamente (debe mostrar tu contraseña)
+grep "^DB_PASSWORD" .env
+
+# 7. Verificar que NO está vacío ni tiene el valor placeholder
+if grep -q "^DB_PASSWORD=$" .env || grep -q "TU_CONTRASEÑA" .env; then
+    echo "ERROR: DB_PASSWORD aún no está configurado correctamente"
+    echo "Por favor, edita .env y configura DB_PASSWORD con un valor real"
+    exit 1
+fi
+
+# 8. Ahora intentar de nuevo
 docker compose --env-file .env up -d
 ```
 
-**⚠️ IMPORTANTE**: `DB_PASSWORD` es **OBLIGATORIO** y debe tener un valor. No puede estar vacío.
+**⚠️ IMPORTANTE**:
+
+- `DB_PASSWORD` es **OBLIGATORIO** y debe tener un valor real
+- No puede estar vacío (`DB_PASSWORD=`)
+- No puede tener el valor placeholder (`DB_PASSWORD=TU_CONTRASEÑA_SEGURA_AQUI`)
+- Debe ser una contraseña segura (mínimo 12 caracteres, con mayúsculas, minúsculas, números y símbolos)
 
 ### Error: "Certificate not obtained" (Caddy)
 
@@ -760,12 +1205,21 @@ docker compose --env-file .env exec php-fpm php artisan tinker
 
 ### Error: "Permission denied" en storage
 
+**Causa**: Los permisos de los directorios de Laravel no están configurados correctamente.
+
 **Solución**:
 
 ```bash
+# Los permisos deberían estar configurados automáticamente en el Dockerfile
+# Si aún hay problemas, ejecutar manualmente:
+
 docker compose --env-file .env exec php-fpm chown -R www-data:www-data /var/www/storage
+docker compose --env-file .env exec php-fpm chown -R www-data:www-data /var/www/bootstrap/cache
 docker compose --env-file .env exec php-fpm chmod -R 775 /var/www/storage
+docker compose --env-file .env exec php-fpm chmod -R 775 /var/www/bootstrap/cache
 ```
+
+**Nota**: En producción, los permisos se configuran automáticamente durante el build de la imagen Docker. Si necesitas ajustarlos, puedes reconstruir la imagen o ejecutar los comandos anteriores.
 
 ### Dashboard no se conecta a la API
 
@@ -806,25 +1260,54 @@ docker compose --env-file .env logs -f db
 
 ### Actualizar Código
 
+**⚠️ IMPORTANTE**: Al actualizar, el script `deploy.sh` ahora:
+
+- Valida que `APP_KEY` existe (no lo regenera)
+- Detiene contenedores ANTES de construir imágenes
+- Usa espera activa para PostgreSQL (no sleep fijo)
+- Usa cache por defecto (usa `--no-cache` solo si es necesario)
+
 ```bash
 # Ir al directorio del proyecto
 cd /var/apps/yape-notifier
 
 # Actualizar código
 git pull origin main
+# O si estás en otra rama: git pull origin master
 
-# Reconstruir y reiniciar
+# Reconstruir imágenes (importante: esto reinstala dependencias de Composer)
 cd infra/docker/environments/production
-docker compose --env-file .env build
+
+# Opción 1: Usar el script de despliegue (recomendado)
+# Con cache (más rápido, usa cache de Docker)
+./deploy.sh
+
+# O sin cache (rebuild completo, más lento pero más seguro)
+./deploy.sh --no-cache
+
+# Opción 2: Despliegue manual
+docker compose --env-file .env down --remove-orphans
+docker compose --env-file .env build  # O con --no-cache si necesitas rebuild completo
 docker compose --env-file .env up -d
 
 # Ejecutar migraciones si hay nuevas
 docker compose --env-file .env exec php-fpm php artisan migrate --force
 
-# Limpiar cache
+# Limpiar y optimizar cache de Laravel
+docker compose --env-file .env exec php-fpm php artisan config:clear
 docker compose --env-file .env exec php-fpm php artisan config:cache
 docker compose --env-file .env exec php-fpm php artisan route:cache
+docker compose --env-file .env exec php-fpm php artisan view:cache
+
+# Verificar que todo esté funcionando
+docker compose --env-file .env ps
 ```
+
+**Nota importante**: Al actualizar el código, es necesario reconstruir las imágenes Docker porque el código está incluido en las imágenes, no montado desde el host. Esto asegura que:
+
+- Las nuevas dependencias de Composer se instalen correctamente
+- Los cambios en el código se reflejen en la aplicación
+- La aplicación mantenga su estado autocontenido
 
 ### Reiniciar Servicios
 
@@ -881,54 +1364,9 @@ chmod +x /var/apps/yape-notifier/update.sh
 
 ## 💾 Backup y Recuperación
 
-### Backup de Base de Datos
+Para una guía completa de backup y disaster recovery, consulta:
 
-```bash
-# Ir al directorio de producción
-cd /var/apps/yape-notifier/infra/docker/environments/production
-
-# Crear backup
-docker compose --env-file .env exec db pg_dump -U postgres yape_notifier > backup_$(date +%Y%m%d_%H%M%S).sql
-
-# Backup con compresión
-docker compose --env-file .env exec db pg_dump -U postgres yape_notifier | gzip > backup_$(date +%Y%m%d_%H%M%S).sql.gz
-```
-
-### Restaurar Backup
-
-```bash
-# Ir al directorio de producción
-cd /var/apps/yape-notifier/infra/docker/environments/production
-
-# Restaurar backup sin comprimir
-docker compose --env-file .env exec -T db psql -U postgres yape_notifier < backup_20240101_120000.sql
-
-# Restaurar backup comprimido
-gunzip < backup_20240101_120000.sql.gz | docker compose --env-file .env exec -T db psql -U postgres yape_notifier
-```
-
-### Backup Automático (Cron)
-
-Crea un script `/var/apps/yape-notifier/backup.sh`:
-
-```bash
-#!/bin/bash
-BACKUP_DIR="/var/backups/yape-notifier"
-mkdir -p $BACKUP_DIR
-cd /var/apps/yape-notifier/infra/docker/environments/production
-
-docker compose --env-file .env exec -T db pg_dump -U postgres yape_notifier | gzip > $BACKUP_DIR/backup_$(date +%Y%m%d_%H%M%S).sql.gz
-
-# Eliminar backups más antiguos de 30 días
-find $BACKUP_DIR -name "backup_*.sql.gz" -mtime +30 -delete
-```
-
-Agrega a crontab:
-
-```bash
-# Backup diario a las 2 AM
-0 2 * * * /var/apps/yape-notifier/backup.sh
-```
+- **`infra/docker/environments/production/BACKUP.md`** - Estrategia completa de backup, scripts automatizados, disaster recovery plan y almacenamiento remoto
 
 ---
 
@@ -940,13 +1378,13 @@ Agrega a crontab:
 - [ ] DNS configurado y propagado
 - [ ] Docker y Docker Compose instalados
 - [ ] Repositorio clonado
-- [ ] `.env` configurado correctamente en `infra/docker/environments/production/`
+- [ ] `.env` configurado correctamente en `infra/docker/environments/production/` con `DB_PASSWORD` y `APP_KEY`
 - [ ] `Caddyfile` configurado con subdominios correctos (ya está configurado)
 
 ### Deployment
 
 - [ ] Contenedores corriendo y saludables
-- [ ] `APP_KEY` generado y configurado
+- [ ] `APP_KEY` configurado en `.env` (generado manualmente antes del despliegue)
 - [ ] Migraciones ejecutadas
 - [ ] Permisos de storage configurados
 - [ ] Certificados SSL obtenidos por Caddy
