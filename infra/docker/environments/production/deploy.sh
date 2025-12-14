@@ -73,6 +73,33 @@ if ! grep -q "^DB_PASSWORD=.*" .env || grep -q "^DB_PASSWORD=$" .env || grep -q 
     exit 1
 fi
 
+# Verificar que las variables de base de datos estén configuradas correctamente
+# Laravel necesita DB_HOST=db para conectarse al servicio PostgreSQL dentro de Docker
+if ! grep -q "^DB_HOST=" .env; then
+    warn "DB_HOST no está configurado en .env, agregando DB_HOST=db (valor correcto para Docker)"
+    echo "DB_HOST=db" >> .env
+elif ! grep -q "^DB_HOST=db" .env; then
+    warn "DB_HOST está configurado pero no es 'db'. Para Docker debe ser 'db' (nombre del servicio)"
+    warn "Valor actual: $(grep '^DB_HOST=' .env)"
+fi
+
+if ! grep -q "^DB_PORT=" .env; then
+    warn "DB_PORT no está configurado en .env, agregando DB_PORT=5432 (default PostgreSQL)"
+    echo "DB_PORT=5432" >> .env
+fi
+
+if ! grep -q "^DB_DATABASE=" .env; then
+    error "DB_DATABASE no está configurado en .env"
+    error "Por favor, edita .env y configura DB_DATABASE"
+    exit 1
+fi
+
+if ! grep -q "^DB_USERNAME=" .env; then
+    error "DB_USERNAME no está configurado en .env"
+    error "Por favor, edita .env y configura DB_USERNAME"
+    exit 1
+fi
+
 # Verificar APP_KEY y determinar si necesita generarse (solo si está vacío)
 # En producción, APP_KEY se genera SOLO UNA VEZ en el primer despliegue si está vacío
 APP_KEY_LINE=$(grep "^APP_KEY=" .env || echo "")
@@ -137,7 +164,17 @@ fi
 
 info "PostgreSQL está listo"
 
-# PASO 5: Generar APP_KEY si es necesario (solo si estaba vacío - primer despliegue)
+# PASO 5: Verificar que las variables de entorno se inyectaron correctamente en el contenedor
+info "Verificando variables de entorno en el contenedor php-fpm..."
+if docker compose --env-file .env exec -T php-fpm env | grep -q "^DB_HOST=db"; then
+    info "✅ DB_HOST correctamente configurado en el contenedor"
+else
+    warn "⚠️  DB_HOST no está configurado como 'db' en el contenedor"
+    warn "Variables DB_* encontradas en el contenedor:"
+    docker compose --env-file .env exec -T php-fpm env | grep "^DB_" || warn "No se encontraron variables DB_*"
+fi
+
+# PASO 6: Generar APP_KEY si es necesario (solo si estaba vacío - primer despliegue)
 if [ $NEEDS_APP_KEY -eq 1 ]; then
     info "Generando APP_KEY (primer despliegue)..."
     GENERATED_KEY=$(docker compose --env-file .env exec -T php-fpm php artisan key:generate --show 2>/dev/null | grep -o "base64:[^[:space:]]*" || echo "")
@@ -160,23 +197,29 @@ if [ $NEEDS_APP_KEY -eq 1 ]; then
     info "APP_KEY generado y persistido en .env (solo se genera una vez)"
 fi
 
-# PASO 6: Asegurar permisos y directorios (antes de migraciones)
+# PASO 7: Asegurar permisos y directorios (antes de migraciones)
 # Esto debe hacerse antes de ejecutar migraciones para evitar errores de permisos
 info "Verificando permisos y directorios..."
 docker compose --env-file .env exec -T php-fpm sh -c "mkdir -p /var/www/storage/framework/{sessions,views,cache} /var/www/storage/logs /var/www/bootstrap/cache && chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache && chmod -R 775 /var/www/storage /var/www/bootstrap/cache"
 
-# PASO 7: Ejecutar migraciones (solo después de que PostgreSQL esté listo)
+# PASO 8: Limpiar caches de Laravel antes de migraciones
+# Esto asegura que Laravel use las variables de entorno actuales y no valores cacheados
+info "Limpiando caches de Laravel..."
+docker compose --env-file .env exec -T php-fpm php artisan config:clear
+docker compose --env-file .env exec -T php-fpm php artisan cache:clear
+
+# PASO 9: Ejecutar migraciones (solo después de que PostgreSQL esté listo y caches limpiados)
 info "Ejecutando migraciones..."
 docker compose --env-file .env exec -T php-fpm php artisan migrate --force
 
-# PASO 8: Optimizar Laravel
+# PASO 10: Optimizar Laravel (después de migraciones)
 info "Optimizando Laravel..."
 docker compose --env-file .env exec -T php-fpm php artisan config:cache
 docker compose --env-file .env exec -T php-fpm php artisan route:cache
 # No cachear vistas en producción inicialmente (puede causar problemas si faltan directorios)
 # docker compose --env-file .env exec -T php-fpm php artisan view:cache
 
-# PASO 9: Verificar estado
+# PASO 11: Verificar estado
 info "Verificando estado de los contenedores..."
 docker compose --env-file .env ps
 

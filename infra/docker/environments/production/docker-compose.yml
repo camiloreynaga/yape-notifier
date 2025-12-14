@@ -26,6 +26,11 @@ services:
     working_dir: /var/www
     volumes:
       - ../../configs/php/production.ini:/usr/local/etc/php/conf.d/production.ini:ro
+    # Inyectar variables de entorno desde .env al contenedor
+    # IMPORTANTE: docker compose --env-file .env solo interpola variables en docker-compose.yml,
+    # pero NO las expone dentro del contenedor. Usamos env_file para que Laravel pueda leerlas.
+    env_file:
+      - .env
     environment:
       - APP_ENV=production
       - APP_DEBUG=false
