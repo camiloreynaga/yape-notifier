@@ -206,7 +206,13 @@ docker compose --env-file .env exec -T php-fpm sh -c "mkdir -p /var/www/storage/
 # Esto asegura que Laravel use las variables de entorno actuales y no valores cacheados
 info "Limpiando caches de Laravel..."
 docker compose --env-file .env exec -T php-fpm php artisan config:clear
-docker compose --env-file .env exec -T php-fpm php artisan cache:clear
+
+# Limpiar cache (puede fallar si CACHE_DRIVER=database y la tabla no existe, pero no es crítico)
+# Si falla, simplemente continuamos porque config:clear ya se ejecutó
+if ! docker compose --env-file .env exec -T php-fpm php artisan cache:clear 2>/dev/null; then
+    warn "cache:clear falló (probablemente CACHE_DRIVER=database sin tabla). Continuando..."
+    warn "Asegúrate de que CACHE_DRIVER=file en tu .env para evitar este warning"
+fi
 
 # PASO 9: Ejecutar migraciones (solo después de que PostgreSQL esté listo y caches limpiados)
 info "Ejecutando migraciones..."
