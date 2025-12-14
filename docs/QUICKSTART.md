@@ -2,7 +2,16 @@
 
 Guía rápida para levantar el sistema completo (API + Dashboard).
 
+> 📖 **Para una guía completa paso a paso, consulta `docs/DEPLOYMENT.md`**
+
 ## 🚀 Producción
+
+### Pasos Rápidos
+
+1. **Preparar servidor** (Droplet, DNS, Docker instalado)
+2. **Clonar repositorio** en `/var/apps/yape-notifier`
+3. **Configurar `.env`** con `DB_PASSWORD` seguro
+4. **Ejecutar `./deploy.sh`**
 
 ```bash
 # 1. Ir al directorio de producción
@@ -19,6 +28,7 @@ nano .env  # Configurar DB_PASSWORD seguro
 ```
 
 **Acceso:**
+
 - API: `https://api.notificaciones.space/up`
 - Dashboard: `https://dashboard.notificaciones.space`
 
@@ -39,6 +49,7 @@ nano .env  # Configurar DB_PASSWORD
 ```
 
 **Acceso:**
+
 - API: `http://localhost:8080/up`
 - Dashboard: `http://localhost:8080/`
 
@@ -59,6 +70,7 @@ nano .env  # Configurar si es necesario
 ```
 
 **Acceso:**
+
 - API: `http://localhost:8000/up`
 - Database: `localhost:5432`
 

@@ -10,7 +10,7 @@ Contexto del proyecto:
 
 - Frontend móvil: App Android en Kotlin usando NotificationListenerService.
 
-- Monorepo: 
+- Monorepo:
 
   - apps/api -> Laravel (backend)
 
@@ -83,16 +83,3 @@ Siempre asume que:
 - Prefiero soluciones limpias y mantenibles a "hacks rápidos".
 
 - El objetivo es que este proyecto pueda crecer a un producto serio, no solo un MVP desordenado.
-
-
-
-
-
-
-
-
-
-
-
-
-
