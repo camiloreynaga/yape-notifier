@@ -16,16 +16,20 @@ return [
         env('APP_URL', 'http://localhost:8000'),
         'https://notificaciones.space',
         'https://www.notificaciones.space',
+        'https://dashboard.notificaciones.space',
+        'https://api.notificaciones.space',
         'http://localhost:3000', // Para desarrollo local
     ],
 
-    'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => [
+        '/^https:\/\/.*\.notificaciones\.space$/',
+    ],
 
     'allowed_headers' => ['*'],
 
     'exposed_headers' => [],
 
-    'max_age' => 0,
+    'max_age' => 3600, // Cache preflight requests for 1 hour
 
     'supports_credentials' => true,
 
