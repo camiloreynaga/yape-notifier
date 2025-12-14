@@ -25,5 +25,16 @@ export const API_ENDPOINTS = {
     statistics: '/api/notifications/statistics',
     updateStatus: (id: number) => `/api/notifications/${id}/status`,
   },
+  monitorPackages: {
+    list: '/api/monitor-packages',
+    create: '/api/monitor-packages',
+    show: (id: number) => `/api/monitor-packages/${id}`,
+    update: (id: number) => `/api/monitor-packages/${id}`,
+    delete: (id: number) => `/api/monitor-packages/${id}`,
+    toggleStatus: (id: number) => `/api/monitor-packages/${id}/toggle-status`,
+    bulkCreate: '/api/monitor-packages/bulk-create',
+    // Public endpoint for clients
+    getActive: '/api/settings/monitored-packages',
+  },
 } as const;
 

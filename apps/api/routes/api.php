@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DeviceController;
+use App\Http\Controllers\MonitorPackageController;
 use App\Http\Controllers\NotificationController;
 use Illuminate\Support\Facades\Route;
 
@@ -14,6 +15,9 @@ use Illuminate\Support\Facades\Route;
 // Public routes
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+
+// Public settings endpoint (used by Android clients)
+Route::get('/settings/monitored-packages', [MonitorPackageController::class, 'getActivePackages']);
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -31,4 +35,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/notifications/statistics', [NotificationController::class, 'statistics']);
     Route::get('/notifications/{id}', [NotificationController::class, 'show']);
     Route::patch('/notifications/{id}/status', [NotificationController::class, 'updateStatus']);
+
+    // Monitor Package routes (admin/management)
+    Route::apiResource('monitor-packages', MonitorPackageController::class);
+    Route::post('/monitor-packages/{id}/toggle-status', [MonitorPackageController::class, 'toggleStatus']);
+    Route::post('/monitor-packages/bulk-create', [MonitorPackageController::class, 'bulkCreate']);
 });
