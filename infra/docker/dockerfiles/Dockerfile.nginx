@@ -1,0 +1,26 @@
+# Dockerfile para Nginx (Laravel API)
+# Ubicación: infra/docker/dockerfiles/Dockerfile.nginx
+# Este Dockerfile construye una imagen de Nginx que incluye el código de Laravel
+# para servir archivos estáticos sin depender del host.
+# 
+# En producción, nginx necesita acceso al directorio public/ para servir
+# archivos estáticos. El código se copia desde el mismo contexto que php-fpm.
+
+FROM nginx:alpine
+
+WORKDIR /var/www
+
+# Copiar solo el directorio public que es lo que nginx necesita para servir archivos estáticos
+# El resto del código se comunica a través de fastcgi_pass a php-fpm
+COPY public /var/www/public
+
+# Crear estructura de directorios necesaria con permisos correctos
+RUN mkdir -p /var/www/storage \
+    && mkdir -p /var/www/bootstrap/cache \
+    && chown -R nginx:nginx /var/www \
+    && chmod -R 755 /var/www
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
+

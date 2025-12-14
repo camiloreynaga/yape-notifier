@@ -60,24 +60,31 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Copy composer files first for better caching
 COPY composer.json composer.lock* ./
 
-# Install PHP dependencies (production only)
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts || true
+# Install PHP dependencies (production only, without scripts first)
+RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts
 
 # Copy application files
 COPY . /var/www
 
-# Create necessary directories and set permissions
+# Create necessary directories with proper structure
 RUN mkdir -p /var/www/storage/framework/sessions \
     && mkdir -p /var/www/storage/framework/views \
-    && mkdir -p /var/www/storage/framework/cache \
+    && mkdir -p /var/www/storage/framework/cache/data \
     && mkdir -p /var/www/storage/logs \
-    && mkdir -p /var/www/bootstrap/cache \
-    && chown -R www-data:www-data /var/www \
+    && mkdir -p /var/www/bootstrap/cache
+
+# Set ownership and permissions for Laravel directories
+# www-data is the default user for PHP-FPM in Alpine
+RUN chown -R www-data:www-data /var/www \
+    && chmod -R 755 /var/www \
     && chmod -R 775 /var/www/storage \
     && chmod -R 775 /var/www/bootstrap/cache
 
-# Run composer scripts after copy
-RUN composer dump-autoload --optimize --classmap-authoritative || true
+# Run composer scripts after copy (post-install scripts like optimize, key:generate, etc.)
+RUN composer run-script post-install-cmd --no-interaction || true
+
+# Optimize autoloader for production
+RUN composer dump-autoload --optimize --classmap-authoritative
 
 EXPOSE 9000
 

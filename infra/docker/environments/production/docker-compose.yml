@@ -25,7 +25,6 @@ services:
     restart: always
     working_dir: /var/www
     volumes:
-      - ../../../../apps/api:/var/www
       - ../../configs/php/production.ini:/usr/local/etc/php/conf.d/production.ini:ro
     environment:
       - APP_ENV=production
@@ -58,12 +57,12 @@ services:
   # Nginx Service (Web Server for API)
   # ============================================
   nginx-api:
-    image: nginx:alpine
+    build:
+      context: ../../../../apps/api
+      dockerfile: ../../infra/docker/dockerfiles/Dockerfile.nginx
     container_name: yape-notifier-nginx-api-prod
     restart: always
     volumes:
-      - ../../../../apps/api:/var/www
-      - ../../../../apps/api/public:/var/www/public:ro
       - ../../configs/nginx/api.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       - yape-network-prod
@@ -79,7 +78,7 @@ services:
           "--tries=1",
           "--spider",
           "--timeout=5",
-          "http://localhost/up",
+          "http://127.0.0.1/up",
         ]
       interval: 30s
       timeout: 10s
@@ -202,7 +201,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-yape_notifier} || exit 1",
+          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} || exit 1",
         ]
       interval: 10s
       timeout: 5s
