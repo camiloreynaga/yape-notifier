@@ -7,7 +7,8 @@
 #
 # Notas importantes:
 # - En producción, primero se detienen los contenedores, luego se construyen las imágenes
-# - APP_KEY nunca se regenera automáticamente en producción (debe existir en .env)
+# - APP_KEY se genera SOLO UNA VEZ si está vacío (primer despliegue), nunca se regenera si ya existe
+# - El archivo .env debe existir previamente con los secretos configurados (no se copia desde .env.example)
 # - Se usa wait loop activo para PostgreSQL en lugar de sleep
 # - El script es idempotente y seguro para ejecutarse múltiples veces
 
@@ -57,18 +58,12 @@ fi
 
 info "Iniciando despliegue en producción..."
 
-# Verificar archivo .env
+# Verificar archivo .env (OBLIGATORIO - no se copia desde .env.example)
 if [ ! -f ".env" ]; then
-    warn "Archivo .env no encontrado"
-    if [ -f ".env.example" ]; then
-        warn "Copiando desde .env.example..."
-        cp .env.example .env
-        error "Por favor configura .env antes de continuar"
-        exit 1
-    else
-        error "Archivo .env.example no encontrado"
-        exit 1
-    fi
+    error "Archivo .env no encontrado"
+    error "El archivo .env es OBLIGATORIO y debe existir previamente con los secretos configurados"
+    error "Por favor, crea el archivo .env con las variables necesarias antes de continuar"
+    exit 1
 fi
 
 # Verificar que DB_PASSWORD está configurado
@@ -78,17 +73,24 @@ if ! grep -q "^DB_PASSWORD=.*" .env || grep -q "^DB_PASSWORD=$" .env || grep -q 
     exit 1
 fi
 
-# Verificar que APP_KEY existe y no está vacío
-# En producción, APP_KEY NUNCA debe regenerarse automáticamente
-if ! grep -q "^APP_KEY=base64:.*" .env || grep -q "^APP_KEY=$" .env; then
-    error "APP_KEY no está configurado en .env"
-    error "En producción, APP_KEY debe existir y ser válido."
-    error "Por favor, edita .env y configura APP_KEY con un valor seguro"
-    error "Puedes generarlo localmente con: php artisan key:generate"
-    exit 1
-fi
+# Verificar APP_KEY y determinar si necesita generarse (solo si está vacío)
+# En producción, APP_KEY se genera SOLO UNA VEZ en el primer despliegue si está vacío
+APP_KEY_LINE=$(grep "^APP_KEY=" .env || echo "")
+NEEDS_APP_KEY=0
 
-info "APP_KEY verificado correctamente"
+if [ -z "$APP_KEY_LINE" ] || echo "$APP_KEY_LINE" | grep -q "^APP_KEY=$"; then
+    warn "APP_KEY no está configurado o está vacío"
+    warn "Se generará automáticamente después de construir las imágenes (primer despliegue)"
+    NEEDS_APP_KEY=1
+else
+    # APP_KEY ya existe, verificar que sea válido
+    if ! echo "$APP_KEY_LINE" | grep -q "^APP_KEY=base64:"; then
+        error "APP_KEY existe pero no tiene un formato válido (debe comenzar con 'base64:')"
+        error "Valor actual: $APP_KEY_LINE"
+        exit 1
+    fi
+    info "APP_KEY verificado correctamente (ya existe, no se regenerará)"
+fi
 
 # PASO 1: Detener contenedores existentes (con --remove-orphans para limpiar servicios huérfanos)
 # Esto debe hacerse ANTES de construir nuevas imágenes para evitar conflictos
@@ -116,7 +118,7 @@ ATTEMPT=0
 POSTGRES_READY=0
 
 while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-    if docker compose --env-file .env exec -T postgres pg_isready -U postgres > /dev/null 2>&1; then
+    if docker compose --env-file .env exec -T db pg_isready -U postgres > /dev/null 2>&1; then
         POSTGRES_READY=1
         break
     fi
@@ -129,29 +131,52 @@ echo ""
 
 if [ $POSTGRES_READY -eq 0 ]; then
     error "PostgreSQL no está disponible después de $MAX_ATTEMPTS intentos"
-    error "Revisa los logs: docker compose --env-file .env logs postgres"
+    error "Revisa los logs: docker compose --env-file .env logs db"
     exit 1
 fi
 
 info "PostgreSQL está listo"
 
-# PASO 5: Asegurar permisos y directorios (antes de migraciones)
+# PASO 5: Generar APP_KEY si es necesario (solo si estaba vacío - primer despliegue)
+if [ $NEEDS_APP_KEY -eq 1 ]; then
+    info "Generando APP_KEY (primer despliegue)..."
+    GENERATED_KEY=$(docker compose --env-file .env exec -T php-fpm php artisan key:generate --show 2>/dev/null | grep -o "base64:[^[:space:]]*" || echo "")
+    
+    if [ -z "$GENERATED_KEY" ]; then
+        error "No se pudo generar APP_KEY. Verifica que los contenedores estén funcionando correctamente"
+        error "Puedes generarlo manualmente con: docker compose --env-file .env exec php-fpm php artisan key:generate"
+        exit 1
+    fi
+    
+    # Persistir APP_KEY en .env
+    if grep -q "^APP_KEY=" .env; then
+        # Reemplazar línea existente vacía
+        sed -i "s|^APP_KEY=.*|APP_KEY=$GENERATED_KEY|" .env
+    else
+        # Agregar nueva línea
+        echo "APP_KEY=$GENERATED_KEY" >> .env
+    fi
+    
+    info "APP_KEY generado y persistido en .env (solo se genera una vez)"
+fi
+
+# PASO 6: Asegurar permisos y directorios (antes de migraciones)
 # Esto debe hacerse antes de ejecutar migraciones para evitar errores de permisos
 info "Verificando permisos y directorios..."
 docker compose --env-file .env exec -T php-fpm sh -c "mkdir -p /var/www/storage/framework/{sessions,views,cache} /var/www/storage/logs /var/www/bootstrap/cache && chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache && chmod -R 775 /var/www/storage /var/www/bootstrap/cache"
 
-# PASO 6: Ejecutar migraciones (solo después de que PostgreSQL esté listo)
+# PASO 7: Ejecutar migraciones (solo después de que PostgreSQL esté listo)
 info "Ejecutando migraciones..."
 docker compose --env-file .env exec -T php-fpm php artisan migrate --force
 
-# PASO 7: Optimizar Laravel
+# PASO 8: Optimizar Laravel
 info "Optimizando Laravel..."
 docker compose --env-file .env exec -T php-fpm php artisan config:cache
 docker compose --env-file .env exec -T php-fpm php artisan route:cache
 # No cachear vistas en producción inicialmente (puede causar problemas si faltan directorios)
 # docker compose --env-file .env exec -T php-fpm php artisan view:cache
 
-# PASO 8: Verificar estado
+# PASO 9: Verificar estado
 info "Verificando estado de los contenedores..."
 docker compose --env-file .env ps
 
