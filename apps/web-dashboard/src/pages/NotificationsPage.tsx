@@ -303,8 +303,8 @@ export default function NotificationsPage() {
                         {notification.title}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {notification.amount
-                          ? `${notification.currency || 'S/'} ${notification.amount.toFixed(2)}`
+                        {notification.amount != null && !isNaN(Number(notification.amount))
+                          ? `${notification.currency || 'S/'} ${Number(notification.amount).toFixed(2)}`
                           : 'N/A'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

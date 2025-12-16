@@ -67,7 +67,7 @@ export default function DashboardPage() {
     .map(([date, data]) => ({
       date: format(new Date(date), 'dd/MM'),
       cantidad: data.count,
-      monto: parseFloat(data.total_amount.toFixed(2)),
+      monto: parseFloat(Number(data.total_amount).toFixed(2)),
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
@@ -75,7 +75,7 @@ export default function DashboardPage() {
     .map(([source, data]) => ({
       source: source || 'Desconocido',
       cantidad: data.count,
-      monto: parseFloat(data.total_amount.toFixed(2)),
+      monto: parseFloat(Number(data.total_amount).toFixed(2)),
     }))
     .sort((a, b) => b.monto - a.monto);
 
@@ -114,7 +114,7 @@ export default function DashboardPage() {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-500">Total Monto</p>
               <p className="text-2xl font-bold text-gray-900">
-                S/ {statistics.total_amount.toFixed(2)}
+                S/ {Number(statistics.total_amount).toFixed(2)}
               </p>
             </div>
           </div>
@@ -235,7 +235,7 @@ export default function DashboardPage() {
                     {item.cantidad}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    S/ {item.monto.toFixed(2)}
+                    S/ {Number(item.monto).toFixed(2)}
                   </td>
                 </tr>
               ))}
