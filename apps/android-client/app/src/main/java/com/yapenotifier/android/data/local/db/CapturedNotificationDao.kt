@@ -22,4 +22,7 @@ interface CapturedNotificationDao {
 
     @Query("SELECT * FROM captured_notifications ORDER BY timestamp DESC")
     fun getAllNotificationsFlow(): kotlinx.coroutines.flow.Flow<List<CapturedNotification>>
+
+    @Query("UPDATE captured_notifications SET status = 'PENDING' WHERE status = 'FAILED'")
+    suspend fun resetFailedNotifications()
 }

@@ -83,6 +83,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        viewModel.logoutComplete.observe(this) { isComplete ->
+            if (isComplete) {
+                navigateToLogin()
+            }
+        }
+
         lifecycleScope.launch {
             ServiceStatusManager.statusHistory.collectLatest { history ->
                 binding.tvServiceLog.text = history.joinToString(separator = "\n")
@@ -100,11 +106,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnLogout.setOnClickListener {
-            // Restore Login functionality
             AlertDialog.Builder(this)
-                .setTitle("Restaurar App")
-                .setMessage("Esto reactivará la pantalla de Login y restaurará el AndroidManifest. ¿Continuar?")
-                .setPositiveButton("Restaurar") { _, _ -> restoreLoginFunctionality() }
+                .setTitle("Cerrar Sesión")
+                .setMessage("¿Estás seguro de que quieres cerrar sesión?")
+                .setPositiveButton("Aceptar") { _, _ -> viewModel.logout() }
                 .setNegativeButton("Cancelar", null)
                 .show()
         }
@@ -177,11 +182,6 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("Más Tarde", null)
             .show()
-    }
-
-    private fun restoreLoginFunctionality() {
-        // This is a developer-only feature to easily revert testing changes.
-        // In a real app, this would be removed.
     }
 
     private fun navigateToLogin() {

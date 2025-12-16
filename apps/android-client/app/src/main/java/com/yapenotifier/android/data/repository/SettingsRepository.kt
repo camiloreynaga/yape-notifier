@@ -9,7 +9,6 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.yapenotifier.android.data.api.RetrofitClient
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 // At the top level of your kotlin file:
@@ -22,25 +21,25 @@ class SettingsRepository(private val context: Context) {
     companion object {
         private val MONITORED_PACKAGES_KEY = stringSetPreferencesKey("monitored_packages")
         private const val TAG = "SettingsRepository"
+        private val DEFAULT_PACKAGES = setOf("com.bcp.innovacxion.yape.movil")
     }
 
     val monitoredPackagesFlow: Flow<Set<String>> = context.dataStore.data
-        .map {
-            it[MONITORED_PACKAGES_KEY] ?: setOf()
+        .map { preferences ->
+            val fromApi = preferences[MONITORED_PACKAGES_KEY] ?: emptySet()
+            fromApi + DEFAULT_PACKAGES
         }
-    
+
     suspend fun refreshMonitoredPackages() {
         try {
             Log.d(TAG, "Fetching monitored packages from API...")
-            val response = apiService.getMonitoredPackages() // This endpoint needs to be created in ApiService
+            val response = apiService.getMonitoredPackages()
             if (response.isSuccessful) {
                 val packages = response.body()?.packages?.toSet() ?: emptySet()
-                if (packages.isNotEmpty()) {
-                    context.dataStore.edit {
-                        it[MONITORED_PACKAGES_KEY] = packages
-                    }
-                    Log.i(TAG, "Successfully updated monitored packages: $packages")
+                context.dataStore.edit { settings ->
+                    settings[MONITORED_PACKAGES_KEY] = packages
                 }
+                Log.i(TAG, "Successfully updated monitored packages from API: $packages")
             } else {
                 Log.e(TAG, "Failed to fetch packages: ${response.code()}")
             }

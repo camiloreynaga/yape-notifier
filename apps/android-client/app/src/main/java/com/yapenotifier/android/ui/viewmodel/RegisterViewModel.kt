@@ -1,5 +1,6 @@
 package com.yapenotifier.android.ui.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -35,20 +36,21 @@ class RegisterViewModel(application: android.app.Application) : androidx.lifecyc
                 if (response.isSuccessful) {
                     val authResponse = response.body()
                     if (authResponse != null) {
-                        // Save token and user info
                         preferencesManager.saveAuthToken(authResponse.token)
                         preferencesManager.saveUserEmail(authResponse.user.email)
-                        
-                        // Register device
-                        registerDevice()
 
-                        _registerResult.value = RegisterResult(true, "Registro exitoso")
+                        val deviceRegistered = registerDevice()
+                        if (deviceRegistered) {
+                            _registerResult.value = RegisterResult(true, "Registro exitoso y dispositivo registrado.")
+                        } else {
+                            _registerResult.value = RegisterResult(false, "Error al registrar el dispositivo. Por favor, intente de nuevo.")
+                        }
                     } else {
-                        _registerResult.value = RegisterResult(false, "Respuesta inválida del servidor")
+                        _registerResult.value = RegisterResult(false, "Respuesta de registro inválida del servidor")
                     }
                 } else {
                     val errorBody = response.errorBody()?.string()
-                    _registerResult.value = RegisterResult(false, "Error: ${response.code()} - $errorBody")
+                    _registerResult.value = RegisterResult(false, "Error de registro: ${response.code()} - $errorBody")
                 }
             } catch (e: Exception) {
                 _registerResult.value = RegisterResult(false, "Error de conexión: ${e.message}")
@@ -58,14 +60,16 @@ class RegisterViewModel(application: android.app.Application) : androidx.lifecyc
         }
     }
 
-    private suspend fun registerDevice() {
+    private suspend fun registerDevice(): Boolean {
         try {
-            val deviceUuid = preferencesManager.deviceUuid.first()
-                ?: kotlinx.coroutines.runBlocking {
-                    val uuid = java.util.UUID.randomUUID().toString()
-                    preferencesManager.saveDeviceUuid(uuid)
-                    uuid
-                }
+            val deviceUuid = preferencesManager.deviceUuid.first() ?: run {
+                val uuid = java.util.UUID.randomUUID().toString()
+                preferencesManager.saveDeviceUuid(uuid)
+                Log.d("RegisterViewModel", "Generated new device UUID: $uuid")
+                uuid
+            }
+
+            Log.d("RegisterViewModel", "Attempting to register device with UUID: $deviceUuid")
 
             val deviceName = android.os.Build.MODEL ?: "Android Device"
             val createDeviceRequest = com.yapenotifier.android.data.model.CreateDeviceRequest(
@@ -75,15 +79,27 @@ class RegisterViewModel(application: android.app.Application) : androidx.lifecyc
             )
 
             val deviceResponse = apiService.createDevice(createDeviceRequest)
+            
             if (deviceResponse.isSuccessful) {
-                val device = deviceResponse.body()?.get("device") as? com.yapenotifier.android.data.model.Device
-                device?.id?.let { deviceId ->
-                    preferencesManager.saveDeviceId(deviceId.toString())
+                val responseBody = deviceResponse.body()
+                Log.d("RegisterViewModel", "Device registration response body: $responseBody")
+
+                responseBody?.device?.let {
+                    preferencesManager.saveDeviceId(it.id.toString())
+                    Log.i("RegisterViewModel", "Device successfully registered with server. Saved remote ID: ${it.id}")
+                    return true
+                } ?: run {
+                    Log.e("RegisterViewModel", "Could not find 'device' object in the response body.")
+                    return false
                 }
+            } else {
+                val errorBody = deviceResponse.errorBody()?.string()
+                Log.e("RegisterViewModel", "Device registration API call failed. Code: ${deviceResponse.code()}, Body: $errorBody")
+                return false
             }
         } catch (e: Exception) {
-            // Log error but don't block registration
-            android.util.Log.e("RegisterViewModel", "Error registering device", e)
+            Log.e("RegisterViewModel", "Exception during device registration", e)
+            return false
         }
     }
 }

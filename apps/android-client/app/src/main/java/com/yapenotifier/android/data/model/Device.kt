@@ -21,3 +21,6 @@ data class CreateDeviceRequest(
     val isActive: Boolean = true
 )
 
+data class DeviceResponse(
+    val device: Device
+)

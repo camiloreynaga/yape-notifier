@@ -10,6 +10,7 @@ import androidx.work.WorkManager
 import com.yapenotifier.android.data.local.db.AppDatabase
 import com.yapenotifier.android.data.local.db.CapturedNotification
 import com.yapenotifier.android.data.repository.SettingsRepository
+import com.yapenotifier.android.util.PaymentNotificationParser
 import com.yapenotifier.android.util.ServiceStatusManager
 import com.yapenotifier.android.worker.SendNotificationWorker
 import kotlinx.coroutines.CoroutineScope
@@ -30,10 +31,9 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         db = AppDatabase.getDatabase(this)
         settingsRepository = SettingsRepository(this)
         
-        // Load monitored packages into memory
         serviceScope.launch {
             monitoredPackages = settingsRepository.monitoredPackagesFlow.first()
-            Log.d(TAG, "Initial monitored packages loaded: $monitoredPackages")
+            Log.d(TAG, "Initial monitored packages: $monitoredPackages")
         }
 
         ServiceStatusManager.updateStatus("✅ Servicio Creado")
@@ -44,44 +44,45 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         super.onListenerConnected()
         ServiceStatusManager.updateStatus("🚀 ¡Conectado! Escuchando notificaciones.")
         Log.i(TAG, "Notification listener connected.")
-        // Refresh packages on connect
         serviceScope.launch {
             settingsRepository.refreshMonitoredPackages()
             monitoredPackages = settingsRepository.monitoredPackagesFlow.first()
-            Log.d(TAG, "Refreshed monitored packages on connect: $monitoredPackages")
+            Log.d(TAG, "Refreshed monitored packages: $monitoredPackages")
         }
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         super.onNotificationPosted(sbn)
-        
-        val packageName = sbn.packageName ?: return
-        ServiceStatusManager.updateStatus("📬 Notificación recibida de: $packageName")
-        
-        // Check against the dynamic list
-        if (!monitoredPackages.contains(packageName) && packageName != "com.yapenotifier.android") {
-            ServiceStatusManager.updateStatus("⚠️ Ignorando (paquete no monitoreado)")
+
+        val packageName = sbn.packageName
+        if (!monitoredPackages.contains(packageName)) {
             return
         }
 
-        val notification = sbn.notification
-        val title = notification.extras?.getString("android.title") ?: return
-        val text = notification.extras?.getString("android.text") ?: ""
+        val notification = sbn.notification ?: return
+        val title = notification.extras?.getString("android.title") ?: ""
+        val text = notification.extras?.getCharSequence("android.text")?.toString() ?: ""
 
-        ServiceStatusManager.updateStatus("✅ Procesando: $title")
+        val paymentDetails = PaymentNotificationParser.parse(title, text)
+        
+        if (paymentDetails != null) {
+            ServiceStatusManager.updateStatus("📬 Notificación de pago recibida de: $packageName")
+            
+            serviceScope.launch {
+                val capturedNotification = CapturedNotification(
+                    packageName = packageName,
+                    title = "Pago de ${paymentDetails.sender}",
+                    body = "Monto: ${paymentDetails.currency}${paymentDetails.amount}"
+                )
+                db.capturedNotificationDao().insert(capturedNotification)
+                Log.i(TAG, "Payment notification saved locally.")
+                ServiceStatusManager.updateStatus("💾 Guardado localmente.")
 
-        serviceScope.launch {
-            val capturedNotification = CapturedNotification(
-                packageName = packageName,
-                title = title,
-                body = text
-            )
-            db.capturedNotificationDao().insert(capturedNotification)
-            Log.i(TAG, "Notification saved locally with status PENDING.")
-            ServiceStatusManager.updateStatus("💾 Guardado localmente.")
-
-            scheduleSendNotificationWorker()
-            ServiceStatusManager.updateStatus("👷 Trabajo de envío planificado.")
+                scheduleSendNotificationWorker()
+                ServiceStatusManager.updateStatus("👷 Trabajo de envío planificado.")
+            }
+        } else {
+            Log.d(TAG, "Notification from $packageName did not match payment pattern.")
         }
     }
 

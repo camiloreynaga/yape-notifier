@@ -13,7 +13,7 @@ class SendNotificationWorker(appContext: Context, workerParams: WorkerParameters
 
     private val notificationDao = AppDatabase.getDatabase(appContext).capturedNotificationDao()
     private val repository = NotificationRepository(appContext)
-    private val parser = NotificationParser()
+    private val parser = NotificationParser(appContext)
 
     override suspend fun doWork(): Result {
         Log.d(TAG, "Starting worker to send pending notifications...")

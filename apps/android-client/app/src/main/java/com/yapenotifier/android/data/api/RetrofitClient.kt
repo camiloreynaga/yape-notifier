@@ -11,8 +11,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
-    // Usando un endpoint Mock para pruebas. Visita https://yape-test.free.beeceptor.com para ver los datos recibidos.
-    private const val BASE_URL = "https://yape-test.free.beeceptor.com/"
+    private const val BASE_URL = "https://api.notificaciones.space/"
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
