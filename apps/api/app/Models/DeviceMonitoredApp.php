@@ -43,3 +43,4 @@ class DeviceMonitoredApp extends Model
 }
 
 
+
