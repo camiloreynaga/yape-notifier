@@ -63,19 +63,32 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         val title = notification.extras?.getString("android.title") ?: ""
         val text = notification.extras?.getCharSequence("android.text")?.toString() ?: ""
 
+        // Capture dual app identifiers (CRITICAL for MIUI and other dual app systems)
+        val androidUserId = sbn.user?.identifier // UserHandle identifier
+        val androidUid = sbn.uid // Optional UID
+        val postedAt = sbn.postTime // Original notification timestamp
+
         val paymentDetails = PaymentNotificationParser.parse(title, text)
         
         if (paymentDetails != null) {
-            ServiceStatusManager.updateStatus("📬 Notificación de pago recibida de: $packageName")
+            val instanceInfo = if (androidUserId != null) {
+                " (User $androidUserId)"
+            } else {
+                ""
+            }
+            ServiceStatusManager.updateStatus("📬 Notificación de pago recibida de: $packageName$instanceInfo")
             
             serviceScope.launch {
                 val capturedNotification = CapturedNotification(
                     packageName = packageName,
+                    androidUserId = androidUserId,
+                    androidUid = androidUid,
                     title = "Pago de ${paymentDetails.sender}",
-                    body = "Monto: ${paymentDetails.currency}${paymentDetails.amount}"
+                    body = "Monto: ${paymentDetails.currency}${paymentDetails.amount}",
+                    postedAt = postedAt
                 )
                 db.capturedNotificationDao().insert(capturedNotification)
-                Log.i(TAG, "Payment notification saved locally.")
+                Log.i(TAG, "Payment notification saved locally. Package: $packageName, UserId: $androidUserId, Uid: $androidUid")
                 ServiceStatusManager.updateStatus("💾 Guardado localmente.")
 
                 scheduleSendNotificationWorker()
