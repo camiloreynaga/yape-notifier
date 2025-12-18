@@ -1,6 +1,6 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { API_BASE_URL, API_ENDPOINTS } from '@/config/api';
-import type { AuthResponse, User, Device, Notification, NotificationFilters, NotificationStatistics, PaginatedResponse, ApiError } from '@/types';
+import type { AuthResponse, User, Device, Notification, NotificationFilters, NotificationStatistics, PaginatedResponse, ApiError, Commerce, AppInstance } from '@/types';
 
 class ApiService {
   private client: AxiosInstance;
@@ -129,6 +129,48 @@ class ApiService {
       { status }
     );
     return response.data.notification;
+  }
+
+  // Commerce methods
+  async createCommerce(name: string): Promise<Commerce> {
+    const response = await this.client.post<{ commerce: Commerce }>(
+      API_ENDPOINTS.commerces.create,
+      { name }
+    );
+    return response.data.commerce;
+  }
+
+  async getCommerce(): Promise<Commerce | null> {
+    try {
+      const response = await this.client.get<{ commerce: Commerce }>(API_ENDPOINTS.commerces.show);
+      return response.data.commerce;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  // App Instance methods
+  async getAppInstances(deviceId?: number): Promise<AppInstance[]> {
+    const response = await this.client.get<{ instances: AppInstance[] }>(
+      API_ENDPOINTS.appInstances.list,
+      { params: deviceId ? { device_id: deviceId } : {} }
+    );
+    return response.data.instances;
+  }
+
+  async getDeviceAppInstances(deviceId: number): Promise<AppInstance[]> {
+    const response = await this.client.get<{ instances: AppInstance[] }>(
+      API_ENDPOINTS.appInstances.getDeviceInstances(deviceId)
+    );
+    return response.data.instances;
+  }
+
+  async updateAppInstanceLabel(id: number, label: string): Promise<AppInstance> {
+    const response = await this.client.patch<{ instance: AppInstance }>(
+      API_ENDPOINTS.appInstances.updateLabel(id),
+      { instance_label: label }
+    );
+    return response.data.instance;
   }
 }
 

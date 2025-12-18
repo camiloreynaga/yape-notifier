@@ -19,8 +19,10 @@ class Device extends Model
      */
     protected $fillable = [
         'user_id',
+        'commerce_id',
         'uuid',
         'name',
+        'alias',
         'platform',
         'is_active',
         'last_seen_at',
@@ -67,5 +69,29 @@ class Device extends Model
     public function notifications(): HasMany
     {
         return $this->hasMany(Notification::class);
+    }
+
+    /**
+     * Get the commerce for this device.
+     */
+    public function commerce(): BelongsTo
+    {
+        return $this->belongsTo(Commerce::class);
+    }
+
+    /**
+     * Get the app instances for this device.
+     */
+    public function appInstances(): HasMany
+    {
+        return $this->hasMany(AppInstance::class);
+    }
+
+    /**
+     * Get the monitored apps for this device.
+     */
+    public function monitoredApps(): HasMany
+    {
+        return $this->hasMany(DeviceMonitoredApp::class);
     }
 }

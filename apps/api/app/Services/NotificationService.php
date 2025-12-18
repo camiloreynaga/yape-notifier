@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AppInstance;
 use App\Models\Device;
 use App\Models\Notification;
 use App\Models\User;
@@ -11,23 +12,52 @@ use Illuminate\Support\Facades\Log;
 
 class NotificationService
 {
+    public function __construct(
+        protected ?AppInstanceService $appInstanceService = null
+    ) {
+        // Lazy load to avoid circular dependency
+        if (!$this->appInstanceService) {
+            $this->appInstanceService = app(AppInstanceService::class);
+        }
+    }
+
     /**
      * Create a notification from device data.
      */
     public function createNotification(array $data, Device $device): Notification
     {
+        // Find or create app instance if dual app identifiers are provided
+        $appInstance = null;
+        if (isset($data['package_name']) && isset($data['android_user_id'])) {
+            $appInstance = $this->appInstanceService->findOrCreate(
+                $device,
+                $data['package_name'],
+                $data['android_user_id']
+            );
+        }
+
         // Check for duplicates
-        $isDuplicate = $this->checkDuplicate($data, $device);
+        $isDuplicate = $this->checkDuplicate($data, $device, $appInstance);
+
+        $commerceId = $device->commerce_id ?? $device->user->commerce_id;
 
         $notification = Notification::create([
             'user_id' => $device->user_id,
+            'commerce_id' => $commerceId,
             'device_id' => $device->id,
             'source_app' => $data['source_app'],
+            'package_name' => $data['package_name'] ?? null,
+            'android_user_id' => $data['android_user_id'] ?? null,
+            'android_uid' => $data['android_uid'] ?? null,
+            'app_instance_id' => $appInstance?->id,
             'title' => $data['title'] ?? null,
             'body' => $data['body'],
             'amount' => $data['amount'] ?? null,
             'currency' => $data['currency'] ?? 'PEN',
             'payer_name' => $data['payer_name'] ?? null,
+            'posted_at' => isset($data['posted_at'])
+                ? Carbon::parse($data['posted_at'])
+                : null,
             'received_at' => isset($data['received_at'])
                 ? Carbon::parse($data['received_at'])
                 : now(),
@@ -42,7 +72,8 @@ class NotificationService
         if ($isDuplicate) {
             Log::info('Duplicate notification detected', [
                 'device_id' => $device->id,
-                'source_app' => $data['source_app'],
+                'package_name' => $data['package_name'] ?? null,
+                'android_user_id' => $data['android_user_id'] ?? null,
                 'received_at' => $notification->received_at,
             ]);
         }
@@ -52,22 +83,32 @@ class NotificationService
 
     /**
      * Check if a notification is a duplicate.
+     * Uses package_name + android_user_id + posted_at + body for deduplication.
      */
-    protected function checkDuplicate(array $data, Device $device): bool
+    protected function checkDuplicate(array $data, Device $device, ?AppInstance $appInstance = null): bool
     {
-        $receivedAt = isset($data['received_at'])
-            ? Carbon::parse($data['received_at'])
-            : now();
+        $postedAt = isset($data['posted_at'])
+            ? Carbon::parse($data['posted_at'])
+            : (isset($data['received_at']) ? Carbon::parse($data['received_at']) : now());
 
         // Check for duplicates within a 5-second window
-        $startTime = $receivedAt->copy()->subSeconds(5);
-        $endTime = $receivedAt->copy()->addSeconds(5);
+        $startTime = $postedAt->copy()->subSeconds(5);
+        $endTime = $postedAt->copy()->addSeconds(5);
 
-        $existing = Notification::where('device_id', $device->id)
-            ->where('source_app', $data['source_app'])
-            ->whereBetween('received_at', [$startTime, $endTime])
-            ->where('body', $data['body'])
-            ->first();
+        $query = Notification::where('device_id', $device->id)
+            ->whereBetween('posted_at', [$startTime, $endTime])
+            ->where('body', $data['body']);
+
+        // If we have dual app identifiers, use them for more precise deduplication
+        if (isset($data['package_name']) && isset($data['android_user_id'])) {
+            $query->where('package_name', $data['package_name'])
+                ->where('android_user_id', $data['android_user_id']);
+        } else {
+            // Fallback to source_app for backward compatibility
+            $query->where('source_app', $data['source_app']);
+        }
+
+        $existing = $query->first();
 
         return $existing !== null;
     }
@@ -80,8 +121,13 @@ class NotificationService
         array $filters = []
     ) {
         $query = Notification::where('user_id', $user->id)
-            ->with('device')
+            ->with(['device', 'appInstance'])
             ->orderBy('received_at', 'desc');
+
+        // Filter by commerce if user has one
+        if ($user->commerce_id) {
+            $query->where('commerce_id', $user->commerce_id);
+        }
 
         // Filter by device
         if (isset($filters['device_id'])) {
@@ -91,6 +137,16 @@ class NotificationService
         // Filter by source app
         if (isset($filters['source_app'])) {
             $query->where('source_app', $filters['source_app']);
+        }
+
+        // Filter by package name
+        if (isset($filters['package_name'])) {
+            $query->where('package_name', $filters['package_name']);
+        }
+
+        // Filter by app instance
+        if (isset($filters['app_instance_id'])) {
+            $query->where('app_instance_id', $filters['app_instance_id']);
         }
 
         // Filter by date range

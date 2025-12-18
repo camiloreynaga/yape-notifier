@@ -20,6 +20,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'commerce_id',
+        'role',
     ];
 
     /**
@@ -59,5 +61,29 @@ class User extends Authenticatable
     public function notifications()
     {
         return $this->hasMany(Notification::class);
+    }
+
+    /**
+     * Get the commerce for this user.
+     */
+    public function commerce()
+    {
+        return $this->belongsTo(Commerce::class);
+    }
+
+    /**
+     * Check if user is admin.
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    /**
+     * Check if user is captador.
+     */
+    public function isCaptador(): bool
+    {
+        return $this->role === 'captador';
     }
 }

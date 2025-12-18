@@ -15,8 +15,10 @@ class DeviceService
     {
         return Device::create([
             'user_id' => $user->id,
+            'commerce_id' => $user->commerce_id,
             'uuid' => $data['uuid'] ?? (string) Str::uuid(),
             'name' => $data['name'],
+            'alias' => $data['alias'] ?? null,
             'platform' => $data['platform'] ?? 'android',
             'is_active' => $data['is_active'] ?? true,
         ]);

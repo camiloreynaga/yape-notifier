@@ -5,6 +5,7 @@ import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import NotificationsPage from './pages/NotificationsPage';
 import DevicesPage from './pages/DevicesPage';
+import CreateCommercePage from './pages/CreateCommercePage';
 import Layout from './components/Layout';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -47,6 +48,11 @@ function AppRoutes() {
         <PublicRoute>
           <RegisterPage />
         </PublicRoute>
+      } />
+      <Route path="/create-commerce" element={
+        <PrivateRoute>
+          <CreateCommercePage />
+        </PrivateRoute>
       } />
       <Route path="/" element={
         <PrivateRoute>

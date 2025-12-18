@@ -36,5 +36,14 @@ export const API_ENDPOINTS = {
     // Public endpoint for clients
     getActive: '/api/settings/monitored-packages',
   },
+  commerces: {
+    create: '/api/commerces',
+    show: '/api/commerces/me',
+  },
+  appInstances: {
+    list: '/api/app-instances',
+    getDeviceInstances: (deviceId: number) => `/api/devices/${deviceId}/app-instances`,
+    updateLabel: (id: number) => `/api/app-instances/${id}/label`,
+  },
 } as const;
 

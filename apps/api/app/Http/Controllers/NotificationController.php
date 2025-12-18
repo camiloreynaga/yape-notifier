@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\Notification\CreateNotificationRequest;
+use App\Services\AppInstanceService;
 use App\Services\DeviceService;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
@@ -12,7 +13,8 @@ class NotificationController extends Controller
 {
     public function __construct(
         protected NotificationService $notificationService,
-        protected DeviceService $deviceService
+        protected DeviceService $deviceService,
+        protected AppInstanceService $appInstanceService
     ) {}
 
     /**
@@ -59,6 +61,8 @@ class NotificationController extends Controller
         $filters = $request->only([
             'device_id',
             'source_app',
+            'package_name',
+            'app_instance_id',
             'start_date',
             'end_date',
             'status',
@@ -80,7 +84,7 @@ class NotificationController extends Controller
     {
         $notification = $request->user()
             ->notifications()
-            ->with('device')
+            ->with(['device', 'appInstance'])
             ->findOrFail($id);
 
         return response()->json([

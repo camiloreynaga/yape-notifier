@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\AppInstanceController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CommerceController;
 use App\Http\Controllers\DeviceController;
 use App\Http\Controllers\MonitorPackageController;
 use App\Http\Controllers\NotificationController;
@@ -40,4 +42,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('monitor-packages', MonitorPackageController::class);
     Route::post('/monitor-packages/{id}/toggle-status', [MonitorPackageController::class, 'toggleStatus']);
     Route::post('/monitor-packages/bulk-create', [MonitorPackageController::class, 'bulkCreate']);
+
+    // App Instance routes (for dual apps management)
+    Route::get('/app-instances', [AppInstanceController::class, 'index']);
+    Route::get('/devices/{deviceId}/app-instances', [AppInstanceController::class, 'getDeviceInstances']);
+    Route::patch('/app-instances/{id}/label', [AppInstanceController::class, 'updateLabel']);
+
+    // Commerce routes
+    Route::post('/commerces', [CommerceController::class, 'store']);
+    Route::get('/commerces/me', [CommerceController::class, 'show']);
 });

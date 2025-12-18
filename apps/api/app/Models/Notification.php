@@ -17,13 +17,19 @@ class Notification extends Model
      */
     protected $fillable = [
         'user_id',
+        'commerce_id',
         'device_id',
         'source_app',
+        'package_name',
+        'android_user_id',
+        'android_uid',
+        'app_instance_id',
         'title',
         'body',
         'amount',
         'currency',
         'payer_name',
+        'posted_at',
         'received_at',
         'raw_json',
         'status',
@@ -39,9 +45,12 @@ class Notification extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'posted_at' => 'datetime',
             'received_at' => 'datetime',
             'raw_json' => 'array',
             'is_duplicate' => 'boolean',
+            'android_user_id' => 'integer',
+            'android_uid' => 'integer',
         ];
     }
 
@@ -59,5 +68,21 @@ class Notification extends Model
     public function device(): BelongsTo
     {
         return $this->belongsTo(Device::class);
+    }
+
+    /**
+     * Get the commerce for this notification.
+     */
+    public function commerce(): BelongsTo
+    {
+        return $this->belongsTo(Commerce::class);
+    }
+
+    /**
+     * Get the app instance for this notification.
+     */
+    public function appInstance(): BelongsTo
+    {
+        return $this->belongsTo(AppInstance::class);
     }
 }

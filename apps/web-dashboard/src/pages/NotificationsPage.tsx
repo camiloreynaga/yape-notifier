@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiService } from '@/services/api';
-import type { Notification, NotificationFilters, PaginatedResponse, Device } from '@/types';
+import type { Notification, NotificationFilters, PaginatedResponse, Device, AppInstance } from '@/types';
 import { format } from 'date-fns';
 import { Download, Filter } from 'lucide-react';
 
@@ -13,9 +13,11 @@ export default function NotificationsPage() {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [devices, setDevices] = useState<Device[]>([]);
+  const [appInstances, setAppInstances] = useState<AppInstance[]>([]);
 
   useEffect(() => {
     loadDevices();
+    loadAppInstances();
   }, []);
 
   useEffect(() => {
@@ -29,6 +31,15 @@ export default function NotificationsPage() {
       setDevices(deviceList);
     } catch (error) {
       console.error('Error loading devices:', error);
+    }
+  };
+
+  const loadAppInstances = async () => {
+    try {
+      const instances = await apiService.getAppInstances();
+      setAppInstances(instances);
+    } catch (error) {
+      console.error('Error loading app instances:', error);
     }
   };
 
@@ -72,6 +83,7 @@ export default function NotificationsPage() {
       'ID',
       'Fecha',
       'Aplicación',
+      'Instancia',
       'Dispositivo',
       'Título',
       'Monto',
@@ -85,6 +97,7 @@ export default function NotificationsPage() {
       n.id,
       format(new Date(n.received_at), 'yyyy-MM-dd HH:mm:ss'),
       n.source_app || 'N/A',
+      n.app_instance?.instance_label || (n.android_user_id ? `${n.package_name} (User ${n.android_user_id})` : 'N/A'),
       n.device?.name || 'N/A',
       n.title,
       n.amount || '0',
@@ -185,12 +198,31 @@ export default function NotificationsPage() {
                 className="input"
               >
                 <option value="">Todas</option>
-                <option value="com.bcp.bancamovil">BCP</option>
-                <option value="com.interbank.mobilebanking">Interbank</option>
-                <option value="com.bbva.bbvacontinental">BBVA</option>
-                <option value="com.scotiabank.mobile">Scotiabank</option>
-                <option value="com.yape">Yape</option>
-                <option value="com.plin">Plin</option>
+                <option value="yape">Yape</option>
+                <option value="plin">Plin</option>
+                <option value="bcp">BCP</option>
+                <option value="interbank">Interbank</option>
+                <option value="bbva">BBVA</option>
+                <option value="scotiabank">Scotiabank</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Instancia (Dual Apps)
+              </label>
+              <select
+                value={filters.app_instance_id || ''}
+                onChange={(e) =>
+                  handleFilterChange('app_instance_id', e.target.value ? parseInt(e.target.value) : undefined)
+                }
+                className="input"
+              >
+                <option value="">Todas</option>
+                {appInstances.map((instance) => (
+                  <option key={instance.id} value={instance.id}>
+                    {instance.instance_label || `${instance.package_name} (User ${instance.android_user_id})`}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
@@ -268,6 +300,9 @@ export default function NotificationsPage() {
                       Aplicación
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Instancia
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Dispositivo
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -295,6 +330,10 @@ export default function NotificationsPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {notification.source_app || 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {notification.app_instance?.instance_label || 
+                         (notification.android_user_id ? `${notification.package_name} (User ${notification.android_user_id})` : 'N/A')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {notification.device?.name || 'N/A'}
