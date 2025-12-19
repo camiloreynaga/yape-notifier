@@ -42,3 +42,9 @@ infra/docker/**/.env.*
 tmp/
 temp/
 *.tmp
+
+# Backups
+backups/
+*.sql.gz
+*.sql
+rollback_*.sh

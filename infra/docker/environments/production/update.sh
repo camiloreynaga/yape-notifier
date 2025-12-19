@@ -20,9 +20,26 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuración
-BACKUP_DIR="${BACKUP_DIR:-/var/backups/yape-notifier}"
 PROJECT_DIR="$(pwd)"
 DATE=$(date +%Y%m%d_%H%M%S)
+
+# Detectar ruta de backup escribible
+# Prioridad: 1) Variable BACKUP_DIR, 2) ./backups, 3) ~/backups/yape-notifier, 4) /tmp/yape-notifier-backups
+if [ -n "$BACKUP_DIR" ]; then
+    # Usar la variable de entorno si está configurada
+    TARGET_DIR="$BACKUP_DIR"
+elif [ -w "$PROJECT_DIR" ]; then
+    # Usar directorio dentro del proyecto si es escribible
+    TARGET_DIR="$PROJECT_DIR/backups"
+elif [ -w "$HOME" ]; then
+    # Usar directorio en el home del usuario
+    TARGET_DIR="$HOME/backups/yape-notifier"
+else
+    # Último recurso: /tmp
+    TARGET_DIR="/tmp/yape-notifier-backups"
+fi
+
+BACKUP_DIR="$TARGET_DIR"
 BACKUP_FILE="$BACKUP_DIR/backup_pre_update_$DATE.sql.gz"
 ROLLBACK_FILE="$BACKUP_DIR/rollback_$DATE.sh"
 
@@ -50,6 +67,24 @@ if [ ! -f "docker-compose.yml" ] || [ ! -f ".env" ]; then
     exit 1
 fi
 
+# Intentar crear el directorio de backup
+if mkdir -p "$BACKUP_DIR" 2>/dev/null; then
+    # Verificar que realmente podemos escribir
+    if [ -w "$BACKUP_DIR" ]; then
+        info "Usando directorio de backup: $BACKUP_DIR"
+    else
+        error "No se puede escribir en: $BACKUP_DIR"
+        error "Configura BACKUP_DIR con una ruta escribible:"
+        error "  export BACKUP_DIR=/ruta/escribible && ./update.sh"
+        exit 1
+    fi
+else
+    error "No se pudo crear el directorio de backup: $BACKUP_DIR"
+    error "Configura BACKUP_DIR con una ruta escribible:"
+    error "  export BACKUP_DIR=/ruta/escribible && ./update.sh"
+    exit 1
+fi
+
 # Verificar que docker compose está disponible
 if ! command -v docker &> /dev/null; then
     error "Docker no está instalado o no está en PATH"
@@ -66,9 +101,6 @@ echo ""
 # PASO 1: BACKUP DE BASE DE DATOS
 # ============================================
 step "1/6: Creando backup de base de datos..."
-
-# Crear directorio de backups si no existe
-mkdir -p "$BACKUP_DIR"
 
 # Verificar que la base de datos está corriendo
 if ! docker compose --env-file .env ps db | grep -q "Up"; then

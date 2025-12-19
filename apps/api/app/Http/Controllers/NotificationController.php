@@ -8,6 +8,8 @@ use App\Services\DeviceService;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class NotificationController extends Controller
 {
@@ -22,35 +24,88 @@ class NotificationController extends Controller
      */
     public function store(CreateNotificationRequest $request): JsonResponse
     {
-        $user = $request->user();
-        $deviceUuid = $request->input('device_id');
+        try {
+            $user = $request->user();
+            $deviceUuid = $request->input('device_id');
 
-        // Find device by UUID
-        $device = $this->deviceService->findDeviceByUuid($user, $deviceUuid);
+            Log::info('Notification creation request received', [
+                'user_id' => $user->id,
+                'device_uuid' => $deviceUuid,
+                'has_commerce' => !is_null($user->commerce_id),
+            ]);
 
-        if (! $device) {
+            // Find device by UUID
+            $device = $this->deviceService->findDeviceByUuid($user, $deviceUuid);
+
+            if (! $device) {
+                Log::warning('Device not found for notification', [
+                    'user_id' => $user->id,
+                    'device_uuid' => $deviceUuid,
+                ]);
+
+                return response()->json([
+                    'message' => 'Device not found',
+                ], 404);
+            }
+
+            if (! $device->is_active) {
+                Log::warning('Inactive device attempted to create notification', [
+                    'user_id' => $user->id,
+                    'device_id' => $device->id,
+                ]);
+
+                return response()->json([
+                    'message' => 'Device is not active',
+                ], 403);
+            }
+
+            // Ensure device has commerce_id
+            if (!$device->commerce_id && $user->commerce_id) {
+                $device->update(['commerce_id' => $user->commerce_id]);
+                Log::info('Device commerce_id updated from user', [
+                    'device_id' => $device->id,
+                    'commerce_id' => $user->commerce_id,
+                ]);
+            }
+
+            $notification = $this->notificationService->createNotification(
+                $request->validated(),
+                $device
+            );
+
+            Log::info('Notification created successfully', [
+                'notification_id' => $notification->id,
+                'user_id' => $user->id,
+                'device_id' => $device->id,
+                'is_duplicate' => $notification->is_duplicate,
+            ]);
+
             return response()->json([
-                'message' => 'Device not found',
-            ], 404);
-        }
+                'message' => $notification->is_duplicate
+                    ? 'Notification received (duplicate detected)'
+                    : 'Notification created successfully',
+                'notification' => $notification,
+            ], 201);
+        } catch (ValidationException $e) {
+            Log::warning('Notification validation failed', [
+                'user_id' => $request->user()->id,
+                'errors' => $e->errors(),
+            ]);
 
-        if (! $device->is_active) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Failed to create notification', [
+                'user_id' => $request->user()->id,
+                'device_uuid' => $request->input('device_id'),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return response()->json([
-                'message' => 'Device is not active',
-            ], 403);
+                'message' => 'Failed to create notification. Please try again.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
         }
-
-        $notification = $this->notificationService->createNotification(
-            $request->validated(),
-            $device
-        );
-
-        return response()->json([
-            'message' => $notification->is_duplicate
-                ? 'Notification received (duplicate detected)'
-                : 'Notification created successfully',
-            'notification' => $notification,
-        ], 201);
     }
 
     /**
@@ -58,23 +113,35 @@ class NotificationController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $filters = $request->only([
-            'device_id',
-            'source_app',
-            'package_name',
-            'app_instance_id',
-            'start_date',
-            'end_date',
-            'status',
-            'exclude_duplicates',
-        ]);
+        try {
+            $filters = $request->only([
+                'device_id',
+                'source_app',
+                'package_name',
+                'app_instance_id',
+                'start_date',
+                'end_date',
+                'status',
+                'exclude_duplicates',
+            ]);
 
-        $perPage = $request->integer('per_page', 50);
-        $notifications = $this->notificationService
-            ->getUserNotifications($request->user(), $filters)
-            ->paginate($perPage);
+            $perPage = $request->integer('per_page', 50);
+            $notifications = $this->notificationService
+                ->getUserNotifications($request->user(), $filters)
+                ->paginate($perPage);
 
-        return response()->json($notifications);
+            return response()->json($notifications);
+        } catch (\Exception $e) {
+            Log::error('Failed to retrieve notifications', [
+                'user_id' => $request->user()->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to retrieve notifications.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
+        }
     }
 
     /**
@@ -97,14 +164,26 @@ class NotificationController extends Controller
      */
     public function statistics(Request $request): JsonResponse
     {
-        $filters = $request->only(['start_date', 'end_date']);
+        try {
+            $filters = $request->only(['start_date', 'end_date']);
 
-        $stats = $this->notificationService->getStatistics(
-            $request->user(),
-            $filters
-        );
+            $stats = $this->notificationService->getStatistics(
+                $request->user(),
+                $filters
+            );
 
-        return response()->json($stats);
+            return response()->json($stats);
+        } catch (\Exception $e) {
+            Log::error('Failed to retrieve notification statistics', [
+                'user_id' => $request->user()->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to retrieve statistics.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
+        }
     }
 
     /**

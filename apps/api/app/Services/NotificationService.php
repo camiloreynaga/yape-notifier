@@ -3,9 +3,11 @@
 namespace App\Services;
 
 use App\Models\AppInstance;
+use App\Models\Commerce;
 use App\Models\Device;
 use App\Models\Notification;
 use App\Models\User;
+use App\Services\CommerceService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -13,11 +15,15 @@ use Illuminate\Support\Facades\Log;
 class NotificationService
 {
     public function __construct(
-        protected ?AppInstanceService $appInstanceService = null
+        protected ?AppInstanceService $appInstanceService = null,
+        protected ?CommerceService $commerceService = null
     ) {
         // Lazy load to avoid circular dependency
         if (!$this->appInstanceService) {
             $this->appInstanceService = app(AppInstanceService::class);
+        }
+        if (!$this->commerceService) {
+            $this->commerceService = app(CommerceService::class);
         }
     }
 
@@ -26,20 +32,43 @@ class NotificationService
      */
     public function createNotification(array $data, Device $device): Notification
     {
+        // Ensure device has commerce_id (from device or user)
+        $commerceId = $device->commerce_id ?? $device->user->commerce_id;
+
+        // If no commerce_id, try to ensure user has one
+        if (!$commerceId) {
+            Log::warning('Notification creation attempted without commerce_id', [
+                'device_id' => $device->id,
+                'user_id' => $device->user_id,
+            ]);
+
+            // Try to ensure user has commerce (fallback: create one)
+            $commerceId = $this->ensureUserHasCommerce($device->user);
+        }
+
         // Find or create app instance if dual app identifiers are provided
+        // Only if we have a valid commerce_id
         $appInstance = null;
-        if (isset($data['package_name']) && isset($data['android_user_id'])) {
-            $appInstance = $this->appInstanceService->findOrCreate(
-                $device,
-                $data['package_name'],
-                $data['android_user_id']
-            );
+        if (isset($data['package_name']) && isset($data['android_user_id']) && $commerceId) {
+            try {
+                $appInstance = $this->appInstanceService->findOrCreate(
+                    $device,
+                    $data['package_name'],
+                    $data['android_user_id']
+                );
+            } catch (\Exception $e) {
+                Log::error('Failed to create/find app instance', [
+                    'device_id' => $device->id,
+                    'package_name' => $data['package_name'],
+                    'android_user_id' => $data['android_user_id'],
+                    'error' => $e->getMessage(),
+                ]);
+                // Continue without app instance
+            }
         }
 
         // Check for duplicates
         $isDuplicate = $this->checkDuplicate($data, $device, $appInstance);
-
-        $commerceId = $device->commerce_id ?? $device->user->commerce_id;
 
         $notification = Notification::create([
             'user_id' => $device->user_id,
@@ -252,5 +281,49 @@ class NotificationService
             'by_status' => $byStatus,
             'duplicates' => $duplicates,
         ];
+    }
+
+    /**
+     * Ensure user has a commerce. Creates one if missing.
+     * 
+     * @param User $user
+     * @return int|null Commerce ID or null if creation failed
+     */
+    protected function ensureUserHasCommerce(User $user): ?int
+    {
+        // Refresh user to get latest commerce_id
+        $user->refresh();
+
+        if ($user->commerce_id) {
+            return $user->commerce_id;
+        }
+
+        // Try to create commerce for user
+        try {
+            $commerce = $this->commerceService->createCommerce($user, [
+                'name' => $user->name . ' - Negocio',
+            ]);
+
+            Log::info('Commerce created automatically for user during notification', [
+                'user_id' => $user->id,
+                'commerce_id' => $commerce->id,
+            ]);
+
+            // Update device if it doesn't have commerce_id
+            if ($user->devices()->whereNull('commerce_id')->exists()) {
+                $user->devices()->whereNull('commerce_id')->update([
+                    'commerce_id' => $commerce->id,
+                ]);
+            }
+
+            return $commerce->id;
+        } catch (\Exception $e) {
+            Log::error('Failed to create commerce for user during notification', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 }

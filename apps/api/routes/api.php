@@ -51,4 +51,5 @@ Route::middleware('auth:sanctum')->group(function () {
     // Commerce routes
     Route::post('/commerces', [CommerceController::class, 'store']);
     Route::get('/commerces/me', [CommerceController::class, 'show']);
+    Route::get('/commerces/check', [CommerceController::class, 'check']);
 });

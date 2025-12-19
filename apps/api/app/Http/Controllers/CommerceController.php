@@ -53,6 +53,21 @@ class CommerceController extends Controller
             'commerce' => $commerce,
         ]);
     }
+
+    /**
+     * Check if current user has a commerce.
+     * Returns a simple boolean response for quick verification.
+     */
+    public function check(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $hasCommerce = !is_null($user->commerce_id);
+
+        return response()->json([
+            'has_commerce' => $hasCommerce,
+            'commerce_id' => $user->commerce_id,
+        ]);
+    }
 }
 
 
