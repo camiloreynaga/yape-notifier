@@ -149,6 +149,26 @@ class ApiService {
     }
   }
 
+  /**
+   * Verifica si el usuario tiene un commerce asociado
+   * Retorna el commerce si existe, o null si no existe
+   * Lanza error si hay un problema de conexión o autenticación
+   */
+  async checkCommerce(): Promise<Commerce | null> {
+    try {
+      const response = await this.client.get<{ commerce: Commerce }>(API_ENDPOINTS.commerces.check);
+      return response.data.commerce;
+    } catch (error) {
+      const axiosError = error as AxiosError<ApiError>;
+      // Si el error es 404, significa que no hay commerce (no es un error crítico)
+      if (axiosError.response?.status === 404) {
+        return null;
+      }
+      // Para otros errores, lanzar excepción
+      throw new Error(axiosError.response?.data?.message || 'Error al verificar commerce');
+    }
+  }
+
   // App Instance methods
   async getAppInstances(deviceId?: number): Promise<AppInstance[]> {
     const response = await this.client.get<{ instances: AppInstance[] }>(

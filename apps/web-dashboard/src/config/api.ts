@@ -39,6 +39,7 @@ export const API_ENDPOINTS = {
   commerces: {
     create: '/api/commerces',
     show: '/api/commerces/me',
+    check: '/api/commerces/me',
   },
   appInstances: {
     list: '/api/app-instances',

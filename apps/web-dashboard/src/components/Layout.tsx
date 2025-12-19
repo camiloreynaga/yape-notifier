@@ -9,6 +9,7 @@ import {
   X 
 } from 'lucide-react';
 import { useState } from 'react';
+import CommerceBanner from './CommerceBanner';
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -137,6 +138,7 @@ export default function Layout() {
         <main className="flex-1">
           <div className="py-6">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+              <CommerceBanner />
               <Outlet />
             </div>
           </div>

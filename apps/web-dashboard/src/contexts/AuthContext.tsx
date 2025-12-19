@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { apiService } from '@/services/api';
 import type { User } from '@/types';
 
@@ -10,6 +10,8 @@ interface AuthContextType {
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
+  hasCommerce: boolean;
+  checkCommerce: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,6 +32,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasCommerce, setHasCommerce] = useState(false);
+
+  /**
+   * Verifica si el usuario tiene un commerce asociado
+   */
+  const checkCommerce = useCallback(async (): Promise<boolean> => {
+    try {
+      const commerce = await apiService.checkCommerce();
+      const hasCommerceValue = !!commerce;
+      setHasCommerce(hasCommerceValue);
+      
+      // Actualizar el usuario con el commerce_id si existe
+      if (commerce) {
+        setUser((prevUser) => {
+          if (prevUser) {
+            return { ...prevUser, commerce_id: commerce.id };
+          }
+          return prevUser;
+        });
+      }
+      
+      return hasCommerceValue;
+    } catch (error) {
+      setHasCommerce(false);
+      return false;
+    }
+  }, []);
 
   useEffect(() => {
     // Check for stored token and user
@@ -38,11 +67,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     if (storedToken && storedUser) {
       setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+      const parsedUser = JSON.parse(storedUser);
+      setUser(parsedUser);
       // Verify token is still valid
       apiService.getCurrentUser()
-        .then((currentUser) => {
+        .then(async (currentUser) => {
           setUser(currentUser);
+          // Verificar commerce después de obtener el usuario actualizado
+          await checkCommerce();
         })
         .catch(() => {
           // Token invalid, clear storage
@@ -50,6 +82,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           localStorage.removeItem('user');
           setToken(null);
           setUser(null);
+          setHasCommerce(false);
         })
         .finally(() => {
           setLoading(false);
@@ -57,7 +90,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } else {
       setLoading(false);
     }
-  }, []);
+  }, [checkCommerce]);
 
   const login = async (email: string, password: string) => {
     const response = await apiService.login(email, password);
@@ -65,6 +98,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(response.user);
     localStorage.setItem('auth_token', response.token);
     localStorage.setItem('user', JSON.stringify(response.user));
+    
+    // Verificar commerce después de login
+    await checkCommerce();
   };
 
   const register = async (name: string, email: string, password: string) => {
@@ -73,6 +109,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(response.user);
     localStorage.setItem('auth_token', response.token);
     localStorage.setItem('user', JSON.stringify(response.user));
+    
+    // Verificar commerce después de registro
+    await checkCommerce();
   };
 
   const logout = async () => {
@@ -83,6 +122,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setToken(null);
       setUser(null);
+      setHasCommerce(false);
       localStorage.removeItem('auth_token');
       localStorage.removeItem('user');
     }
@@ -96,6 +136,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     register,
     logout,
     isAuthenticated: !!token && !!user,
+    hasCommerce,
+    checkCommerce,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

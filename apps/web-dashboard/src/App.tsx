@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -8,8 +8,14 @@ import DevicesPage from './pages/DevicesPage';
 import CreateCommercePage from './pages/CreateCommercePage';
 import Layout from './components/Layout';
 
-function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, loading } = useAuth();
+interface PrivateRouteProps {
+  children: React.ReactNode;
+  requireCommerce?: boolean;
+}
+
+function PrivateRoute({ children, requireCommerce = false }: PrivateRouteProps) {
+  const { isAuthenticated, loading, hasCommerce } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -19,7 +25,17 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  // Si requiere commerce y no lo tiene, redirigir a crear commerce
+  // Excepto si ya está en la página de crear commerce
+  if (requireCommerce && !hasCommerce && location.pathname !== '/create-commerce') {
+    return <Navigate to="/create-commerce" replace />;
+  }
+
+  return <>{children}</>;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
@@ -50,12 +66,12 @@ function AppRoutes() {
         </PublicRoute>
       } />
       <Route path="/create-commerce" element={
-        <PrivateRoute>
+        <PrivateRoute requireCommerce={false}>
           <CreateCommercePage />
         </PrivateRoute>
       } />
       <Route path="/" element={
-        <PrivateRoute>
+        <PrivateRoute requireCommerce={true}>
           <Layout />
         </PrivateRoute>
       }>
