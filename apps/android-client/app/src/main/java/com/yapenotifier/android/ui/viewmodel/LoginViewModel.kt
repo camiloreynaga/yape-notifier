@@ -8,17 +8,20 @@ import androidx.lifecycle.viewModelScope
 import com.yapenotifier.android.data.api.RetrofitClient
 import com.yapenotifier.android.data.local.PreferencesManager
 import com.yapenotifier.android.data.model.LoginRequest
+import com.yapenotifier.android.data.repository.CommerceRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 data class LoginResult(
     val success: Boolean,
-    val message: String? = null
+    val message: String? = null,
+    val needsCommerceCreation: Boolean = false
 )
 
 class LoginViewModel(application: android.app.Application) : androidx.lifecycle.AndroidViewModel(application) {
     private val apiService = RetrofitClient.createApiService(application)
     private val preferencesManager = PreferencesManager(application)
+    private val commerceRepository = CommerceRepository(apiService)
 
     private val _loginResult = MutableLiveData<LoginResult?>()
     val loginResult: LiveData<LoginResult?> = _loginResult
@@ -41,7 +44,13 @@ class LoginViewModel(application: android.app.Application) : androidx.lifecycle.
 
                         val deviceRegistered = registerDevice()
                         if (deviceRegistered) {
-                            _loginResult.value = LoginResult(true, "Login exitoso y dispositivo registrado.")
+                            val commerceCheckResponse = commerceRepository.checkCommerce()
+                            if(commerceCheckResponse.isSuccessful) {
+                                val needsCreation = commerceCheckResponse.body()?.exists == false
+                                _loginResult.value = LoginResult(true, "Login exitoso y dispositivo registrado.", needsCreation)
+                            } else {
+                                _loginResult.value = LoginResult(false, "Error al verificar el comercio.")
+                            }
                         } else {
                             _loginResult.value = LoginResult(false, "Error al registrar el dispositivo. Por favor, intente de nuevo.")
                         }

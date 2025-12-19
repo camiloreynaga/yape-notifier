@@ -8,17 +8,20 @@ import androidx.lifecycle.viewModelScope
 import com.yapenotifier.android.data.api.RetrofitClient
 import com.yapenotifier.android.data.local.PreferencesManager
 import com.yapenotifier.android.data.model.RegisterRequest
+import com.yapenotifier.android.data.repository.CommerceRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 data class RegisterResult(
     val success: Boolean,
-    val message: String? = null
+    val message: String? = null,
+    val needsCommerceCreation: Boolean = false
 )
 
 class RegisterViewModel(application: android.app.Application) : androidx.lifecycle.AndroidViewModel(application) {
     private val apiService = RetrofitClient.createApiService(application)
     private val preferencesManager = PreferencesManager(application)
+    private val commerceRepository = CommerceRepository(apiService)
 
     private val _registerResult = MutableLiveData<RegisterResult?>()
     val registerResult: LiveData<RegisterResult?> = _registerResult
@@ -41,7 +44,13 @@ class RegisterViewModel(application: android.app.Application) : androidx.lifecyc
 
                         val deviceRegistered = registerDevice()
                         if (deviceRegistered) {
-                            _registerResult.value = RegisterResult(true, "Registro exitoso y dispositivo registrado.")
+                            val commerceCheckResponse = commerceRepository.checkCommerce()
+                            if(commerceCheckResponse.isSuccessful) {
+                                val needsCreation = commerceCheckResponse.body()?.exists == false
+                                _registerResult.value = RegisterResult(true, "Registro exitoso y dispositivo registrado.", needsCreation)
+                            } else {
+                                _registerResult.value = RegisterResult(false, "Error al verificar el comercio.")
+                            }
                         } else {
                             _registerResult.value = RegisterResult(false, "Error al registrar el dispositivo. Por favor, intente de nuevo.")
                         }

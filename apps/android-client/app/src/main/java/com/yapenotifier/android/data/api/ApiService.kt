@@ -1,6 +1,9 @@
 package com.yapenotifier.android.data.api
 
 import com.yapenotifier.android.data.model.AuthResponse
+import com.yapenotifier.android.data.model.CommerceCheckResponse
+import com.yapenotifier.android.data.model.CommerceResponse
+import com.yapenotifier.android.data.model.CreateCommerceRequest
 import com.yapenotifier.android.data.model.CreateDeviceRequest
 import com.yapenotifier.android.data.model.DeviceResponse
 import com.yapenotifier.android.data.model.LoginRequest
@@ -26,6 +29,16 @@ interface ApiService {
     // --- Devices ---
     @POST("api/devices")
     suspend fun createDevice(@Body request: CreateDeviceRequest): Response<DeviceResponse>
+
+    // --- Commerce ---
+    @POST("api/commerces")
+    suspend fun createCommerce(@Body request: CreateCommerceRequest): Response<CommerceResponse>
+
+    @GET("api/commerces/me")
+    suspend fun getCommerce(): Response<CommerceResponse>
+
+    @GET("api/commerces/check")
+    suspend fun checkCommerce(): Response<CommerceCheckResponse>
 
     // --- Notifications ---
     @POST("api/notifications")

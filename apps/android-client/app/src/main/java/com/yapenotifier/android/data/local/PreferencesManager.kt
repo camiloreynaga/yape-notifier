@@ -17,6 +17,7 @@ class PreferencesManager(private val context: Context) {
         private val DEVICE_UUID_KEY = stringPreferencesKey("device_uuid")
         private val DEVICE_ID_KEY = stringPreferencesKey("device_id")
         private val USER_EMAIL_KEY = stringPreferencesKey("user_email")
+        private val COMMERCE_ID_KEY = stringPreferencesKey("commerce_id")
     }
 
     val authToken: Flow<String?> = context.dataStore.data.map { preferences ->
@@ -33,6 +34,10 @@ class PreferencesManager(private val context: Context) {
 
     val deviceId: Flow<String?> = context.dataStore.data.map { preferences ->
         preferences[DEVICE_ID_KEY]
+    }
+
+    val commerceId: Flow<String?> = context.dataStore.data.map { preferences ->
+        preferences[COMMERCE_ID_KEY]
     }
 
     suspend fun saveAuthToken(token: String) {
@@ -59,10 +64,15 @@ class PreferencesManager(private val context: Context) {
         }
     }
 
+    suspend fun saveCommerceId(commerceId: String) {
+        context.dataStore.edit { preferences ->
+            preferences[COMMERCE_ID_KEY] = commerceId
+        }
+    }
+
     suspend fun clearAll() {
         context.dataStore.edit { preferences ->
             preferences.clear()
         }
     }
 }
-

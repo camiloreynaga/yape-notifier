@@ -28,7 +28,11 @@ class LoginActivity : AppCompatActivity() {
             result?.let {
                 if (it.success) {
                     Toast.makeText(this, "Login exitoso", Toast.LENGTH_SHORT).show()
-                    navigateToMain()
+                    if (it.needsCommerceCreation) {
+                        navigateToCreateCommerce()
+                    } else {
+                        navigateToMain()
+                    }
                 } else {
                     Toast.makeText(this, it.message ?: "Error al iniciar sesión", Toast.LENGTH_LONG).show()
                 }
@@ -78,5 +82,11 @@ class LoginActivity : AppCompatActivity() {
         startActivity(intent)
         finish()
     }
-}
 
+    private fun navigateToCreateCommerce() {
+        val intent = Intent(this, CreateCommerceActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
+    }
+}

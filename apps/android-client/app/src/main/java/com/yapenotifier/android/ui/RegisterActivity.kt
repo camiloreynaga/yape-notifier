@@ -28,7 +28,11 @@ class RegisterActivity : AppCompatActivity() {
             result?.let {
                 if (it.success) {
                     Toast.makeText(this, "Registro exitoso", Toast.LENGTH_SHORT).show()
-                    navigateToMain()
+                    if (it.needsCommerceCreation) {
+                        navigateToCreateCommerce()
+                    } else {
+                        navigateToMain()
+                    }
                 } else {
                     Toast.makeText(this, it.message ?: "Error al registrarse", Toast.LENGTH_LONG).show()
                 }
@@ -88,6 +92,13 @@ class RegisterActivity : AppCompatActivity() {
 
     private fun navigateToMain() {
         val intent = Intent(this, MainActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
+    }
+
+    private fun navigateToCreateCommerce() {
+        val intent = Intent(this, CreateCommerceActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
         finish()

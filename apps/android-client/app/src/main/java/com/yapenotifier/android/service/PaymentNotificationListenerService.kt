@@ -64,7 +64,7 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         val text = notification.extras?.getCharSequence("android.text")?.toString() ?: ""
 
         // Capture dual app identifiers (CRITICAL for MIUI and other dual app systems)
-        val androidUserId = sbn.user?.identifier // UserHandle identifier
+        val androidUserId = sbn.user?.hashCode() // UserHandle identifier
         val androidUid = sbn.uid // Optional UID
         val postedAt = sbn.postTime // Original notification timestamp
 
@@ -79,16 +79,18 @@ class PaymentNotificationListenerService : NotificationListenerService() {
             ServiceStatusManager.updateStatus("📬 Notificación de pago recibida de: $packageName$instanceInfo")
             
             serviceScope.launch {
+                // IMPORTANT: Save the ORIGINAL title and body, not the parsed version
+                // This ensures we can send the exact notification content to the API
                 val capturedNotification = CapturedNotification(
                     packageName = packageName,
                     androidUserId = androidUserId,
                     androidUid = androidUid,
-                    title = "Pago de ${paymentDetails.sender}",
-                    body = "Monto: ${paymentDetails.currency}${paymentDetails.amount}",
+                    title = title, // Original title from notification
+                    body = text,   // Original body text from notification
                     postedAt = postedAt
                 )
                 db.capturedNotificationDao().insert(capturedNotification)
-                Log.i(TAG, "Payment notification saved locally. Package: $packageName, UserId: $androidUserId, Uid: $androidUid")
+                Log.i(TAG, "Payment notification saved locally. Package: $packageName, UserId: $androidUserId, Uid: $androidUid, Title: '$title', Body: '$text'")
                 ServiceStatusManager.updateStatus("💾 Guardado localmente.")
 
                 scheduleSendNotificationWorker()
