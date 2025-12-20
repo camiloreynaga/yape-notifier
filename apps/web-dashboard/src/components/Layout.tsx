@@ -2,13 +2,9 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   LayoutDashboard, 
-  Bell, 
-  Smartphone, 
   LogOut, 
   Menu,
   X,
-  Package,
-  Settings
 } from 'lucide-react';
 import { useState } from 'react';
 import CommerceBanner from './CommerceBanner';
@@ -20,10 +16,6 @@ export default function Layout() {
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Notificaciones', href: '/notifications', icon: Bell },
-    { name: 'Dispositivos', href: '/devices', icon: Smartphone },
-    { name: 'Instancias de Apps', href: '/app-instances', icon: Package },
-    { name: 'Configuración', href: '/settings/monitored-apps', icon: Settings },
   ];
 
   const isActive = (path: string) => {

@@ -81,12 +81,13 @@ function AppRoutes() {
       }>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="notifications" element={<NotificationsPage />} />
+        {/* Rutas individuales para deep linking */}
+        <Route path="notifications" element={<Navigate to="/dashboard?tab=notifications" replace />} />
         <Route path="notifications/:id" element={<NotificationDetailPage />} />
-        <Route path="devices" element={<DevicesPage />} />
+        <Route path="devices" element={<Navigate to="/dashboard?tab=devices" replace />} />
         <Route path="devices/add" element={<AddDevicePage />} />
         <Route path="app-instances" element={<AppInstancesPage />} />
-        <Route path="settings/monitored-apps" element={<MonitoredAppsPage />} />
+        <Route path="settings/monitored-apps" element={<Navigate to="/dashboard?tab=settings" replace />} />
       </Route>
     </Routes>
   );
