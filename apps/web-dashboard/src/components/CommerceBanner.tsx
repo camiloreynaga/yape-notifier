@@ -1,15 +1,16 @@
 import { Link, useLocation } from 'react-router-dom';
 import { AlertCircle, X } from 'lucide-react';
 import { useState } from 'react';
-import { useCommerce } from '@/hooks/useCommerce';
+import { useAuth } from '@/contexts/AuthContext';
 
 /**
  * Componente que muestra un banner de alerta cuando el usuario no tiene commerce
  * Se muestra en todas las páginas excepto en /create-commerce
+ * Usa AuthContext para evitar llamadas API duplicadas
  */
 export default function CommerceBanner() {
   const location = useLocation();
-  const { hasCommerce, loading } = useCommerce();
+  const { hasCommerce, loading } = useAuth();
   const [dismissed, setDismissed] = useState(false);
 
   // No mostrar si está en la página de crear commerce

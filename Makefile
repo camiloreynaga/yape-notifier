@@ -4,26 +4,38 @@ help: ## Mostrar esta ayuda
 	@echo "Comandos disponibles:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-install: ## Instalar dependencias de todas las apps
-	@echo "📦 Instalando dependencias..."
+install: ## Instalar dependencias (para desarrollo local sin Docker)
+	@echo "📦 Instalando dependencias localmente..."
+	@echo "⚠️  Nota: En desarrollo se recomienda usar Docker. Ver docs/DEVELOPMENT_WORKFLOW.md"
 	@cd apps/api && composer install
 	@cd apps/web-dashboard && npm install
 	@echo "✅ Dependencias instaladas"
 
-dev: ## Iniciar entorno de desarrollo
-	@echo "🚀 Iniciando entorno de desarrollo..."
+install:docker: ## Instalar dependencias en contenedores Docker
+	@echo "📦 Instalando dependencias en contenedores Docker..."
+	@cd infra/docker/environments/development && docker compose --env-file .env build
+	@echo "✅ Dependencias instaladas en contenedores"
+
+dev: ## Iniciar entorno de desarrollo con Docker
+	@echo "🚀 Iniciando entorno de desarrollo con Docker..."
 	@echo "Backend: http://localhost:8000"
 	@echo "Dashboard: http://localhost:3000"
-	@cd apps/api && php artisan serve &
-	@cd apps/web-dashboard && npm run dev
+	@cd infra/docker/environments/development && docker compose --env-file .env up -d
+	@echo "✅ Servicios iniciados. Ver logs con: docker compose --env-file .env logs -f"
 
-dev:api: ## Iniciar solo el backend
-	@echo "🚀 Iniciando backend..."
-	@cd apps/api && php artisan serve
+dev:api: ## Iniciar solo el backend (Docker)
+	@echo "🚀 Iniciando backend con Docker..."
+	@cd infra/docker/environments/development && docker compose --env-file .env up -d php-fpm nginx-api db
 
-dev:dashboard: ## Iniciar solo el dashboard
-	@echo "🚀 Iniciando dashboard..."
-	@cd apps/web-dashboard && npm run dev
+dev:dashboard: ## Iniciar solo el dashboard (Docker)
+	@echo "🚀 Iniciando dashboard con Docker..."
+	@cd infra/docker/environments/development && docker compose --env-file .env up -d dashboard
+
+dev:logs: ## Ver logs del entorno de desarrollo
+	@cd infra/docker/environments/development && docker compose --env-file .env logs -f
+
+dev:down: ## Detener entorno de desarrollo
+	@cd infra/docker/environments/development && docker compose --env-file .env down
 
 test: ## Ejecutar todos los tests
 	@echo "🧪 Ejecutando tests..."

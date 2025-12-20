@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiService } from '@/services/api';
 import type { Device } from '@/types';
 import { format } from 'date-fns';
-import { Plus, Edit, Trash2, Power, PowerOff, Smartphone } from 'lucide-react';
+import { Plus, Edit, Trash2, Power, PowerOff, Smartphone, QrCode, Battery, Wifi, WifiOff, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 
 export default function DevicesPage() {
+  const navigate = useNavigate();
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -89,14 +91,33 @@ export default function DevicesPage() {
     }
   };
 
+  const isDeviceOnline = (device: Device): boolean => {
+    if (!device.last_heartbeat) {
+      return false;
+    }
+    const heartbeatTime = new Date(device.last_heartbeat).getTime();
+    const now = Date.now();
+    const diffMinutes = (now - heartbeatTime) / (1000 * 60);
+    return diffMinutes < 5;
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-900">Dispositivos</h1>
-        <button onClick={handleCreate} className="btn btn-primary flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Nuevo Dispositivo
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => navigate('/devices/add')}
+            className="btn btn-primary flex items-center gap-2"
+          >
+            <QrCode className="h-4 w-4" />
+            Agregar Dispositivo
+          </button>
+          <button onClick={handleCreate} className="btn btn-secondary flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Nuevo Dispositivo
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -147,14 +168,109 @@ export default function DevicesPage() {
                     {device.is_active ? 'Activo' : 'Inactivo'}
                   </span>
                 </div>
-                {device.last_seen_at && (
+                
+                {/* Health Status */}
+                <div className="pt-2 border-t border-gray-200 space-y-2">
+                  {/* Online Status */}
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-500">Última actividad:</span>
-                    <span className="text-gray-700">
-                      {format(new Date(device.last_seen_at), 'dd/MM/yyyy HH:mm')}
+                    <span className="text-gray-500 flex items-center gap-1">
+                      <Wifi className="h-3 w-3" />
+                      Conexión:
                     </span>
+                    {device.last_heartbeat && isDeviceOnline(device) ? (
+                      <span className="flex items-center gap-1 text-green-600">
+                        <Wifi className="h-3 w-3" />
+                        <span>En línea</span>
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-gray-400">
+                        <WifiOff className="h-3 w-3" />
+                        <span>Desconectado</span>
+                      </span>
+                    )}
                   </div>
-                )}
+
+                  {/* Battery Level */}
+                  {device.battery_level !== null && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500 flex items-center gap-1">
+                        <Battery className="h-3 w-3" />
+                        Batería:
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${
+                              device.battery_level > 50
+                                ? 'bg-green-500'
+                                : device.battery_level > 20
+                                ? 'bg-yellow-500'
+                                : 'bg-red-500'
+                            }`}
+                            style={{ width: `${device.battery_level}%` }}
+                          />
+                        </div>
+                        <span className="text-gray-700 font-medium">{device.battery_level}%</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Battery Optimization */}
+                  {device.battery_optimization_disabled !== null && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Optimización batería:</span>
+                      {device.battery_optimization_disabled ? (
+                        <span className="flex items-center gap-1 text-green-600">
+                          <CheckCircle className="h-3 w-3" />
+                          <span>Desactivada</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-orange-600">
+                          <AlertCircle className="h-3 w-3" />
+                          <span>Activada</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Notification Permission */}
+                  {device.notification_permission_enabled !== null && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Permisos notificaciones:</span>
+                      {device.notification_permission_enabled ? (
+                        <span className="flex items-center gap-1 text-green-600">
+                          <CheckCircle className="h-3 w-3" />
+                          <span>Habilitado</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-red-600">
+                          <XCircle className="h-3 w-3" />
+                          <span>Deshabilitado</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Last Heartbeat */}
+                  {device.last_heartbeat && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Último heartbeat:</span>
+                      <span className="text-gray-700">
+                        {format(new Date(device.last_heartbeat), 'dd/MM/yyyy HH:mm')}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Last Seen */}
+                  {device.last_seen_at && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Última actividad:</span>
+                      <span className="text-gray-700">
+                        {format(new Date(device.last_seen_at), 'dd/MM/yyyy HH:mm')}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="mt-4 flex gap-2">
@@ -179,9 +295,18 @@ export default function DevicesPage() {
         <div className="card text-center py-12">
           <Smartphone className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-500 mb-4">No hay dispositivos registrados</p>
-          <button onClick={handleCreate} className="btn btn-primary">
-            Crear primer dispositivo
-          </button>
+          <div className="flex gap-2 justify-center">
+            <button
+              onClick={() => navigate('/devices/add')}
+              className="btn btn-primary flex items-center gap-2"
+            >
+              <QrCode className="h-4 w-4" />
+              Agregar Dispositivo
+            </button>
+            <button onClick={handleCreate} className="btn btn-secondary">
+              Crear Dispositivo
+            </button>
+          </div>
         </div>
       )}
 

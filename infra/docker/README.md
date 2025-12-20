@@ -51,12 +51,18 @@ nano .env
 
 # Desplegar
 ./deploy.sh
+
+# O manualmente:
+docker compose --env-file .env up -d
 ```
 
 **Acceso:**
 
 - API: `http://localhost:8000/up`
+- Dashboard: `http://localhost:3000` (Vite dev server con hot reload)
 - Database: `localhost:5432`
+
+**Nota**: El dashboard corre en Docker con hot reload. El código se monta como volumen para desarrollo rápido. Ver `docs/DEVELOPMENT_WORKFLOW.md` para más detalles.
 
 ### Staging
 

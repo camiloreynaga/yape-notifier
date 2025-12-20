@@ -99,6 +99,55 @@ class ApiService {
     return response.data.device;
   }
 
+  async updateDeviceHealth(
+    id: number,
+    data: {
+      battery_level?: number;
+      battery_optimization_disabled?: boolean;
+      notification_permission_enabled?: boolean;
+    }
+  ): Promise<Device> {
+    const response = await this.client.post<{ device: Device; health: any }>(
+      API_ENDPOINTS.devices.updateHealth(id),
+      data
+    );
+    return response.data.device;
+  }
+
+  /**
+   * Genera un código de vinculación para vincular un dispositivo
+   * @returns Objeto con el código y fecha de expiración
+   */
+  async generateLinkCode(): Promise<{ code: string; expires_at: string }> {
+    const response = await this.client.post<{
+      message: string;
+      code: string;
+      expires_at: string;
+    }>(API_ENDPOINTS.devices.generateLinkCode);
+    return {
+      code: response.data.code,
+      expires_at: response.data.expires_at,
+    };
+  }
+
+  /**
+   * Verifica el estado de un código de vinculación
+   * @param code Código de vinculación a verificar
+   * @returns Objeto con información de validez y commerce asociado
+   */
+  async checkLinkCode(code: string): Promise<{
+    valid: boolean;
+    message: string;
+    commerce?: { id: number; name: string };
+  }> {
+    const response = await this.client.get<{
+      valid: boolean;
+      message: string;
+      commerce?: { id: number; name: string };
+    }>(API_ENDPOINTS.devices.checkLinkCode(code));
+    return response.data;
+  }
+
   // Notification methods
   async getNotifications(filters?: NotificationFilters): Promise<PaginatedResponse<Notification>> {
     const response = await this.client.get<PaginatedResponse<Notification>>(

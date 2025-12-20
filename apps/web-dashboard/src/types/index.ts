@@ -16,6 +16,10 @@ export interface Device {
   platform: string;
   is_active: boolean;
   last_seen_at: string | null;
+  battery_level: number | null;
+  battery_optimization_disabled: boolean | null;
+  notification_permission_enabled: boolean | null;
+  last_heartbeat: string | null;
   created_at: string;
   updated_at: string;
 }

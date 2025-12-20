@@ -5,6 +5,7 @@ import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import NotificationsPage from './pages/NotificationsPage';
 import DevicesPage from './pages/DevicesPage';
+import AddDevicePage from './pages/AddDevicePage';
 import CreateCommercePage from './pages/CreateCommercePage';
 import Layout from './components/Layout';
 
@@ -79,6 +80,7 @@ function AppRoutes() {
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="devices" element={<DevicesPage />} />
+        <Route path="devices/add" element={<AddDevicePage />} />
       </Route>
     </Routes>
   );
