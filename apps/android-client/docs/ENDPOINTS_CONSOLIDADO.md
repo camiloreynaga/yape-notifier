@@ -111,7 +111,8 @@ Accept: application/json
       "status": "pending|validated|inconsistent" // opcional
     }
     ```
-- `GET /api/notifications` — Listar (query opcionales: `device_id`, `source_app`, `start_date`, `end_date`, `status`, `exclude_duplicates`, `per_page`)
+- `GET /api/notifications` — Listar (query opcionales: `device_id`, `source_app`, `package_name`, `app_instance_id`, `start_date`, `end_date`, `status`, `exclude_duplicates`, `per_page`)
+  - `package_name`: Filtrar por nombre de paquete (ej: `com.bcp.innovacxion.yapeapp`)
 - `GET /api/notifications/{id}` — Obtener detalle
 - `PATCH /api/notifications/{id}/status` — Actualizar estado (`pending|validated|inconsistent`)
 - `GET /api/notifications/statistics` — Métricas (query: `start_date`, `end_date`)

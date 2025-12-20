@@ -12,6 +12,7 @@ import com.yapenotifier.android.databinding.ActivityAppInstancesBinding
 import com.yapenotifier.android.data.local.PreferencesManager
 import com.yapenotifier.android.ui.adapter.AppInstanceAdapter
 import com.yapenotifier.android.ui.viewmodel.AppInstancesViewModel
+import com.yapenotifier.android.util.DeviceHealthWorkerHelper
 import com.yapenotifier.android.util.WizardHelper
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -140,6 +141,8 @@ class AppInstancesActivity : AppCompatActivity() {
                 isSaving = false
                 if (state.saveError == null) {
                     Toast.makeText(this, "Cambios guardados exitosamente", Toast.LENGTH_SHORT).show()
+                    // Start device health worker after saving app instances
+                    DeviceHealthWorkerHelper.scheduleDeviceHealthWorker(this@AppInstancesActivity)
                     // Check wizard and navigate
                     lifecycleScope.launch {
                         val wizardShown = WizardHelper.checkAndShowWizard(this@AppInstancesActivity)

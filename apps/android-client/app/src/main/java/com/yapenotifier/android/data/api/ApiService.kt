@@ -18,6 +18,7 @@ import com.yapenotifier.android.data.model.RegisterRequest
 import com.yapenotifier.android.data.model.UpdateAppInstanceLabelRequest
 import com.yapenotifier.android.data.model.UpdateAppInstanceLabelResponse
 import com.yapenotifier.android.data.model.UpdateDeviceMonitoredAppsRequest
+import com.yapenotifier.android.data.model.DeviceHealthData
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -83,4 +84,11 @@ interface ApiService {
         @Path("instanceId") instanceId: Long,
         @Body request: UpdateAppInstanceLabelRequest
     ): Response<UpdateAppInstanceLabelResponse>
+
+    // --- Device Health ---
+    @POST("api/devices/{deviceId}/health")
+    suspend fun updateDeviceHealth(
+        @Path("deviceId") deviceId: String,
+        @Body data: DeviceHealthData
+    ): Response<Unit>
 }

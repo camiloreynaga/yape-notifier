@@ -83,18 +83,17 @@ class PermissionsWizardActivity : AppCompatActivity() {
     }
 
     private fun canProceedToNextStep(currentPosition: Int): Boolean {
-        val fragment = supportFragmentManager.findFragmentByTag("f$currentPosition")
-        return when (val currentItem = binding.viewPager.currentItem) {
+        return when (currentPosition) {
             0 -> {
-                val notificationFragment = supportFragmentManager.findFragmentByTag("f$currentItem") as? NotificationPermissionFragment
+                val notificationFragment = supportFragmentManager.findFragmentByTag("f$currentPosition") as? NotificationPermissionFragment
                 notificationFragment?.isPermissionGranted() ?: false
             }
             1 -> {
-                val batteryFragment = supportFragmentManager.findFragmentByTag("f$currentItem") as? BatteryOptimizationFragment
+                val batteryFragment = supportFragmentManager.findFragmentByTag("f$currentPosition") as? BatteryOptimizationFragment
                 batteryFragment?.isBatteryOptimizationDisabled() ?: false
             }
             2 -> {
-                val appsFragment = supportFragmentManager.findFragmentByTag("f$currentItem") as? MonitoredAppsFragment
+                val appsFragment = supportFragmentManager.findFragmentByTag("f$currentPosition") as? MonitoredAppsFragment
                 appsFragment?.getSelectedPackages()?.isNotEmpty() ?: false
             }
             else -> true

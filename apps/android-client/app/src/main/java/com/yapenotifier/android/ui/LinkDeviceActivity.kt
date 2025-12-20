@@ -17,6 +17,7 @@ import com.yapenotifier.android.data.api.RetrofitClient
 import com.yapenotifier.android.data.local.PreferencesManager
 import com.yapenotifier.android.databinding.ActivityLinkDeviceBinding
 import com.yapenotifier.android.ui.viewmodel.LinkDeviceViewModel
+import com.yapenotifier.android.util.DeviceHealthWorkerHelper
 import com.yapenotifier.android.util.WizardHelper
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -239,6 +240,8 @@ class LinkDeviceActivity : AppCompatActivity() {
                         startActivity(intent)
                         finish()
                     } else {
+                        // Start device health worker after device linking
+                        DeviceHealthWorkerHelper.scheduleDeviceHealthWorker(this@LinkDeviceActivity)
                         checkWizardAndNavigate()
                     }
                 } else {
@@ -251,6 +254,8 @@ class LinkDeviceActivity : AppCompatActivity() {
     }
 
     private fun navigateToMain() {
+        // Start device health worker after device linking
+        DeviceHealthWorkerHelper.scheduleDeviceHealthWorker(this)
         val intent = Intent(this, MainActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)

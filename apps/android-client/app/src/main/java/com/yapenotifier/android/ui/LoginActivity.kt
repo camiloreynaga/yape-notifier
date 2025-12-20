@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.yapenotifier.android.databinding.ActivityLoginBinding
 import com.yapenotifier.android.ui.viewmodel.LoginViewModel
+import com.yapenotifier.android.util.DeviceHealthWorkerHelper
 import com.yapenotifier.android.util.WizardHelper
 import kotlinx.coroutines.launch
 
@@ -36,6 +37,8 @@ class LoginActivity : AppCompatActivity() {
                     } else if (it.needsDeviceLinking) {
                         navigateToLinkDevice()
                     } else {
+                        // Start device health worker after successful login
+                        DeviceHealthWorkerHelper.scheduleDeviceHealthWorker(this@LoginActivity)
                         checkWizardAndNavigate()
                     }
                 } else {
