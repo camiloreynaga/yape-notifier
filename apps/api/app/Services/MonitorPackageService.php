@@ -10,21 +10,32 @@ class MonitorPackageService
     /**
      * Get all active monitor packages as a simple array.
      * This is used for the public API endpoint that clients consume.
+     * Filters by commerce_id if provided.
      */
-    public function getActivePackagesArray(): array
+    public function getActivePackagesArray(?int $commerceId = null): array
     {
-        return MonitorPackage::active()
-            ->ordered()
-            ->pluck('package_name')
-            ->toArray();
+        $query = MonitorPackage::active()->ordered();
+
+        if ($commerceId) {
+            $query->where('commerce_id', $commerceId);
+        }
+
+        return $query->pluck('package_name')->toArray();
     }
 
     /**
      * Get all monitor packages (for admin/management).
+     * Filters by commerce_id if provided.
      */
-    public function getAllPackages()
+    public function getAllPackages(?int $commerceId = null)
     {
-        return MonitorPackage::ordered()->get();
+        $query = MonitorPackage::ordered();
+
+        if ($commerceId) {
+            $query->where('commerce_id', $commerceId);
+        }
+
+        return $query->get();
     }
 
     /**
@@ -37,9 +48,15 @@ class MonitorPackageService
 
     /**
      * Create a new monitor package.
+     * Automatically assigns commerce_id if not provided.
      */
-    public function createPackage(array $data): MonitorPackage
+    public function createPackage(array $data, ?int $defaultCommerceId = null): MonitorPackage
     {
+        // If commerce_id not provided, use default
+        if (!isset($data['commerce_id']) && $defaultCommerceId) {
+            $data['commerce_id'] = $defaultCommerceId;
+        }
+
         return MonitorPackage::create($data);
     }
 

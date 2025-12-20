@@ -29,6 +29,19 @@ class NotificationController extends Controller
             $user = $request->user();
             $deviceUuid = $request->input('device_id');
 
+            // Validate user has commerce (critical operation)
+            if (!$user->commerce_id) {
+                Log::warning('Notification creation attempted without commerce', [
+                    'user_id' => $user->id,
+                    'device_uuid' => $deviceUuid,
+                ]);
+
+                return response()->json([
+                    'message' => 'Debes pertenecer a un negocio para recibir notificaciones. Por favor, crea un negocio primero.',
+                    'error' => 'commerce_required',
+                ], 403);
+            }
+
             Log::info('Notification creation request received', [
                 'user_id' => $user->id,
                 'device_uuid' => $deviceUuid,

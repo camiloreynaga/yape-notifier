@@ -8,6 +8,7 @@ use App\Models\Device;
 use App\Models\Notification;
 use App\Models\User;
 use App\Services\CommerceService;
+use App\Services\PaymentNotificationValidator;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -32,6 +33,25 @@ class NotificationService
      */
     public function createNotification(array $data, Device $device): Notification
     {
+        // Validate that this is a real payment notification (not publicity/promotion)
+        $validation = PaymentNotificationValidator::isValid($data);
+        
+        if (!$validation['valid']) {
+            Log::warning('Notification rejected by validator', [
+                'device_id' => $device->id,
+                'user_id' => $device->user_id,
+                'title' => $data['title'] ?? null,
+                'body' => $data['body'] ?? null,
+                'amount' => $data['amount'] ?? null,
+                'source_app' => $data['source_app'] ?? null,
+                'reason' => $validation['reason'],
+            ]);
+
+            // Mark as inconsistent instead of rejecting completely
+            // This allows for auditing and potential manual review
+            $data['status'] = 'inconsistent';
+        }
+
         // Ensure device has commerce_id (from device or user)
         $commerceId = $device->commerce_id ?? $device->user->commerce_id;
 
