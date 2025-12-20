@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\Notification\CreateNotificationRequest;
+use App\Http\Requests\Notification\ListNotificationsRequest;
 use App\Services\AppInstanceService;
 use App\Services\DeviceService;
 use App\Services\NotificationService;
@@ -111,7 +112,7 @@ class NotificationController extends Controller
     /**
      * List notifications for the authenticated user.
      */
-    public function index(Request $request): JsonResponse
+    public function index(ListNotificationsRequest $request): JsonResponse
     {
         try {
             $filters = $request->only([
