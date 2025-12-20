@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiService } from '@/services/api';
 import type { Notification, NotificationFilters, PaginatedResponse, Device, AppInstance } from '@/types';
 import { format } from 'date-fns';
-import { Download, Filter } from 'lucide-react';
+import { Download, Filter, Eye } from 'lucide-react';
 
 export default function NotificationsPage() {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<PaginatedResponse<Notification> | null>(null);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<NotificationFilters>({
@@ -357,6 +359,14 @@ export default function NotificationsPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => navigate(`/notifications/${notification.id}`)}
+                            className="btn btn-secondary btn-sm flex items-center gap-1"
+                            title="Ver detalle"
+                          >
+                            <Eye className="h-3 w-3" />
+                            Ver
+                          </button>
                           <select
                             value={notification.status}
                             onChange={(e) =>
