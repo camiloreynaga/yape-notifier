@@ -68,6 +68,14 @@ class Commerce extends Model
     {
         return $this->hasMany(MonitorPackage::class);
     }
+
+    /**
+     * Get the device link codes for this commerce.
+     */
+    public function deviceLinkCodes(): HasMany
+    {
+        return $this->hasMany(DeviceLinkCode::class);
+    }
 }
 
 

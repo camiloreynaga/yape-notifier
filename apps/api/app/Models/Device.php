@@ -94,4 +94,12 @@ class Device extends Model
     {
         return $this->hasMany(DeviceMonitoredApp::class);
     }
+
+    /**
+     * Get the device link code that was used to link this device.
+     */
+    public function linkCode(): BelongsTo
+    {
+        return $this->belongsTo(DeviceLinkCode::class);
+    }
 }

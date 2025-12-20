@@ -4,6 +4,7 @@ use App\Http\Controllers\AppInstanceController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CommerceController;
 use App\Http\Controllers\DeviceController;
+use App\Http\Controllers\DeviceLinkController;
 use App\Http\Controllers\MonitorPackageController;
 use App\Http\Controllers\NotificationController;
 use Illuminate\Support\Facades\Route;
@@ -21,6 +22,9 @@ Route::post('/login', [AuthController::class, 'login']);
 // Public settings endpoint (used by Android clients)
 Route::get('/settings/monitored-packages', [MonitorPackageController::class, 'getActivePackages']);
 
+// Public device link code validation endpoint
+Route::get('/devices/link-code/{code}', [DeviceLinkController::class, 'validateLinkCode']);
+
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
     // Auth routes
@@ -30,6 +34,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // Device routes
     Route::apiResource('devices', DeviceController::class);
     Route::post('/devices/{id}/toggle-status', [DeviceController::class, 'toggleStatus']);
+
+    // Device Link routes (for QR/code linking)
+    Route::post('/devices/generate-link-code', [DeviceLinkController::class, 'generateLinkCode']);
+    Route::post('/devices/link-by-code', [DeviceLinkController::class, 'linkByCode']);
+    Route::get('/devices/link-codes', [DeviceLinkController::class, 'getActiveCodes']);
 
     // Notification routes
     Route::post('/notifications', [NotificationController::class, 'store']);
