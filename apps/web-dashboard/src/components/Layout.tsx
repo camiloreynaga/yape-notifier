@@ -6,7 +6,8 @@ import {
   Smartphone, 
   LogOut, 
   Menu,
-  X 
+  X,
+  Package
 } from 'lucide-react';
 import { useState } from 'react';
 import CommerceBanner from './CommerceBanner';
@@ -20,6 +21,7 @@ export default function Layout() {
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Notificaciones', href: '/notifications', icon: Bell },
     { name: 'Dispositivos', href: '/devices', icon: Smartphone },
+    { name: 'Instancias de Apps', href: '/app-instances', icon: Package },
   ];
 
   const isActive = (path: string) => location.pathname === path;

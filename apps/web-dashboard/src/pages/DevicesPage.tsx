@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '@/services/api';
-import type { Device } from '@/types';
+import type { Device, AppInstance } from '@/types';
 import { format } from 'date-fns';
-import { Plus, Edit, Trash2, Power, PowerOff, Smartphone, QrCode, Battery, Wifi, WifiOff, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, Power, PowerOff, Smartphone, QrCode, Battery, Wifi, WifiOff, CheckCircle, XCircle, AlertCircle, Package, ChevronDown, ChevronUp } from 'lucide-react';
+import AppInstanceCard from '@/components/AppInstanceCard';
 
 export default function DevicesPage() {
   const navigate = useNavigate();
@@ -14,6 +15,9 @@ export default function DevicesPage() {
   const [formData, setFormData] = useState({
     name: '',
   });
+  const [expandedDevices, setExpandedDevices] = useState<Set<number>>(new Set());
+  const [deviceInstances, setDeviceInstances] = useState<Record<number, AppInstance[]>>({});
+  const [loadingInstances, setLoadingInstances] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     loadDevices();
@@ -99,6 +103,44 @@ export default function DevicesPage() {
     const now = Date.now();
     const diffMinutes = (now - heartbeatTime) / (1000 * 60);
     return diffMinutes < 5;
+  };
+
+  const toggleDeviceExpanded = async (deviceId: number) => {
+    const isExpanded = expandedDevices.has(deviceId);
+    const newExpanded = new Set(expandedDevices);
+    
+    if (isExpanded) {
+      newExpanded.delete(deviceId);
+    } else {
+      newExpanded.add(deviceId);
+      // Cargar instancias si no están cargadas
+      if (!deviceInstances[deviceId]) {
+        await loadDeviceInstances(deviceId);
+      }
+    }
+    
+    setExpandedDevices(newExpanded);
+  };
+
+  const loadDeviceInstances = async (deviceId: number) => {
+    setLoadingInstances((prev) => new Set(prev).add(deviceId));
+    try {
+      const instances = await apiService.getDeviceAppInstances(deviceId);
+      setDeviceInstances((prev) => ({ ...prev, [deviceId]: instances }));
+    } catch (error) {
+      console.error('Error loading device instances:', error);
+      setDeviceInstances((prev) => ({ ...prev, [deviceId]: [] }));
+    } finally {
+      setLoadingInstances((prev) => {
+        const next = new Set(prev);
+        next.delete(deviceId);
+        return next;
+      });
+    }
+  };
+
+  const handleInstanceUpdate = (deviceId: number) => {
+    loadDeviceInstances(deviceId);
   };
 
   return (
@@ -271,6 +313,63 @@ export default function DevicesPage() {
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* Instancias de Apps */}
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => toggleDeviceExpanded(device.id)}
+                  className="w-full flex items-center justify-between text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    <span>
+                      Instancias de Apps
+                      {deviceInstances[device.id] && (
+                        <span className="ml-2 text-gray-500">
+                          ({deviceInstances[device.id].length})
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  {expandedDevices.has(device.id) ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                </button>
+
+                {expandedDevices.has(device.id) && (
+                  <div className="mt-3 space-y-2">
+                    {loadingInstances.has(device.id) ? (
+                      <div className="flex items-center justify-center py-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div>
+                      </div>
+                    ) : deviceInstances[device.id] && deviceInstances[device.id].length > 0 ? (
+                      <div className="space-y-2">
+                        {deviceInstances[device.id].map((instance) => (
+                          <div key={instance.id} className="bg-gray-50 rounded-lg p-3">
+                            <AppInstanceCard
+                              instance={instance}
+                              onUpdate={() => handleInstanceUpdate(device.id)}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 text-sm text-gray-500">
+                        <Package className="h-6 w-6 mx-auto mb-2 text-gray-400" />
+                        <p>No hay instancias de apps en este dispositivo</p>
+                        <button
+                          onClick={() => navigate('/app-instances')}
+                          className="mt-2 text-primary-600 hover:text-primary-700 text-sm font-medium"
+                        >
+                          Ver todas las instancias
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="mt-4 flex gap-2">
