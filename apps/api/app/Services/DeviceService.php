@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Device;
+use App\Models\DeviceMonitoredApp;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -149,5 +150,61 @@ class DeviceService
         ]);
 
         return $device->fresh();
+    }
+
+    /**
+     * Sync monitored apps for a device.
+     * Removes apps not in the list and creates new ones.
+     *
+     * @param Device $device
+     * @param array $packageNames
+     * @return void
+     */
+    public function syncMonitoredApps(Device $device, array $packageNames): void
+    {
+        // Get current monitored apps
+        $currentApps = $device->monitoredApps()->pluck('package_name')->toArray();
+
+        // Apps to remove (in current but not in new list)
+        $appsToRemove = array_diff($currentApps, $packageNames);
+
+        // Apps to add (in new list but not in current)
+        $appsToAdd = array_diff($packageNames, $currentApps);
+
+        // Remove apps that are no longer in the list
+        if (!empty($appsToRemove)) {
+            DeviceMonitoredApp::where('device_id', $device->id)
+                ->whereIn('package_name', $appsToRemove)
+                ->delete();
+
+            Log::info('Removed monitored apps from device', [
+                'device_id' => $device->id,
+                'removed_packages' => $appsToRemove,
+            ]);
+        }
+
+        // Add new apps
+        foreach ($appsToAdd as $packageName) {
+            DeviceMonitoredApp::create([
+                'device_id' => $device->id,
+                'package_name' => $packageName,
+                'enabled' => true,
+            ]);
+        }
+
+        if (!empty($appsToAdd)) {
+            Log::info('Added monitored apps to device', [
+                'device_id' => $device->id,
+                'added_packages' => $appsToAdd,
+            ]);
+        }
+
+        // If no changes, log it
+        if (empty($appsToRemove) && empty($appsToAdd)) {
+            Log::debug('No changes to monitored apps', [
+                'device_id' => $device->id,
+                'package_names' => $packageNames,
+            ]);
+        }
     }
 }

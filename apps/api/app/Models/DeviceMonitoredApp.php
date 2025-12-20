@@ -40,6 +40,23 @@ class DeviceMonitoredApp extends Model
     {
         return $this->belongsTo(Device::class);
     }
+
+    /**
+     * Get monitor package using a more reliable method.
+     * This method loads the device first to get commerce_id.
+     * Note: This is not a direct Eloquent relationship because the relationship
+     * depends on both package_name and commerce_id from the device.
+     */
+    public function getMonitorPackageAttribute(): ?MonitorPackage
+    {
+        if (!$this->device || !$this->device->commerce_id) {
+            return null;
+        }
+
+        return MonitorPackage::where('package_name', $this->package_name)
+            ->where('commerce_id', $this->device->commerce_id)
+            ->first();
+    }
 }
 
 
