@@ -4,6 +4,7 @@ use App\Http\Controllers\AppInstanceController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CommerceController;
 use App\Http\Controllers\DeviceController;
+use App\Http\Controllers\DeviceHealthController;
 use App\Http\Controllers\DeviceLinkController;
 use App\Http\Controllers\MonitorPackageController;
 use App\Http\Controllers\NotificationController;
@@ -34,6 +35,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Device routes
     Route::apiResource('devices', DeviceController::class);
     Route::post('/devices/{id}/toggle-status', [DeviceController::class, 'toggleStatus']);
+    Route::post('/devices/{id}/health', [DeviceHealthController::class, 'update']);
 
     // Device Link routes (for QR/code linking)
     Route::post('/devices/generate-link-code', [DeviceLinkController::class, 'generateLinkCode']);

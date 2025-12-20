@@ -26,6 +26,10 @@ class Device extends Model
         'platform',
         'is_active',
         'last_seen_at',
+        'battery_level',
+        'battery_optimization_disabled',
+        'notification_permission_enabled',
+        'last_heartbeat',
     ];
 
     /**
@@ -38,6 +42,9 @@ class Device extends Model
         return [
             'is_active' => 'boolean',
             'last_seen_at' => 'datetime',
+            'battery_optimization_disabled' => 'boolean',
+            'notification_permission_enabled' => 'boolean',
+            'last_heartbeat' => 'datetime',
         ];
     }
 
@@ -101,5 +108,36 @@ class Device extends Model
     public function linkCode(): BelongsTo
     {
         return $this->belongsTo(DeviceLinkCode::class);
+    }
+
+    /**
+     * Check if device is online (last heartbeat within 5 minutes).
+     *
+     * @return bool
+     */
+    public function isOnline(): bool
+    {
+        if (!$this->last_heartbeat) {
+            return false;
+        }
+
+        return $this->last_heartbeat->diffInMinutes(now()) < 5;
+    }
+
+    /**
+     * Get health status summary.
+     *
+     * @return array
+     */
+    public function getHealthStatus(): array
+    {
+        return [
+            'is_online' => $this->isOnline(),
+            'battery_level' => $this->battery_level,
+            'battery_optimization_disabled' => $this->battery_optimization_disabled,
+            'notification_permission_enabled' => $this->notification_permission_enabled,
+            'last_heartbeat' => $this->last_heartbeat?->toIso8601String(),
+            'last_seen_at' => $this->last_seen_at?->toIso8601String(),
+        ];
     }
 }

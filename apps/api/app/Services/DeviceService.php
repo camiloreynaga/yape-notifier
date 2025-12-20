@@ -112,4 +112,42 @@ class DeviceService
 
         return $device->fresh();
     }
+
+    /**
+     * Update device health information.
+     *
+     * @param Device $device
+     * @param array $data
+     * @return Device
+     */
+    public function updateHealth(Device $device, array $data): Device
+    {
+        $updateData = [];
+
+        if (isset($data['battery_level'])) {
+            $updateData['battery_level'] = $data['battery_level'];
+        }
+
+        if (isset($data['battery_optimization_disabled'])) {
+            $updateData['battery_optimization_disabled'] = $data['battery_optimization_disabled'];
+        }
+
+        if (isset($data['notification_permission_enabled'])) {
+            $updateData['notification_permission_enabled'] = $data['notification_permission_enabled'];
+        }
+
+        // Always update last_heartbeat when health is reported
+        $updateData['last_heartbeat'] = now();
+
+        $device->update($updateData);
+
+        Log::info('Device health updated', [
+            'device_id' => $device->id,
+            'battery_level' => $updateData['battery_level'] ?? null,
+            'battery_optimization_disabled' => $updateData['battery_optimization_disabled'] ?? null,
+            'notification_permission_enabled' => $updateData['notification_permission_enabled'] ?? null,
+        ]);
+
+        return $device->fresh();
+    }
 }
