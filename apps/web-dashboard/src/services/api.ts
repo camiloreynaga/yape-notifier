@@ -1,6 +1,6 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { API_BASE_URL, API_ENDPOINTS } from '@/config/api';
-import type { AuthResponse, User, Device, Notification, NotificationFilters, NotificationStatistics, PaginatedResponse, ApiError, Commerce, AppInstance } from '@/types';
+import type { AuthResponse, User, Device, Notification, NotificationFilters, NotificationStatistics, PaginatedResponse, ApiError, Commerce, AppInstance, MonitorPackage } from '@/types';
 
 class ApiService {
   private client: AxiosInstance;
@@ -240,6 +240,102 @@ class ApiService {
       { instance_label: label }
     );
     return response.data.instance;
+  }
+
+  // Monitor Package methods
+  /**
+   * Obtiene todos los paquetes monitoreados
+   * @param activeOnly Si es true, solo retorna los activos
+   */
+  async getMonitorPackages(activeOnly = false): Promise<MonitorPackage[]> {
+    const response = await this.client.get<{ packages: MonitorPackage[] }>(
+      API_ENDPOINTS.monitorPackages.list,
+      { params: { active_only: activeOnly } }
+    );
+    return response.data.packages;
+  }
+
+  /**
+   * Obtiene un paquete monitoreado por ID
+   */
+  async getMonitorPackage(id: number): Promise<MonitorPackage> {
+    const response = await this.client.get<{ package: MonitorPackage }>(
+      API_ENDPOINTS.monitorPackages.show(id)
+    );
+    return response.data.package;
+  }
+
+  /**
+   * Crea un nuevo paquete monitoreado
+   */
+  async createMonitorPackage(data: {
+    package_name: string;
+    app_name?: string;
+    description?: string;
+    priority?: number;
+  }): Promise<MonitorPackage> {
+    const response = await this.client.post<{ package: MonitorPackage; message: string }>(
+      API_ENDPOINTS.monitorPackages.create,
+      data
+    );
+    return response.data.package;
+  }
+
+  /**
+   * Actualiza un paquete monitoreado
+   */
+  async updateMonitorPackage(
+    id: number,
+    data: {
+      package_name?: string;
+      app_name?: string;
+      description?: string;
+      priority?: number;
+    }
+  ): Promise<MonitorPackage> {
+    const response = await this.client.put<{ package: MonitorPackage; message: string }>(
+      API_ENDPOINTS.monitorPackages.update(id),
+      data
+    );
+    return response.data.package;
+  }
+
+  /**
+   * Elimina un paquete monitoreado
+   */
+  async deleteMonitorPackage(id: number): Promise<void> {
+    await this.client.delete(API_ENDPOINTS.monitorPackages.delete(id));
+  }
+
+  /**
+   * Activa o desactiva un paquete monitoreado
+   */
+  async toggleMonitorPackageStatus(id: number, isActive: boolean): Promise<MonitorPackage> {
+    const response = await this.client.post<{ package: MonitorPackage; message: string }>(
+      API_ENDPOINTS.monitorPackages.toggleStatus(id),
+      { is_active: isActive }
+    );
+    return response.data.package;
+  }
+
+  /**
+   * Crea múltiples paquetes a la vez
+   */
+  async bulkCreateMonitorPackages(packageNames: string[]): Promise<{
+    created_count: number;
+    packages: MonitorPackage[];
+  }> {
+    const response = await this.client.post<{
+      message: string;
+      created_count: number;
+      packages: MonitorPackage[];
+    }>(API_ENDPOINTS.monitorPackages.bulkCreate, {
+      packages: packageNames,
+    });
+    return {
+      created_count: response.data.created_count,
+      packages: response.data.packages,
+    };
   }
 }
 

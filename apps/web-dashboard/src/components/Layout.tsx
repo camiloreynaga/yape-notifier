@@ -7,7 +7,8 @@ import {
   LogOut, 
   Menu,
   X,
-  Package
+  Package,
+  Settings
 } from 'lucide-react';
 import { useState } from 'react';
 import CommerceBanner from './CommerceBanner';
@@ -22,9 +23,16 @@ export default function Layout() {
     { name: 'Notificaciones', href: '/notifications', icon: Bell },
     { name: 'Dispositivos', href: '/devices', icon: Smartphone },
     { name: 'Instancias de Apps', href: '/app-instances', icon: Package },
+    { name: 'Configuración', href: '/settings/monitored-apps', icon: Settings },
   ];
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string) => {
+    // Para rutas de configuración, verificar si la ruta actual empieza con el path
+    if (path.startsWith('/settings')) {
+      return location.pathname.startsWith(path);
+    }
+    return location.pathname === path;
+  };
 
   const handleLogout = async () => {
     await logout();

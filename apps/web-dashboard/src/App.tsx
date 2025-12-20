@@ -7,6 +7,7 @@ import NotificationsPage from './pages/NotificationsPage';
 import DevicesPage from './pages/DevicesPage';
 import AddDevicePage from './pages/AddDevicePage';
 import AppInstancesPage from './pages/AppInstancesPage';
+import MonitoredAppsPage from './pages/MonitoredAppsPage';
 import CreateCommercePage from './pages/CreateCommercePage';
 import Layout from './components/Layout';
 
@@ -83,6 +84,7 @@ function AppRoutes() {
         <Route path="devices" element={<DevicesPage />} />
         <Route path="devices/add" element={<AddDevicePage />} />
         <Route path="app-instances" element={<AppInstancesPage />} />
+        <Route path="settings/monitored-apps" element={<MonitoredAppsPage />} />
       </Route>
     </Routes>
   );

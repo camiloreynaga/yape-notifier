@@ -109,6 +109,19 @@ export interface AuthResponse {
   token: string;
 }
 
+export interface MonitorPackage {
+  id: number;
+  commerce_id: number;
+  package_name: string;
+  app_name: string | null;
+  description: string | null;
+  is_active: boolean;
+  enabled_default?: boolean;
+  priority: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ApiError {
   message: string;
   errors?: Record<string, string[]>;
