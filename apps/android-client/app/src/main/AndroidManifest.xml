@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" />
+    <uses-permission android:name="android.permission.CAMERA" />
 
     <application
         android:name=".YapeNotifierApplication"
@@ -46,6 +47,13 @@
             android:name=".ui.CapturedNotificationsActivity"
             android:exported="false"
             android:label="Notificaciones Guardadas"
+            android:theme="@style/Theme.YapeNotifier" />
+
+        <!-- Link Device Activity -->
+        <activity
+            android:name=".ui.LinkDeviceActivity"
+            android:exported="false"
+            android:label="Vincular Dispositivo"
             android:theme="@style/Theme.YapeNotifier" />
 
         <!-- Notification Listener Service -->

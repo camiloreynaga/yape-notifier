@@ -30,6 +30,8 @@ class LoginActivity : AppCompatActivity() {
                     Toast.makeText(this, "Login exitoso", Toast.LENGTH_SHORT).show()
                     if (it.needsCommerceCreation) {
                         navigateToCreateCommerce()
+                    } else if (it.needsDeviceLinking) {
+                        navigateToLinkDevice()
                     } else {
                         navigateToMain()
                     }
@@ -85,6 +87,13 @@ class LoginActivity : AppCompatActivity() {
 
     private fun navigateToCreateCommerce() {
         val intent = Intent(this, CreateCommerceActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
+    }
+
+    private fun navigateToLinkDevice() {
+        val intent = Intent(this, LinkDeviceActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
         finish()

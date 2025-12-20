@@ -28,6 +28,70 @@ Accept: application/json
 - `DELETE /api/devices/{id}` — Eliminar
 - `POST   /api/devices/{id}/toggle-status` — Activar/desactivar (`is_active` opcional)
 
+### 2.1) Vinculación de Dispositivos por Código/QR (token requerido, admin)
+- `POST /api/devices/generate-link-code` — Generar código de vinculación (requiere admin)
+  - Respuesta:
+    ```json
+    {
+      "message": "Código de vinculación generado exitosamente",
+      "code": "ABC12345",
+      "expires_at": "2025-01-21T10:30:00Z",
+      "link_code": { ... }
+    }
+    ```
+  - El código expira en 24 horas
+- `POST /api/devices/link-by-code` — Vincular dispositivo usando código
+  - Body:
+    ```json
+    {
+      "code": "ABC12345",
+      "device_uuid": "uuid-del-dispositivo"
+    }
+    ```
+  - Respuesta:
+    ```json
+    {
+      "message": "Dispositivo vinculado exitosamente",
+      "device": { ... }
+    }
+    ```
+- `GET /api/devices/link-codes` — Listar códigos activos del commerce (requiere admin)
+  - Respuesta:
+    ```json
+    {
+      "codes": [
+        {
+          "id": 1,
+          "code": "ABC12345",
+          "expires_at": "2025-01-21T10:30:00Z",
+          "used_at": null,
+          "created_at": "..."
+        }
+      ]
+    }
+    ```
+
+### 2.2) Validación de Código de Vinculación (público)
+- `GET /api/devices/link-code/{code}` — Validar código de vinculación (sin token)
+  - Respuesta válida:
+    ```json
+    {
+      "valid": true,
+      "message": "Código válido",
+      "commerce": {
+        "id": 1,
+        "name": "Mi Negocio"
+      }
+    }
+    ```
+  - Respuesta inválida:
+    ```json
+    {
+      "valid": false,
+      "message": "Código expirado" // o "Código no encontrado" o "Código ya utilizado"
+    }
+    ```
+
 ---
 
 ## 3) Notificaciones (token requerido)

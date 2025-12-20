@@ -10,7 +10,9 @@ data class Device(
     @SerializedName("is_active")
     val isActive: Boolean,
     @SerializedName("last_seen_at")
-    val lastSeenAt: String?
+    val lastSeenAt: String?,
+    @SerializedName("commerce_id")
+    val commerceId: Long? = null
 )
 
 data class CreateDeviceRequest(

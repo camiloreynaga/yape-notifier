@@ -6,6 +6,9 @@ import com.yapenotifier.android.data.model.CommerceResponse
 import com.yapenotifier.android.data.model.CreateCommerceRequest
 import com.yapenotifier.android.data.model.CreateDeviceRequest
 import com.yapenotifier.android.data.model.DeviceResponse
+import com.yapenotifier.android.data.model.LinkCodeValidationResponse
+import com.yapenotifier.android.data.model.LinkDeviceRequest
+import com.yapenotifier.android.data.model.LinkDeviceResponse
 import com.yapenotifier.android.data.model.LoginRequest
 import com.yapenotifier.android.data.model.MonitoredPackagesResponse
 import com.yapenotifier.android.data.model.NotificationData
@@ -14,6 +17,7 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Path
 
 interface ApiService {
     // --- Auth ---
@@ -47,4 +51,11 @@ interface ApiService {
     // --- Settings ---
     @GET("api/settings/monitored-packages")
     suspend fun getMonitoredPackages(): Response<MonitoredPackagesResponse>
+
+    // --- Device Linking ---
+    @GET("api/devices/link-code/{code}")
+    suspend fun validateLinkCode(@Path("code") code: String): Response<LinkCodeValidationResponse>
+
+    @POST("api/devices/link-by-code")
+    suspend fun linkDeviceByCode(@Body request: LinkDeviceRequest): Response<LinkDeviceResponse>
 }

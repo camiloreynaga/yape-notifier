@@ -15,7 +15,8 @@ import kotlinx.coroutines.launch
 data class LoginResult(
     val success: Boolean,
     val message: String? = null,
-    val needsCommerceCreation: Boolean = false
+    val needsCommerceCreation: Boolean = false,
+    val needsDeviceLinking: Boolean = false
 )
 
 class LoginViewModel(application: android.app.Application) : androidx.lifecycle.AndroidViewModel(application) {
@@ -42,17 +43,32 @@ class LoginViewModel(application: android.app.Application) : androidx.lifecycle.
                         preferencesManager.saveAuthToken(authResponse.token)
                         preferencesManager.saveUserEmail(authResponse.user.email)
 
-                        val deviceRegistered = registerDevice()
-                        if (deviceRegistered) {
+                        val deviceRegistrationResult = registerDevice()
+                        if (deviceRegistrationResult.success) {
                             val commerceCheckResponse = commerceRepository.checkCommerce()
                             if(commerceCheckResponse.isSuccessful) {
                                 val needsCreation = commerceCheckResponse.body()?.exists == false
-                                _loginResult.value = LoginResult(true, "Login exitoso y dispositivo registrado.", needsCreation)
+                                
+                                // Check if device is linked to a commerce
+                                val deviceHasCommerce = deviceRegistrationResult.device?.commerceId != null
+                                
+                                if (needsCreation) {
+                                    _loginResult.value = LoginResult(true, "Login exitoso y dispositivo registrado.", true, false)
+                                } else if (!deviceHasCommerce) {
+                                    // Device registered but not linked to commerce
+                                    _loginResult.value = LoginResult(true, "Login exitoso. Necesitas vincular tu dispositivo.", false, true)
+                                } else {
+                                    // Everything is OK - save commerce_id if available
+                                    deviceRegistrationResult.device?.commerceId?.let {
+                                        preferencesManager.saveCommerceId(it.toString())
+                                    }
+                                    _loginResult.value = LoginResult(true, "Login exitoso y dispositivo registrado.", false, false)
+                                }
                             } else {
                                 _loginResult.value = LoginResult(false, "Error al verificar el comercio.")
                             }
                         } else {
-                            _loginResult.value = LoginResult(false, "Error al registrar el dispositivo. Por favor, intente de nuevo.")
+                            _loginResult.value = LoginResult(false, deviceRegistrationResult.message ?: "Error al registrar el dispositivo. Por favor, intente de nuevo.")
                         }
                     } else {
                         _loginResult.value = LoginResult(false, "Respuesta de login inválida del servidor")
@@ -69,7 +85,13 @@ class LoginViewModel(application: android.app.Application) : androidx.lifecycle.
         }
     }
 
-    private suspend fun registerDevice(): Boolean {
+    private data class DeviceRegistrationResult(
+        val success: Boolean,
+        val device: com.yapenotifier.android.data.model.Device? = null,
+        val message: String? = null
+    )
+
+    private suspend fun registerDevice(): DeviceRegistrationResult {
         try {
             val deviceUuid = preferencesManager.deviceUuid.first() ?: run {
                 val uuid = java.util.UUID.randomUUID().toString()
@@ -95,20 +117,20 @@ class LoginViewModel(application: android.app.Application) : androidx.lifecycle.
 
                 responseBody?.device?.let {
                     preferencesManager.saveDeviceId(it.id.toString())
-                    Log.i("LoginViewModel", "Device successfully registered with server. Saved remote ID: ${it.id}")
-                    return true
+                    Log.i("LoginViewModel", "Device successfully registered with server. Saved remote ID: ${it.id}, Commerce ID: ${it.commerceId}")
+                    return DeviceRegistrationResult(true, it)
                 } ?: run {
                     Log.e("LoginViewModel", "Could not find 'device' object in the response body.")
-                    return false
+                    return DeviceRegistrationResult(false, null, "Respuesta inválida del servidor")
                 }
             } else {
                 val errorBody = deviceResponse.errorBody()?.string()
                 Log.e("LoginViewModel", "Device registration API call failed. Code: ${deviceResponse.code()}, Body: $errorBody")
-                return false
+                return DeviceRegistrationResult(false, null, "Error al registrar dispositivo: ${deviceResponse.code()}")
             }
         } catch (e: Exception) {
             Log.e("LoginViewModel", "Exception during device registration", e)
-            return false
+            return DeviceRegistrationResult(false, null, "Error de conexión: ${e.message}")
         }
     }
 }
