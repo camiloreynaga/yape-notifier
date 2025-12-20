@@ -25,4 +25,17 @@ interface CapturedNotificationDao {
 
     @Query("UPDATE captured_notifications SET status = 'PENDING' WHERE status = 'FAILED'")
     suspend fun resetFailedNotifications()
+
+    // Statistics queries
+    @Query("SELECT * FROM captured_notifications WHERE status = 'SENT' ORDER BY timestamp DESC LIMIT 1")
+    suspend fun getLastSentNotification(): CapturedNotification?
+
+    @Query("SELECT COUNT(*) FROM captured_notifications WHERE status = 'SENT' AND timestamp >= (strftime('%s', 'now', 'start of day') * 1000)")
+    suspend fun getSentTodayCount(): Int
+
+    @Query("SELECT COUNT(*) FROM captured_notifications WHERE status = 'PENDING'")
+    fun getPendingCountFlow(): kotlinx.coroutines.flow.Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM captured_notifications WHERE status = 'FAILED'")
+    fun getFailedCountFlow(): kotlinx.coroutines.flow.Flow<Int>
 }

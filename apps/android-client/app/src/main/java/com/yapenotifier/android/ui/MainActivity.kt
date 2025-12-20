@@ -25,18 +25,25 @@ import com.yapenotifier.android.R
 import com.yapenotifier.android.data.local.PreferencesManager
 import com.yapenotifier.android.databinding.ActivityMainBinding
 import com.yapenotifier.android.ui.viewmodel.MainViewModel
+import com.yapenotifier.android.ui.viewmodel.StatisticsViewModel
 import com.yapenotifier.android.util.NotificationAccessChecker
+import com.yapenotifier.android.util.PaymentNotificationParser
 import com.yapenotifier.android.util.ServiceStatusManager
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var viewModel: MainViewModel
+    private lateinit var statisticsViewModel: StatisticsViewModel
     private lateinit var preferencesManager: PreferencesManager
 
     private val TEST_CHANNEL_ID = "TEST_CHANNEL_ID"
+    private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -58,6 +65,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         viewModel = ViewModelProvider(this, ViewModelProvider.AndroidViewModelFactory.getInstance(application))[MainViewModel::class.java]
+        statisticsViewModel = ViewModelProvider(this, ViewModelProvider.AndroidViewModelFactory.getInstance(application))[StatisticsViewModel::class.java]
 
         setupUI()
         setupObservers()
@@ -69,12 +77,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupUI() {
         binding.tvServiceLog.movementMethod = ScrollingMovementMethod()
+        updateCaptureStatus("Verificando...", android.graphics.Color.parseColor("#757575"))
     }
 
-    override fun onResume() {
-        super.onResume()
-        updateAllPermissionStatus()
-    }
 
     private fun setupObservers() {
         viewModel.statusMessage.observe(this) { message ->
@@ -92,7 +97,87 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             ServiceStatusManager.statusHistory.collectLatest { history ->
                 binding.tvServiceLog.text = history.joinToString(separator = "\n")
+                // Update capture status based on last status
+                if (history.isNotEmpty()) {
+                    val lastStatus = history.first()
+                    updateCaptureStatusFromServiceStatus(lastStatus)
+                }
             }
+        }
+
+        // Observe statistics
+        lifecycleScope.launch {
+            statisticsViewModel.statisticsState.collectLatest(::updateStatistics)
+        }
+
+        // Refresh statistics when activity resumes
+        lifecycleScope.launch {
+            statisticsViewModel.refreshStatistics()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateAllPermissionStatus()
+        // Refresh statistics when returning to activity
+        statisticsViewModel.refreshStatistics()
+    }
+
+    private fun updateCaptureStatusFromServiceStatus(status: String) {
+        when {
+            status.contains("✅") || status.contains("OK") || status.contains("exitoso") -> {
+                updateCaptureStatus("✅ Capturando OK", android.graphics.Color.parseColor("#4CAF50"))
+            }
+            status.contains("⚠️") || status.contains("advertencia") || status.contains("pendiente") -> {
+                updateCaptureStatus("⚠️ Advertencia", android.graphics.Color.parseColor("#FF9800"))
+            }
+            status.contains("❌") || status.contains("ERROR") || status.contains("FAIL") || status.contains("error") -> {
+                updateCaptureStatus("❌ Error en Captura", android.graphics.Color.parseColor("#F44336"))
+            }
+            else -> {
+                updateCaptureStatus("🔄 En Proceso", android.graphics.Color.parseColor("#2196F3"))
+            }
+        }
+        binding.tvLastServiceStatus.text = status
+    }
+
+    private fun updateCaptureStatus(statusText: String, color: Int) {
+        binding.tvCaptureStatus.text = statusText
+        binding.tvCaptureStatus.setTextColor(color)
+        // Update card stroke color dynamically
+        binding.cardCaptureStatus.strokeColor = color
+        binding.cardCaptureStatus.strokeWidth = if (color != android.graphics.Color.parseColor("#757575")) 3 else 0
+    }
+
+    private fun updateStatistics(state: com.yapenotifier.android.ui.viewmodel.StatisticsState) {
+        // Update counts
+        binding.tvSentTodayCount.text = state.sentTodayCount.toString()
+        binding.tvPendingCount.text = state.pendingCount.toString()
+        binding.tvFailedCount.text = state.failedCount.toString()
+
+        // Update last event
+        state.lastSentNotification?.let { notification ->
+            val time = timeFormat.format(Date(notification.timestamp))
+            val appName = getAppDisplayName(notification.packageName)
+            
+            // Try to parse amount from notification
+            val paymentDetails = PaymentNotificationParser.parse(notification.title, notification.body)
+            val amountText = paymentDetails?.let { 
+                "${it.currency} ${it.amount}"
+            } ?: "Sin monto"
+            
+            binding.tvLastEvent.text = "$time - $appName\n$amountText"
+        } ?: run {
+            binding.tvLastEvent.text = "No hay eventos enviados"
+        }
+    }
+
+    private fun getAppDisplayName(packageName: String): String {
+        return when (packageName) {
+            "com.bcp.innovacxion.yape.movil" -> "Yape"
+            "pe.com.interbank.mobilebanking" -> "Interbank"
+            "com.scotiabank.mobile.android" -> "Scotiabank"
+            else -> packageName
         }
     }
 
