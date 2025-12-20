@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { apiService } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 import type { MonitorPackage } from '@/types';
@@ -34,11 +34,7 @@ export default function MonitoredAppsPage() {
 
   const isAdmin = user?.role === 'admin';
 
-  useEffect(() => {
-    loadPackages();
-  }, [showActiveOnly]);
-
-  const loadPackages = async () => {
+  const loadPackages = useCallback(async () => {
     setLoading(true);
     try {
       const packagesData = await apiService.getMonitorPackages(showActiveOnly);
@@ -48,7 +44,11 @@ export default function MonitoredAppsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showActiveOnly]);
+
+  useEffect(() => {
+    loadPackages();
+  }, [loadPackages]);
 
   const handleCreate = () => {
     setEditingPackage(null);

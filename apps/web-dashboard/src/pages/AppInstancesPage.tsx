@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { apiService } from '@/services/api';
 import type { AppInstance, Device } from '@/types';
 import AppInstanceCard from '@/components/AppInstanceCard';
@@ -11,13 +11,24 @@ export default function AppInstancesPage() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
+  const loadInstances = useCallback(async () => {
+    try {
+      const instancesData = await apiService.getAppInstances(
+        selectedDeviceId || undefined
+      );
+      setInstances(instancesData);
+    } catch (error) {
+      console.error('Error loading instances:', error);
+    }
+  }, [selectedDeviceId]);
+
   useEffect(() => {
     loadData();
   }, []);
 
   useEffect(() => {
     loadInstances();
-  }, [selectedDeviceId]);
+  }, [loadInstances]);
 
   const loadData = async () => {
     setLoading(true);
@@ -32,17 +43,6 @@ export default function AppInstancesPage() {
       console.error('Error loading data:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadInstances = async () => {
-    try {
-      const instancesData = await apiService.getAppInstances(
-        selectedDeviceId || undefined
-      );
-      setInstances(instancesData);
-    } catch (error) {
-      console.error('Error loading instances:', error);
     }
   };
 

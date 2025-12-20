@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { apiService } from '@/services/api';
 import type { Notification } from '@/types';
 import { format } from 'date-fns';
@@ -21,7 +21,6 @@ import {
 
 export default function NotificationDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const [notification, setNotification] = useState<Notification | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

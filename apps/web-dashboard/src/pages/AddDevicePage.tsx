@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '@/services/api';
 import QRCodeDisplay from '@/components/QRCodeDisplay';
@@ -16,37 +16,7 @@ export default function AddDevicePage() {
   const [copied, setCopied] = useState(false);
   const pollingIntervalRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    generateLinkCode();
-
-    // Cleanup: detener polling al desmontar
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-      }
-    };
-  }, []);
-
-  const generateLinkCode = async () => {
-    try {
-      setStatus('generating');
-      setError(null);
-      const result = await apiService.generateLinkCode();
-      setLinkCode(result.code);
-      setExpiresAt(new Date(result.expires_at));
-      setStatus('waiting');
-      startPolling(result.code);
-    } catch (err: unknown) {
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : 'Error al generar código de vinculación';
-      setError(errorMessage);
-      setStatus('error');
-    }
-  };
-
-  const startPolling = (code: string) => {
+  const startPolling = useCallback((code: string) => {
     // Limpiar intervalo anterior si existe
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
@@ -81,7 +51,37 @@ export default function AddDevicePage() {
         console.error('Error checking link code:', err);
       }
     }, 2000);
-  };
+  }, [navigate]);
+
+  const generateLinkCode = useCallback(async () => {
+    try {
+      setStatus('generating');
+      setError(null);
+      const result = await apiService.generateLinkCode();
+      setLinkCode(result.code);
+      setExpiresAt(new Date(result.expires_at));
+      setStatus('waiting');
+      startPolling(result.code);
+    } catch (err: unknown) {
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : 'Error al generar código de vinculación';
+      setError(errorMessage);
+      setStatus('error');
+    }
+  }, [startPolling]);
+
+  useEffect(() => {
+    generateLinkCode();
+
+    // Cleanup: detener polling al desmontar
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, [generateLinkCode]);
 
   const handleCopyCode = async () => {
     if (!linkCode) return;
@@ -101,9 +101,6 @@ export default function AddDevicePage() {
     }
     generateLinkCode();
   };
-
-  // Construir URL completa para el QR (el dispositivo Android escaneará esto)
-  const qrValue = linkCode || '';
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">

@@ -107,7 +107,14 @@ class ApiService {
       notification_permission_enabled?: boolean;
     }
   ): Promise<Device> {
-    const response = await this.client.post<{ device: Device; health: any }>(
+    const response = await this.client.post<{ 
+      device: Device; 
+      health: {
+        battery_level?: number;
+        battery_optimization_disabled?: boolean;
+        notification_permission_enabled?: boolean;
+      }
+    }>(
       API_ENDPOINTS.devices.updateHealth(id),
       data
     );

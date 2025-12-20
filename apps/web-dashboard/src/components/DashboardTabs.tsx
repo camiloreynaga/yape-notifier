@@ -25,7 +25,11 @@ interface DashboardTabsProps {
 export default function DashboardTabs({ children, defaultTab = 'notifications' }: DashboardTabsProps) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const activeTab = (searchParams.get('tab') as TabValue) || defaultTab;
+  const tabFromUrl = searchParams.get('tab');
+  const isValidTab = (tab: string | null): tab is TabValue => {
+    return tab === 'notifications' || tab === 'devices' || tab === 'settings';
+  };
+  const activeTab = isValidTab(tabFromUrl) ? tabFromUrl : defaultTab;
 
   const handleTabChange = (tabValue: TabValue) => {
     navigate(`/dashboard?tab=${tabValue}`, { replace: true });
