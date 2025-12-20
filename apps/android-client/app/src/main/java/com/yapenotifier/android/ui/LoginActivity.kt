@@ -5,8 +5,11 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import com.yapenotifier.android.databinding.ActivityLoginBinding
 import com.yapenotifier.android.ui.viewmodel.LoginViewModel
+import com.yapenotifier.android.util.WizardHelper
+import kotlinx.coroutines.launch
 
 class LoginActivity : AppCompatActivity() {
     private lateinit var binding: ActivityLoginBinding
@@ -33,7 +36,7 @@ class LoginActivity : AppCompatActivity() {
                     } else if (it.needsDeviceLinking) {
                         navigateToLinkDevice()
                     } else {
-                        navigateToMain()
+                        checkWizardAndNavigate()
                     }
                 } else {
                     Toast.makeText(this, it.message ?: "Error al iniciar sesión", Toast.LENGTH_LONG).show()
@@ -97,5 +100,16 @@ class LoginActivity : AppCompatActivity() {
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
         finish()
+    }
+
+    private fun checkWizardAndNavigate() {
+        lifecycleScope.launch {
+            val wizardShown = WizardHelper.checkAndShowWizard(this@LoginActivity)
+            if (!wizardShown) {
+                navigateToMain()
+            } else {
+                finish()
+            }
+        }
     }
 }

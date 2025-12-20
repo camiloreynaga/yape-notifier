@@ -4,7 +4,9 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -18,6 +20,8 @@ class PreferencesManager(private val context: Context) {
         private val DEVICE_ID_KEY = stringPreferencesKey("device_id")
         private val USER_EMAIL_KEY = stringPreferencesKey("user_email")
         private val COMMERCE_ID_KEY = stringPreferencesKey("commerce_id")
+        private val WIZARD_COMPLETED_KEY = booleanPreferencesKey("wizard_completed")
+        private val SELECTED_MONITORED_PACKAGES_KEY = stringSetPreferencesKey("selected_monitored_packages")
     }
 
     val authToken: Flow<String?> = context.dataStore.data.map { preferences ->
@@ -38,6 +42,14 @@ class PreferencesManager(private val context: Context) {
 
     val commerceId: Flow<String?> = context.dataStore.data.map { preferences ->
         preferences[COMMERCE_ID_KEY]
+    }
+
+    val wizardCompleted: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[WIZARD_COMPLETED_KEY] ?: false
+    }
+
+    val selectedMonitoredPackages: Flow<Set<String>> = context.dataStore.data.map { preferences ->
+        preferences[SELECTED_MONITORED_PACKAGES_KEY] ?: emptySet()
     }
 
     suspend fun saveAuthToken(token: String) {
@@ -67,6 +79,18 @@ class PreferencesManager(private val context: Context) {
     suspend fun saveCommerceId(commerceId: String) {
         context.dataStore.edit { preferences ->
             preferences[COMMERCE_ID_KEY] = commerceId
+        }
+    }
+
+    suspend fun setWizardCompleted(completed: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[WIZARD_COMPLETED_KEY] = completed
+        }
+    }
+
+    suspend fun saveSelectedMonitoredPackages(packages: Set<String>) {
+        context.dataStore.edit { preferences ->
+            preferences[SELECTED_MONITORED_PACKAGES_KEY] = packages
         }
     }
 

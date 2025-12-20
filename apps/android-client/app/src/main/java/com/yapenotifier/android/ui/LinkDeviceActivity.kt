@@ -11,11 +11,13 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
-import com.google.zxing.integration.android.IntentIntegrator
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import com.yapenotifier.android.data.api.RetrofitClient
 import com.yapenotifier.android.data.local.PreferencesManager
 import com.yapenotifier.android.databinding.ActivityLinkDeviceBinding
 import com.yapenotifier.android.ui.viewmodel.LinkDeviceViewModel
+import com.yapenotifier.android.util.WizardHelper
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -36,6 +38,16 @@ class LinkDeviceActivity : AppCompatActivity() {
                 "Se necesita permiso de cámara para escanear el código QR",
                 Toast.LENGTH_LONG
             ).show()
+        }
+    }
+
+    private val qrScannerLauncher = registerForActivityResult(ScanContract()) { result ->
+        if (result.contents != null) {
+            val scannedCode = result.contents.trim()
+            binding.etCode.setText(scannedCode)
+            validateCode(scannedCode)
+        } else {
+            Toast.makeText(this, "No se pudo escanear el código", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -160,29 +172,14 @@ class LinkDeviceActivity : AppCompatActivity() {
     }
 
     private fun startQRScanner() {
-        val integrator = IntentIntegrator(this)
-        integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE)
-        integrator.setPrompt("Escanea el código QR de vinculación")
-        integrator.setCameraId(0)
-        integrator.setBeepEnabled(false)
-        integrator.setBarcodeImageEnabled(false)
-        integrator.setOrientationLocked(false)
-        integrator.initiateScan()
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        val result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data)
-        if (result != null) {
-            if (result.contents != null) {
-                val scannedCode = result.contents.trim()
-                binding.etCode.setText(scannedCode)
-                validateCode(scannedCode)
-            } else {
-                Toast.makeText(this, "No se pudo escanear el código", Toast.LENGTH_SHORT).show()
-            }
-        } else {
-            super.onActivityResult(requestCode, resultCode, data)
-        }
+        val options = ScanOptions()
+        options.setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+        options.setPrompt("Escanea el código QR de vinculación")
+        options.setCameraId(0)
+        options.setBeepEnabled(false)
+        options.setBarcodeImageEnabled(false)
+        options.setOrientationLocked(false)
+        qrScannerLauncher.launch(options)
     }
 
     private fun validateCode(code: String) {
@@ -213,7 +210,6 @@ class LinkDeviceActivity : AppCompatActivity() {
             .setTitle("Dispositivo Vinculado")
             .setMessage(message)
             .setPositiveButton("Continuar") { _, _ ->
-                // Check if there are unnamed app instances
                 checkAppInstancesAndNavigate()
             }
             .setCancelable(false)
@@ -224,33 +220,33 @@ class LinkDeviceActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 val deviceId = preferencesManager.deviceId.first()?.toLongOrNull()
-                if (deviceId != null) {
-                    val response = apiService.getDeviceAppInstances(deviceId)
-                    if (response.isSuccessful) {
-                        val instances = response.body()?.instances ?: emptyList()
-                        val hasUnnamedInstances = instances.any { it.instanceLabel.isNullOrBlank() }
-                        
-                        if (hasUnnamedInstances) {
-                            // Navigate to AppInstancesActivity
-                            val intent = Intent(this@LinkDeviceActivity, AppInstancesActivity::class.java)
-                            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                            startActivity(intent)
-                        } else {
-                            // Navigate to MainActivity
-                            navigateToMain()
-                        }
+                if (deviceId == null) {
+                    navigateToMain() // Navigates and finishes
+                    return@launch
+                }
+
+                val response = apiService.getDeviceAppInstances(deviceId)
+                if (response.isSuccessful) {
+                    val instances = response.body()?.instances ?: emptyList()
+                    val hasUnnamedInstances = instances.any {
+                        val label = it.label
+                        label.isNullOrBlank()
+                    }
+
+                    if (hasUnnamedInstances) {
+                        val intent = Intent(this@LinkDeviceActivity, AppInstancesActivity::class.java)
+                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        startActivity(intent)
+                        finish()
                     } else {
-                        // On error, just go to MainActivity
-                        navigateToMain()
+                        checkWizardAndNavigate()
                     }
                 } else {
                     navigateToMain()
                 }
             } catch (e: Exception) {
-                // On error, just go to MainActivity
                 navigateToMain()
             }
-            finish()
         }
     }
 
@@ -259,5 +255,16 @@ class LinkDeviceActivity : AppCompatActivity() {
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
         finish()
+    }
+
+    private fun checkWizardAndNavigate() {
+        lifecycleScope.launch {
+            val wizardShown = WizardHelper.checkAndShowWizard(this@LinkDeviceActivity)
+            if (!wizardShown) {
+                navigateToMain()
+            } else {
+                finish()
+            }
+        }
     }
 }

@@ -58,13 +58,13 @@ class AppInstancesViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    fun updateInstanceLabel(instanceId: Long, label: String) {
+    fun updateInstanceLabel(instanceId: String, label: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value?.copy(saving = true, saveError = null)
             
             try {
-                val request = UpdateAppInstanceLabelRequest(label.trim())
-                val response = apiService.updateAppInstanceLabel(instanceId, request)
+                val request = UpdateAppInstanceLabelRequest(instanceLabel = label.trim())
+                val response = apiService.updateAppInstanceLabel(instanceId.toLongOrNull() ?: 0, request)
                 
                 if (response.isSuccessful) {
                     val updatedInstance = response.body()?.instance
@@ -72,7 +72,7 @@ class AppInstancesViewModel(application: Application) : AndroidViewModel(applica
                         // Update the instance in the list
                         val currentInstances = _uiState.value?.instances ?: emptyList()
                         val updatedInstances = currentInstances.map { instance ->
-                            if (instance.id == instanceId) {
+                            if (instance.id.toString() == instanceId) {
                                 updatedInstance
                             } else {
                                 instance
@@ -105,22 +105,23 @@ class AppInstancesViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    fun saveAllLabels(labels: Map<Long, String>) {
+    fun saveAllLabels(labels: Map<String, String>) {
         viewModelScope.launch {
             _uiState.value = _uiState.value?.copy(saving = true, saveError = null)
             
             try {
                 val updateJobs = labels.map { (instanceId, label) ->
                     launch {
-                        val request = UpdateAppInstanceLabelRequest(label.trim())
-                        apiService.updateAppInstanceLabel(instanceId, request)
+                        val request = UpdateAppInstanceLabelRequest(instanceLabel = label.trim())
+                        apiService.updateAppInstanceLabel(instanceId.toLongOrNull() ?: 0L, request)
                     }
                 }
                 
                 updateJobs.forEach { it.join() }
                 
                 // Reload instances to get updated data
-                val deviceId = preferencesManager.deviceId.first()?.toLongOrNull()
+                val deviceIdStr = preferencesManager.deviceId.first()
+                val deviceId = deviceIdStr?.toLongOrNull()
                 if (deviceId != null) {
                     loadAppInstances(deviceId)
                 } else {
@@ -140,7 +141,9 @@ class AppInstancesViewModel(application: Application) : AndroidViewModel(applica
     }
 
     fun hasUnnamedInstances(): Boolean {
-        return _uiState.value?.instances?.any { it.instanceLabel.isNullOrBlank() } ?: false
+        return _uiState.value?.instances?.any { 
+            val label = it.label
+            label.isNullOrBlank()
+        } ?: false
     }
 }
-

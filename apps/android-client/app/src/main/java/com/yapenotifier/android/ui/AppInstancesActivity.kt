@@ -6,12 +6,15 @@ import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.yapenotifier.android.databinding.ActivityAppInstancesBinding
 import com.yapenotifier.android.data.local.PreferencesManager
 import com.yapenotifier.android.ui.adapter.AppInstanceAdapter
 import com.yapenotifier.android.ui.viewmodel.AppInstancesViewModel
+import com.yapenotifier.android.util.WizardHelper
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 class AppInstancesActivity : AppCompatActivity() {
@@ -126,7 +129,7 @@ class AppInstancesActivity : AppCompatActivity() {
         }
 
         isSaving = true
-        val changesToSave = labelChanges.toMap()
+        val changesToSave = labelChanges.mapKeys { it.key.toString() }
         labelChanges.clear()
         
         viewModel.saveAllLabels(changesToSave)
@@ -137,11 +140,18 @@ class AppInstancesActivity : AppCompatActivity() {
                 isSaving = false
                 if (state.saveError == null) {
                     Toast.makeText(this, "Cambios guardados exitosamente", Toast.LENGTH_SHORT).show()
-                    // Navigate to MainActivity after successful save
-                    val intent = Intent(this, MainActivity::class.java)
-                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                    startActivity(intent)
-                    finish()
+                    // Check wizard and navigate
+                    lifecycleScope.launch {
+                        val wizardShown = WizardHelper.checkAndShowWizard(this@AppInstancesActivity)
+                        if (!wizardShown) {
+                            val intent = Intent(this@AppInstancesActivity, MainActivity::class.java)
+                            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            startActivity(intent)
+                            finish()
+                        } else {
+                            finish()
+                        }
+                    }
                 }
             }
         }
@@ -153,4 +163,3 @@ class AppInstancesActivity : AppCompatActivity() {
         }
     }
 }
-

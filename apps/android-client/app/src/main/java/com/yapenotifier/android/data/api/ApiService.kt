@@ -5,6 +5,7 @@ import com.yapenotifier.android.data.model.CommerceCheckResponse
 import com.yapenotifier.android.data.model.CommerceResponse
 import com.yapenotifier.android.data.model.CreateCommerceRequest
 import com.yapenotifier.android.data.model.CreateDeviceRequest
+import com.yapenotifier.android.data.model.DeviceMonitoredAppsResponse
 import com.yapenotifier.android.data.model.DeviceResponse
 import com.yapenotifier.android.data.model.AppInstancesResponse
 import com.yapenotifier.android.data.model.LinkCodeValidationResponse
@@ -16,6 +17,7 @@ import com.yapenotifier.android.data.model.NotificationData
 import com.yapenotifier.android.data.model.RegisterRequest
 import com.yapenotifier.android.data.model.UpdateAppInstanceLabelRequest
 import com.yapenotifier.android.data.model.UpdateAppInstanceLabelResponse
+import com.yapenotifier.android.data.model.UpdateDeviceMonitoredAppsRequest
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -37,6 +39,15 @@ interface ApiService {
     // --- Devices ---
     @POST("api/devices")
     suspend fun createDevice(@Body request: CreateDeviceRequest): Response<DeviceResponse>
+
+    @GET("api/devices/{deviceId}/monitored-apps")
+    suspend fun getDeviceMonitoredApps(@Path("deviceId") deviceId: String): Response<DeviceMonitoredAppsResponse>
+
+    @POST("api/devices/{deviceId}/monitored-apps")
+    suspend fun updateDeviceMonitoredApps(
+        @Path("deviceId") deviceId: String,
+        @Body request: UpdateDeviceMonitoredAppsRequest
+    ): Response<Unit>
 
     // --- Commerce ---
     @POST("api/commerces")

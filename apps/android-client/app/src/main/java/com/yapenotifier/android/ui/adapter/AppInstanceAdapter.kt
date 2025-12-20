@@ -33,17 +33,17 @@ class AppInstanceAdapter(
         fun bind(instance: AppInstance) {
             binding.apply {
                 tvPackageName.text = instance.packageName
-                tvAndroidUserId.text = "Usuario Android: ${instance.androidUserId}"
                 
                 // Set current label or placeholder
-                etInstanceLabel.setText(instance.instanceLabel ?: "")
+                etInstanceLabel.setText(instance.label ?: "")
                 etInstanceLabel.hint = "Ej: Yape 1 (Rocío)"
                 
                 // Update label when text changes (debounced or on focus lost)
                 etInstanceLabel.setOnFocusChangeListener { _, hasFocus ->
                     if (!hasFocus) {
                         val newLabel = etInstanceLabel.text.toString().trim()
-                        if (newLabel != instance.instanceLabel) {
+                        val currentLabel = instance.label
+                        if (newLabel != currentLabel) {
                             onLabelChanged(instance.id, newLabel)
                         }
                     }
@@ -62,4 +62,3 @@ class AppInstanceAdapter(
         }
     }
 }
-

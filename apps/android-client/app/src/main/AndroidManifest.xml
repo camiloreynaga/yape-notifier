@@ -63,6 +63,13 @@
             android:label="Instancias de Aplicaciones"
             android:theme="@style/Theme.YapeNotifier" />
 
+        <!-- Permissions Wizard Activity -->
+        <activity
+            android:name=".ui.PermissionsWizardActivity"
+            android:exported="false"
+            android:label="Configuración Inicial"
+            android:theme="@style/Theme.YapeNotifier" />
+
         <!-- Notification Listener Service -->
         <service
             android:name=".service.PaymentNotificationListenerService"

@@ -7,46 +7,77 @@
     tools:context=".ui.LinkDeviceActivity">
 
     <Button
-        android:id="@+id/btn_scan_qr"
+        android:id="@+id/btn_scan_QR"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="32dp"
         android:layout_marginEnd="32dp"
         android:text="Escanear QR"
-        app:layout_constraintBottom_toTopOf="@+id/til_link_code"
+        app:layout_constraintBottom_toTopOf="@+id/til_code"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintVertical_chainStyle="packed" />
 
     <com.google.android.material.textfield.TextInputLayout
-        android:id="@+id/til_link_code"
+        android:id="@+id/til_code"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="32dp"
         android:hint="O ingrese el código manualmente"
-        app:layout_constraintBottom_toTopOf="@+id/btn_link_device"
-        app:layout_constraintEnd_toEndOf="@+id/btn_scan_qr"
-        app:layout_constraintStart_toStartOf="@+id/btn_scan_qr"
-        app:layout_constraintTop_toBottomOf="@+id/btn_scan_qr">
+        app:layout_constraintBottom_toTopOf="@+id/tvCommerceInfo"
+        app:layout_constraintEnd_toEndOf="@+id/btn_scan_QR"
+        app:layout_constraintStart_toStartOf="@+id/btn_scan_QR"
+        app:layout_constraintTop_toBottomOf="@+id/btn_scan_QR">
 
         <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/et_link_code"
+            android:id="@+id/et_code"
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
 
     </com.google.android.material.textfield.TextInputLayout>
 
+    <TextView
+        android:id="@+id/tvCommerceInfo"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:textAlignment="center"
+        android:textAppearance="?attr/textAppearanceBody1"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@+id/tvError"
+        app:layout_constraintEnd_toEndOf="@+id/til_code"
+        app:layout_constraintStart_toStartOf="@+id/til_code"
+        app:layout_constraintTop_toBottomOf="@+id/til_code"
+        tools:text="Comercio: Mi Tienda S.A.C."
+        tools:visibility="visible" />
+
+    <TextView
+        android:id="@+id/tvError"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:textAlignment="center"
+        android:textColor="?attr/colorError"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@+id/btn_link"
+        app:layout_constraintEnd_toEndOf="@+id/til_code"
+        app:layout_constraintStart_toStartOf="@+id/til_code"
+        app:layout_constraintTop_toBottomOf="@+id/tvCommerceInfo"
+        tools:text="El código ingresado es inválido."
+        tools:visibility="visible" />
+
     <Button
-        android:id="@+id/btn_link_device"
+        android:id="@+id/btn_link"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
+        android:enabled="false"
         android:text="Vincular"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="@+id/til_link_code"
-        app:layout_constraintStart_toStartOf="@+id/til_link_code"
-        app:layout_constraintTop_toBottomOf="@+id/til_link_code" />
+        app:layout_constraintEnd_toEndOf="@+id/til_code"
+        app:layout_constraintStart_toStartOf="@+id/til_code"
+        app:layout_constraintTop_toBottomOf="@+id/tvError" />
 
     <ProgressBar
         android:id="@+id/progress_bar"
@@ -57,6 +88,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent"
+        tools:visibility="visible"/>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
