@@ -6,6 +6,7 @@ import com.yapenotifier.android.data.model.CommerceResponse
 import com.yapenotifier.android.data.model.CreateCommerceRequest
 import com.yapenotifier.android.data.model.CreateDeviceRequest
 import com.yapenotifier.android.data.model.DeviceResponse
+import com.yapenotifier.android.data.model.AppInstancesResponse
 import com.yapenotifier.android.data.model.LinkCodeValidationResponse
 import com.yapenotifier.android.data.model.LinkDeviceRequest
 import com.yapenotifier.android.data.model.LinkDeviceResponse
@@ -13,9 +14,12 @@ import com.yapenotifier.android.data.model.LoginRequest
 import com.yapenotifier.android.data.model.MonitoredPackagesResponse
 import com.yapenotifier.android.data.model.NotificationData
 import com.yapenotifier.android.data.model.RegisterRequest
+import com.yapenotifier.android.data.model.UpdateAppInstanceLabelRequest
+import com.yapenotifier.android.data.model.UpdateAppInstanceLabelResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 
@@ -58,4 +62,14 @@ interface ApiService {
 
     @POST("api/devices/link-by-code")
     suspend fun linkDeviceByCode(@Body request: LinkDeviceRequest): Response<LinkDeviceResponse>
+
+    // --- App Instances ---
+    @GET("api/devices/{deviceId}/app-instances")
+    suspend fun getDeviceAppInstances(@Path("deviceId") deviceId: Long): Response<AppInstancesResponse>
+
+    @PATCH("api/app-instances/{instanceId}/label")
+    suspend fun updateAppInstanceLabel(
+        @Path("instanceId") instanceId: Long,
+        @Body request: UpdateAppInstanceLabelRequest
+    ): Response<UpdateAppInstanceLabelResponse>
 }

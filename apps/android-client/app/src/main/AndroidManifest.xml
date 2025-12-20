@@ -56,6 +56,13 @@
             android:label="Vincular Dispositivo"
             android:theme="@style/Theme.YapeNotifier" />
 
+        <!-- App Instances Activity -->
+        <activity
+            android:name=".ui.AppInstancesActivity"
+            android:exported="false"
+            android:label="Instancias de Aplicaciones"
+            android:theme="@style/Theme.YapeNotifier" />
+
         <!-- Notification Listener Service -->
         <service
             android:name=".service.PaymentNotificationListenerService"
