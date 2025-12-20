@@ -35,3 +35,4 @@ class ListNotificationsRequest extends FormRequest
     }
 }
 
+
