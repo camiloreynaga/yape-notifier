@@ -39,7 +39,7 @@ class LoginActivity : AppCompatActivity() {
                     } else {
                         // Start device health worker after successful login
                         DeviceHealthWorkerHelper.scheduleDeviceHealthWorker(this@LoginActivity)
-                        checkWizardAndNavigate()
+                        navigateToNextScreen()
                     }
                 } else {
                     Toast.makeText(this, it.message ?: "Error al iniciar sesión", Toast.LENGTH_LONG).show()
@@ -105,10 +105,10 @@ class LoginActivity : AppCompatActivity() {
         finish()
     }
 
-    private fun checkWizardAndNavigate() {
+    private fun navigateToNextScreen() {
         lifecycleScope.launch {
-            val wizardShown = WizardHelper.checkAndShowWizard(this@LoginActivity)
-            if (!wizardShown) {
+            val navigated = WizardHelper.navigateToNextScreen(this@LoginActivity)
+            if (!navigated) {
                 navigateToMain()
             } else {
                 finish()

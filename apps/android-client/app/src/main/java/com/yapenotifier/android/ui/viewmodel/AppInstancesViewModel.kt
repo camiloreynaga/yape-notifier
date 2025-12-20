@@ -146,4 +146,26 @@ class AppInstancesViewModel(application: Application) : AndroidViewModel(applica
             label.isNullOrBlank()
         } ?: false
     }
+
+    /**
+     * Checks if there are unnamed instances by querying the backend.
+     * This is useful when we need to check before navigating.
+     */
+    suspend fun hasUnnamedInstancesFromBackend(deviceId: Long): Boolean {
+        return try {
+            val response = apiService.getDeviceAppInstances(deviceId)
+            if (response.isSuccessful) {
+                val instances = response.body()?.instances ?: emptyList()
+                instances.any {
+                    val label = it.label
+                    label.isNullOrBlank()
+                }
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            Log.e("AppInstancesViewModel", "Error checking unnamed instances", e)
+            false
+        }
+    }
 }

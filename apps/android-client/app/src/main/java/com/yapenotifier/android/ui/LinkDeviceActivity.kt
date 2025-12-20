@@ -242,7 +242,7 @@ class LinkDeviceActivity : AppCompatActivity() {
                     } else {
                         // Start device health worker after device linking
                         DeviceHealthWorkerHelper.scheduleDeviceHealthWorker(this@LinkDeviceActivity)
-                        checkWizardAndNavigate()
+                        navigateToNextScreen()
                     }
                 } else {
                     navigateToMain()
@@ -262,10 +262,10 @@ class LinkDeviceActivity : AppCompatActivity() {
         finish()
     }
 
-    private fun checkWizardAndNavigate() {
+    private fun navigateToNextScreen() {
         lifecycleScope.launch {
-            val wizardShown = WizardHelper.checkAndShowWizard(this@LinkDeviceActivity)
-            if (!wizardShown) {
+            val navigated = WizardHelper.navigateToNextScreen(this@LinkDeviceActivity)
+            if (!navigated) {
                 navigateToMain()
             } else {
                 finish()

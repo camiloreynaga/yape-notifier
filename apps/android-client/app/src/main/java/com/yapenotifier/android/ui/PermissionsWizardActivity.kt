@@ -13,6 +13,8 @@ import com.yapenotifier.android.ui.adapter.PermissionsWizardAdapter
 import com.yapenotifier.android.ui.fragment.BatteryOptimizationFragment
 import com.yapenotifier.android.ui.fragment.MonitoredAppsFragment
 import com.yapenotifier.android.ui.fragment.NotificationPermissionFragment
+import com.yapenotifier.android.util.DeviceHealthWorkerHelper
+import com.yapenotifier.android.util.WizardHelper
 import kotlinx.coroutines.launch
 
 class PermissionsWizardActivity : AppCompatActivity() {
@@ -102,8 +104,25 @@ class PermissionsWizardActivity : AppCompatActivity() {
 
     private fun finishWizard() {
         lifecycleScope.launch {
-            preferencesManager.setWizardCompleted(true)
-            navigateToMain()
+            // Mark wizard as completed
+            WizardHelper.markWizardCompleted(this@PermissionsWizardActivity)
+            
+            // Start device health worker
+            DeviceHealthWorkerHelper.scheduleDeviceHealthWorker(this@PermissionsWizardActivity)
+            
+            // Check if there are unnamed instances
+            val hasUnnamed = WizardHelper.hasUnnamedInstances(this@PermissionsWizardActivity)
+            
+            if (hasUnnamed) {
+                // Navigate to AppInstancesActivity
+                val intent = Intent(this@PermissionsWizardActivity, AppInstancesActivity::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                startActivity(intent)
+                finish()
+            } else {
+                // Navigate to MainActivity
+                navigateToMain()
+            }
         }
     }
 

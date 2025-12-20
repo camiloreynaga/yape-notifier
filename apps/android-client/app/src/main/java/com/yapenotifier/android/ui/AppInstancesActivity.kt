@@ -143,21 +143,51 @@ class AppInstancesActivity : AppCompatActivity() {
                     Toast.makeText(this, "Cambios guardados exitosamente", Toast.LENGTH_SHORT).show()
                     // Start device health worker after saving app instances
                     DeviceHealthWorkerHelper.scheduleDeviceHealthWorker(this@AppInstancesActivity)
-                    // Check wizard and navigate
+                    // Check if all instances have names now
                     lifecycleScope.launch {
-                        val wizardShown = WizardHelper.checkAndShowWizard(this@AppInstancesActivity)
-                        if (!wizardShown) {
-                            val intent = Intent(this@AppInstancesActivity, MainActivity::class.java)
-                            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                            startActivity(intent)
-                            finish()
-                        } else {
-                            finish()
-                        }
+                        checkAllInstancesNamedAndNavigate()
                     }
                 }
             }
         }
+    }
+
+    private fun checkAllInstancesNamedAndNavigate() {
+        lifecycleScope.launch {
+            try {
+                val deviceId = preferencesManager.deviceId.first()?.toLongOrNull()
+                if (deviceId != null) {
+                    val hasUnnamed = viewModel.hasUnnamedInstancesFromBackend(deviceId)
+                    if (hasUnnamed) {
+                        // Still have unnamed instances, show message
+                        Toast.makeText(
+                            this@AppInstancesActivity,
+                            "Aún hay instancias sin nombre. Por favor, completa todas las instancias.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    } else {
+                        // All instances have names, navigate to MainActivity
+                        val intent = Intent(this@AppInstancesActivity, MainActivity::class.java)
+                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        startActivity(intent)
+                        finish()
+                    }
+                } else {
+                    // No device ID, navigate to MainActivity anyway
+                    navigateToMain()
+                }
+            } catch (e: Exception) {
+                // On error, navigate to MainActivity
+                navigateToMain()
+            }
+        }
+    }
+
+    private fun navigateToMain() {
+        val intent = Intent(this, MainActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
     }
 
     companion object {
