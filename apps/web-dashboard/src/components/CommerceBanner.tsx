@@ -1,7 +1,7 @@
-import { Link, useLocation } from 'react-router-dom';
-import { AlertCircle, X } from 'lucide-react';
-import { useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { Link, useLocation } from "react-router-dom";
+import { AlertCircle, X } from "lucide-react";
+import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 /**
  * Componente que muestra un banner de alerta cuando el usuario no tiene commerce
@@ -10,11 +10,22 @@ import { useAuth } from '@/contexts/AuthContext';
  */
 export default function CommerceBanner() {
   const location = useLocation();
-  const { hasCommerce, loading } = useAuth();
+  const { hasCommerce, loading, isAuthenticated } = useAuth();
   const [dismissed, setDismissed] = useState(false);
 
+  // No mostrar en páginas públicas (login, register)
+  const publicRoutes = ["/login", "/register"];
+  if (publicRoutes.includes(location.pathname)) {
+    return null;
+  }
+
   // No mostrar si está en la página de crear commerce
-  if (location.pathname === '/create-commerce') {
+  if (location.pathname === "/create-commerce") {
+    return null;
+  }
+
+  // No mostrar si no está autenticado (por seguridad)
+  if (!isAuthenticated) {
     return null;
   }
 
@@ -40,8 +51,9 @@ export default function CommerceBanner() {
           </h3>
           <div className="mt-2 text-sm text-yellow-700">
             <p>
-              Para usar todas las funcionalidades del sistema, necesitas crear un comercio.
-              Esto te permitirá organizar tus dispositivos y notificaciones.
+              Para usar todas las funcionalidades del sistema, necesitas crear
+              un comercio. Esto te permitirá organizar tus dispositivos y
+              notificaciones.
             </p>
           </div>
           <div className="mt-4">
@@ -78,4 +90,3 @@ export default function CommerceBanner() {
     </div>
   );
 }
-
