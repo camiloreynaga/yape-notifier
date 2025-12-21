@@ -1,8 +1,10 @@
 package com.yapenotifier.android.service
 
+import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.work.Constraints
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
@@ -64,7 +66,15 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         val text = notification.extras?.getCharSequence("android.text")?.toString() ?: ""
 
         // Capture dual app identifiers (CRITICAL for MIUI and other dual app systems)
-        val androidUserId = sbn.user?.hashCode() // UserHandle identifier
+        // UserHandle.getIdentifier() is available from API 24 (our minSdk)
+        // This is the CORRECT way to get a unique identifier for dual app instances
+        // hashCode() is NOT reliable as it can change between app restarts
+        @Suppress("DEPRECATION")
+        val androidUserId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            sbn.userId
+        } else {
+            null // Should not happen as minSdk is 24, but safe fallback
+        }
         val androidUid = sbn.uid // Optional UID
         val postedAt = sbn.postTime // Original notification timestamp
 
@@ -97,7 +107,7 @@ class PaymentNotificationListenerService : NotificationListenerService() {
                 ServiceStatusManager.updateStatus("👷 Trabajo de envío planificado.")
             }
         } else {
-            Log.d(TAG, "Notification from $packageName did not match payment pattern.")
+            Log.d(TAG, "Notification from $packageName did not match payment pattern or was filtered out. Title='$title', Text='$text'")
         }
     }
 

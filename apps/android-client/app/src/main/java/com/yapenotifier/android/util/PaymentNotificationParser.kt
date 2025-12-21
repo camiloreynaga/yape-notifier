@@ -60,6 +60,14 @@ object PaymentNotificationParser {
      */
     fun parse(title: String, text: String): PaymentDetails? {
         Log.d(TAG, "Attempting to parse notification: Title='$title', Text='$text'")
+        
+        // STEP 1: Filter out advertisements, promotions, and reminders
+        val filterResult = PaymentNotificationFilter.validatePaymentNotification(title, text)
+        if (!filterResult.isValid) {
+            val reason = filterResult.reason ?: "Unknown reason"
+            Log.d(TAG, "Notification excluded by filter: Title='$title', Text='$text', Reason='$reason'")
+            return null
+        }
 
         // Try Yape patterns first
         if ("Yape" in title || "Yape" in text || "te envió un pago" in text) {
