@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\NotificationCreated;
 use App\Models\AppInstance;
 use App\Models\Commerce;
 use App\Models\Device;
@@ -124,6 +125,21 @@ class NotificationService
                 'package_name' => $data['package_name'] ?? null,
                 'android_user_id' => $data['android_user_id'] ?? null,
                 'received_at' => $notification->received_at,
+            ]);
+        }
+
+        // Broadcast notification to WebSocket clients
+        try {
+            broadcast(new NotificationCreated($notification))->toOthers();
+            Log::info('Notification broadcasted via WebSocket', [
+                'notification_id' => $notification->id,
+                'commerce_id' => $notification->commerce_id,
+            ]);
+        } catch (\Exception $e) {
+            // Log error but don't fail notification creation
+            Log::warning('Failed to broadcast notification', [
+                'notification_id' => $notification->id,
+                'error' => $e->getMessage(),
             ]);
         }
 
