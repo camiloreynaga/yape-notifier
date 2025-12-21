@@ -373,3 +373,4 @@ apps/api/app/
 - **Roadmap**: Ver `docs/07-reference/ROADMAP.md`
 - **Estado de implementación**: Ver `docs/07-reference/IMPLEMENTATION_STATUS.md`
 - **Arquitectura**: Ver `docs/03-architecture/`
+- **WebSockets**: Ver `docs/05-features/WEBSOCKETS.md` para notificaciones en tiempo real

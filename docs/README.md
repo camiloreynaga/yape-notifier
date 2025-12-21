@@ -49,7 +49,8 @@ Guías para desarrolladores.
 ### 05. Features
 Documentación de funcionalidades y features del sistema.
 
-- **[NOTIFICATION_FILTERING.md](05-features/NOTIFICATION_FILTERING.md)** - Filtrado inteligente de notificaciones (PENDIENTE DE IMPLEMENTAR)
+- **[NOTIFICATION_FILTERING.md](05-features/NOTIFICATION_FILTERING.md)** - Filtrado inteligente de notificaciones (Fase 2 implementada)
+- **[WEBSOCKETS.md](05-features/WEBSOCKETS.md)** - WebSockets para notificaciones en tiempo real (pendiente)
 - **COMMERCE.md** - Sistema de comercios (pendiente)
 - **DEVICE_LINKING.md** - Vinculación de dispositivos (pendiente)
 
