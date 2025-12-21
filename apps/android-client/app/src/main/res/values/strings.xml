@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Yape Notifier</string>
+    <string name="admin_panel_title">Panel Admin</string>
+    <string name="admin_panel_subtitle">Central de Pagos</string>
+    <string name="filter_all">Todos</string>
+    <string name="filter_today">Hoy</string>
+    <string name="mark_all_as_read_toast">Todas las notificaciones marcadas como leídas</string>
 </resources>
-

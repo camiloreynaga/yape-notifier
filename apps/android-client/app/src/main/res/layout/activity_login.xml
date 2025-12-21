@@ -25,7 +25,7 @@
         android:layout_height="wrap_content"
         android:text="Inicia sesión para continuar"
         android:textSize="16sp"
-        android:textColor="@android:color/darker_gray"
+        android:textColor="#757575"
         android:layout_marginTop="8dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"

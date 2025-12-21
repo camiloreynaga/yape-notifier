@@ -70,6 +70,43 @@
             android:label="Configuración Inicial"
             android:theme="@style/Theme.YapeNotifier" />
 
+        <!-- Admin Module Activities -->
+        <activity
+            android:name=".ui.admin.ModeSelectionActivity"
+            android:exported="false"
+            android:label="NotiCentral"
+            android:theme="@style/Theme.YapeNotifier" />
+        
+        <activity
+            android:name=".ui.admin.AdminPanelActivity"
+            android:exported="false"
+            android:label="Panel Admin"
+            android:theme="@style/Theme.YapeNotifier" />
+        
+        <activity
+            android:name=".ui.admin.AdminAddDeviceActivity"
+            android:exported="false"
+            android:label="Conectar Dispositivo"
+            android:theme="@style/Theme.YapeNotifier" />
+        
+        <activity
+            android:name=".ui.admin.AdminDevicesActivity"
+            android:exported="false"
+            android:label="Dispositivos"
+            android:theme="@style/Theme.YapeNotifier" />
+        
+        <activity
+            android:name=".ui.admin.AdminNotificationDetailActivity"
+            android:exported="false"
+            android:label="Detalle de Notificación"
+            android:theme="@style/Theme.YapeNotifier" />
+        
+        <activity
+            android:name=".ui.admin.AdminSettingsActivity"
+            android:exported="false"
+            android:label="Configuración"
+            android:theme="@style/Theme.YapeNotifier" />
+
         <!-- Notification Listener Service -->
         <service
             android:name=".service.PaymentNotificationListenerService"

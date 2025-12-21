@@ -5,6 +5,7 @@ import com.yapenotifier.android.data.model.CommerceCheckResponse
 import com.yapenotifier.android.data.model.CommerceResponse
 import com.yapenotifier.android.data.model.CreateCommerceRequest
 import com.yapenotifier.android.data.model.CreateDeviceRequest
+import com.yapenotifier.android.data.model.Device
 import com.yapenotifier.android.data.model.DeviceMonitoredAppsResponse
 import com.yapenotifier.android.data.model.DeviceResponse
 import com.yapenotifier.android.data.model.AppInstancesResponse
@@ -19,12 +20,18 @@ import com.yapenotifier.android.data.model.UpdateAppInstanceLabelRequest
 import com.yapenotifier.android.data.model.UpdateAppInstanceLabelResponse
 import com.yapenotifier.android.data.model.UpdateDeviceMonitoredAppsRequest
 import com.yapenotifier.android.data.model.DeviceHealthData
+import com.yapenotifier.android.data.model.Notification
+import com.yapenotifier.android.data.model.PaginatedResponse
+import com.yapenotifier.android.data.model.LinkCodeGenerateRequest
+import com.yapenotifier.android.data.model.LinkCodeGenerateResponse
+import com.yapenotifier.android.data.model.DevicesResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 interface ApiService {
     // --- Auth ---
@@ -91,4 +98,42 @@ interface ApiService {
         @Path("deviceId") deviceId: String,
         @Body data: DeviceHealthData
     ): Response<Unit>
+
+    // --- Admin: Notifications ---
+    @GET("api/notifications")
+    suspend fun getNotifications(
+        @Query("device_id") deviceId: Long? = null,
+        @Query("source_app") sourceApp: String? = null,
+        @Query("package_name") packageName: String? = null,
+        @Query("app_instance_id") appInstanceId: Long? = null,
+        @Query("start_date") startDate: String? = null,
+        @Query("end_date") endDate: String? = null,
+        @Query("status") status: String? = null,
+        @Query("exclude_duplicates") excludeDuplicates: Boolean? = null,
+        @Query("per_page") perPage: Int? = null,
+        @Query("page") page: Int? = null
+    ): Response<PaginatedResponse<Notification>>
+
+    @GET("api/notifications/{id}")
+    suspend fun getNotification(@Path("id") id: Long): Response<Notification>
+
+    @PATCH("api/notifications/{id}/status")
+    suspend fun updateNotificationStatus(
+        @Path("id") id: Long,
+        @Body status: Map<String, String>
+    ): Response<Unit>
+
+    // --- Admin: Devices ---
+    @GET("api/devices")
+    suspend fun getDevices(@Query("active_only") activeOnly: Boolean? = null): Response<DevicesResponse>
+
+    @GET("api/devices/{id}")
+    suspend fun getDevice(@Path("id") id: Long): Response<DeviceResponse>
+
+    // --- Admin: Link Codes ---
+    @POST("api/devices/generate-link-code")
+    suspend fun generateLinkCode(@Body request: LinkCodeGenerateRequest): Response<LinkCodeGenerateResponse>
+
+    @GET("api/devices/link-codes")
+    suspend fun getActiveLinkCodes(): Response<List<LinkCodeGenerateResponse>>
 }
