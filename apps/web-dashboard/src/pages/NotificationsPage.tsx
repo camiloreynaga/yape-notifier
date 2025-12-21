@@ -172,10 +172,11 @@ export default function NotificationsPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="filter-device" className="block text-sm font-medium text-gray-700 mb-2">
                 Dispositivo
               </label>
               <select
+                id="filter-device"
                 value={filters.device_id || ''}
                 onChange={(e) =>
                   handleFilterChange('device_id', e.target.value ? parseInt(e.target.value) : undefined)
@@ -191,10 +192,11 @@ export default function NotificationsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="filter-app" className="block text-sm font-medium text-gray-700 mb-2">
                 Aplicación
               </label>
               <select
+                id="filter-app"
                 value={filters.source_app || ''}
                 onChange={(e) => handleFilterChange('source_app', e.target.value || undefined)}
                 className="input"
@@ -209,10 +211,11 @@ export default function NotificationsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="filter-instance" className="block text-sm font-medium text-gray-700 mb-2">
                 Instancia (Dual Apps)
               </label>
               <select
+                id="filter-instance"
                 value={filters.app_instance_id || ''}
                 onChange={(e) =>
                   handleFilterChange('app_instance_id', e.target.value ? parseInt(e.target.value) : undefined)
@@ -228,10 +231,11 @@ export default function NotificationsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="filter-status" className="block text-sm font-medium text-gray-700 mb-2">
                 Estado
               </label>
               <select
+                id="filter-status"
                 value={filters.status || ''}
                 onChange={(e) =>
                   handleFilterChange('status', e.target.value || undefined)
@@ -245,10 +249,11 @@ export default function NotificationsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="filter-start-date" className="block text-sm font-medium text-gray-700 mb-2">
                 Fecha Inicio
               </label>
               <input
+                id="filter-start-date"
                 type="date"
                 value={filters.start_date || ''}
                 onChange={(e) => handleFilterChange('start_date', e.target.value || undefined)}
@@ -256,10 +261,11 @@ export default function NotificationsPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="filter-end-date" className="block text-sm font-medium text-gray-700 mb-2">
                 Fecha Fin
               </label>
               <input
+                id="filter-end-date"
                 type="date"
                 value={filters.end_date || ''}
                 onChange={(e) => handleFilterChange('end_date', e.target.value || undefined)}
@@ -267,8 +273,9 @@ export default function NotificationsPage() {
               />
             </div>
             <div className="flex items-end">
-              <label className="flex items-center">
+              <label htmlFor="filter-exclude-duplicates" className="flex items-center">
                 <input
+                  id="filter-exclude-duplicates"
                   type="checkbox"
                   checked={filters.exclude_duplicates || false}
                   onChange={(e) =>

@@ -32,28 +32,33 @@ export default function ChartsSection() {
   // Preparar datos para gráfico de líneas (notificaciones por día)
   const notificationsByDate = useMemo(() => {
     if (!statistics?.by_date) return [];
-    return Object.entries(statistics.by_date)
-      .map(([date, data]) => {
-        try {
-          // Intentar parsear la fecha, si falla usar la fecha original
-          const parsedDate = parseISO(date);
-          return {
-            date: format(parsedDate, 'dd/MM'),
-            count: data.count,
-            amount: data.total_amount,
-            sortKey: parsedDate.getTime(),
-          };
-        } catch {
-          return {
-            date: date,
-            count: data.count,
-            amount: data.total_amount,
-            sortKey: 0,
-          };
-        }
-      })
+    const entries = Object.entries(statistics.by_date).map(([date, data]) => {
+      try {
+        // Intentar parsear la fecha, si falla usar la fecha original
+        const parsedDate = parseISO(date);
+        return {
+          date: format(parsedDate, 'dd/MM'),
+          count: data.count,
+          amount: data.total_amount,
+          sortKey: parsedDate.getTime(),
+        };
+      } catch {
+        return {
+          date: date,
+          count: data.count,
+          amount: data.total_amount,
+          sortKey: 0,
+        };
+      }
+    });
+    
+    return entries
       .sort((a, b) => a.sortKey - b.sortKey)
-      .map(({ sortKey, ...rest }) => rest)
+      .map((entry) => ({
+        date: entry.date,
+        count: entry.count,
+        amount: entry.amount,
+      }))
       .slice(-30); // Últimos 30 días
   }, [statistics]);
 

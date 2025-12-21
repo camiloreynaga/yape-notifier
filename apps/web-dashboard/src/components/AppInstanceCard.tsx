@@ -77,7 +77,6 @@ export default function AppInstanceCard({ instance, onUpdate }: AppInstanceCardP
                 disabled={loading}
                 className="input w-full"
                 placeholder="Nombre de la instancia"
-                autoFocus
               />
               {error && (
                 <p className="text-sm text-red-600">{error}</p>

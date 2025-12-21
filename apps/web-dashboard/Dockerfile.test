@@ -1,0 +1,22 @@
+# Dockerfile for running tests in CI/CD
+# This is a lightweight image for testing only
+
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install dependencies needed for testing
+RUN apk add --no-cache git
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (including dev dependencies for testing)
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Run tests and generate coverage
+CMD ["npm", "run", "test:ci"]
+

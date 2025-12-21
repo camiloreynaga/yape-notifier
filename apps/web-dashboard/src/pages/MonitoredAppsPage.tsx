@@ -13,6 +13,8 @@ import {
   Settings,
   AlertCircle,
   CheckCircle,
+  Upload,
+  FileText,
 } from 'lucide-react';
 
 export default function MonitoredAppsPage() {
@@ -31,6 +33,10 @@ export default function MonitoredAppsPage() {
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [formLoading, setFormLoading] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkPackages, setBulkPackages] = useState('');
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkError, setBulkError] = useState<string | null>(null);
 
   const isAdmin = user?.role === 'admin';
 
@@ -122,6 +128,40 @@ export default function MonitoredAppsPage() {
     }
   };
 
+  const handleBulkCreate = async () => {
+    setBulkLoading(true);
+    setBulkError(null);
+
+    try {
+      // Parsear packages (uno por línea)
+      const packageNames = bulkPackages
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0 && line.match(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/));
+
+      if (packageNames.length === 0) {
+        setBulkError('No se encontraron packages válidos. Formato: com.example.app (uno por línea)');
+        setBulkLoading(false);
+        return;
+      }
+
+      const result = await apiService.bulkCreateMonitorPackages(packageNames);
+      setShowBulkModal(false);
+      setBulkPackages('');
+      alert(`Se crearon ${result.created_count} packages exitosamente`);
+      loadPackages();
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } };
+      const errorMessage =
+        error.response?.data?.message ||
+        Object.values(error.response?.data?.errors || {}).flat().join(', ') ||
+        'Error al crear packages en lote';
+      setBulkError(errorMessage);
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
   // Filtrar paquetes por búsqueda
   const filteredPackages = packages.filter((pkg) => {
     const matchesSearch =
@@ -155,10 +195,19 @@ export default function MonitoredAppsPage() {
           </p>
         </div>
         {isAdmin && (
-          <button onClick={handleCreate} className="btn btn-primary flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Agregar App
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowBulkModal(true)}
+              className="btn btn-secondary flex items-center gap-2"
+            >
+              <Upload className="h-4 w-4" />
+              Crear en Lote
+            </button>
+            <button onClick={handleCreate} className="btn btn-primary flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Agregar App
+            </button>
+          </div>
         )}
       </div>
 
@@ -167,11 +216,12 @@ export default function MonitoredAppsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Búsqueda */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="search-packages" className="block text-sm font-medium text-gray-700 mb-2">
               <Search className="h-4 w-4 inline mr-1" />
               Buscar
             </label>
             <input
+              id="search-packages"
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -182,12 +232,13 @@ export default function MonitoredAppsPage() {
 
           {/* Filtro activos */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <span className="block text-sm font-medium text-gray-700 mb-2">
               <Settings className="h-4 w-4 inline mr-1" />
               Filtro
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
+            </span>
+            <label htmlFor="filter-active-only" className="flex items-center gap-2 cursor-pointer">
               <input
+                id="filter-active-only"
                 type="checkbox"
                 checked={showActiveOnly}
                 onChange={(e) => setShowActiveOnly(e.target.checked)}
@@ -305,10 +356,11 @@ export default function MonitoredAppsPage() {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="package-name" className="block text-sm font-medium text-gray-700 mb-2">
                   Package Name <span className="text-red-500">*</span>
                 </label>
                 <input
+                  id="package-name"
                   type="text"
                   required
                   disabled={!!editingPackage}
@@ -325,10 +377,11 @@ export default function MonitoredAppsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="app-name" className="block text-sm font-medium text-gray-700 mb-2">
                   Nombre de la App
                 </label>
                 <input
+                  id="app-name"
                   type="text"
                   value={formData.app_name}
                   onChange={(e) => setFormData({ ...formData, app_name: e.target.value })}
@@ -338,10 +391,11 @@ export default function MonitoredAppsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="app-description" className="block text-sm font-medium text-gray-700 mb-2">
                   Descripción
                 </label>
                 <textarea
+                  id="app-description"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="input"
@@ -351,10 +405,11 @@ export default function MonitoredAppsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="app-priority" className="block text-sm font-medium text-gray-700 mb-2">
                   Prioridad
                 </label>
                 <input
+                  id="app-priority"
                   type="number"
                   min="0"
                   max="100"
@@ -383,6 +438,73 @@ export default function MonitoredAppsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para bulk create */}
+      {showBulkModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Crear Packages en Lote</h2>
+            <div className="space-y-4">
+              {bulkError && (
+                <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded">
+                  <div className="flex">
+                    <AlertCircle className="h-5 w-5 text-red-400" />
+                    <p className="ml-3 text-sm text-red-700">{bulkError}</p>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="bulk-packages" className="block text-sm font-medium text-gray-700 mb-2">
+                  <FileText className="h-4 w-4 inline mr-1" />
+                  Packages (uno por línea)
+                </label>
+                <textarea
+                  id="bulk-packages"
+                  value={bulkPackages}
+                  onChange={(e) => setBulkPackages(e.target.value)}
+                  className="input font-mono text-sm"
+                  rows={10}
+                  placeholder="com.yape.android&#10;com.plin.android&#10;com.bcp.bancadigital&#10;pe.com.interbank.mobilebanking"
+                />
+                <p className="mt-2 text-xs text-gray-500">
+                  Ingresa los package names, uno por línea. Formato: com.example.app
+                </p>
+                <p className="mt-1 text-xs text-gray-500">
+                  Los packages que ya existen se omitirán automáticamente.
+                </p>
+              </div>
+
+              <div className="flex gap-2 justify-end pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBulkModal(false);
+                    setBulkPackages('');
+                    setBulkError(null);
+                  }}
+                  className="btn btn-secondary"
+                  disabled={bulkLoading}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleBulkCreate}
+                  className="btn btn-primary flex items-center gap-2"
+                  disabled={bulkLoading}
+                >
+                  {bulkLoading ? 'Creando...' : (
+                    <>
+                      <Upload className="h-4 w-4" />
+                      Crear Packages
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

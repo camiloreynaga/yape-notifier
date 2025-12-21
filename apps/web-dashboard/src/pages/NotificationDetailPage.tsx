@@ -174,22 +174,22 @@ export default function NotificationDetailPage() {
             </h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-500 mb-1">
+                <span className="block text-sm font-medium text-gray-500 mb-1">
                   Título
-                </label>
+                </span>
                 <p className="text-base text-gray-900">{notification.title}</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-500 mb-1">
+                <span className="block text-sm font-medium text-gray-500 mb-1">
                   Mensaje
-                </label>
+                </span>
                 <p className="text-base text-gray-900">{notification.body}</p>
               </div>
               {notification.amount != null && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                  <span className="block text-sm font-medium text-gray-500 mb-1">
                     Monto
-                  </label>
+                  </span>
                   <p className="text-2xl font-bold text-gray-900">
                     {notification.currency || 'S/'} {Number(notification.amount).toFixed(2)}
                   </p>
@@ -197,9 +197,9 @@ export default function NotificationDetailPage() {
               )}
               {notification.payer_name && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                  <span className="block text-sm font-medium text-gray-500 mb-1">
                     Pagador
-                  </label>
+                  </span>
                   <p className="text-base text-gray-900 flex items-center gap-2">
                     <User className="h-4 w-4 text-gray-400" />
                     {notification.payer_name}
@@ -217,16 +217,16 @@ export default function NotificationDetailPage() {
             </h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-500 mb-1">
+                <span className="block text-sm font-medium text-gray-500 mb-1">
                   Aplicación
-                </label>
+                </span>
                 <p className="text-base text-gray-900">{notification.source_app || 'N/A'}</p>
               </div>
               {notification.package_name && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                  <span className="block text-sm font-medium text-gray-500 mb-1">
                     Package Name
-                  </label>
+                  </span>
                   <p className="text-sm font-mono text-gray-700 bg-gray-50 p-2 rounded">
                     {notification.package_name}
                   </p>
@@ -234,9 +234,9 @@ export default function NotificationDetailPage() {
               )}
               {notification.app_instance ? (
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                  <span className="block text-sm font-medium text-gray-500 mb-1">
                     Instancia de App
-                  </label>
+                  </span>
                   <p className="text-base text-gray-900">
                     {notification.app_instance.instance_label || 'Sin nombre'}
                   </p>
@@ -246,17 +246,17 @@ export default function NotificationDetailPage() {
                 </div>
               ) : notification.android_user_id && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                  <span className="block text-sm font-medium text-gray-500 mb-1">
                     Usuario Android
-                  </label>
+                  </span>
                   <p className="text-base text-gray-900">{notification.android_user_id}</p>
                 </div>
               )}
               {notification.android_uid && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                  <span className="block text-sm font-medium text-gray-500 mb-1">
                     Android UID
-                  </label>
+                  </span>
                   <p className="text-sm font-mono text-gray-700">{notification.android_uid}</p>
                 </div>
               )}
@@ -275,23 +275,23 @@ export default function NotificationDetailPage() {
             {notification.device ? (
               <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                  <span className="block text-sm font-medium text-gray-500 mb-1">
                     Nombre
-                  </label>
+                  </span>
                   <p className="text-base text-gray-900">{notification.device.name}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                  <span className="block text-sm font-medium text-gray-500 mb-1">
                     UUID
-                  </label>
+                  </span>
                   <p className="text-sm font-mono text-gray-700 bg-gray-50 p-2 rounded">
                     {notification.device.uuid}
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                  <span className="block text-sm font-medium text-gray-500 mb-1">
                     Plataforma
-                  </label>
+                  </span>
                   <p className="text-base text-gray-900">{notification.device.platform}</p>
                 </div>
                 <Link
@@ -314,35 +314,35 @@ export default function NotificationDetailPage() {
             </h2>
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-500 mb-1">
+                <span className="block text-sm font-medium text-gray-500 mb-1">
                   Recibida
-                </label>
+                </span>
                 <p className="text-base text-gray-900">
                   {format(new Date(notification.received_at), 'dd/MM/yyyy HH:mm:ss')}
                 </p>
               </div>
               {notification.posted_at && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                  <span className="block text-sm font-medium text-gray-500 mb-1">
                     Publicada
-                  </label>
+                  </span>
                   <p className="text-base text-gray-900">
                     {format(new Date(notification.posted_at), 'dd/MM/yyyy HH:mm:ss')}
                   </p>
                 </div>
               )}
               <div>
-                <label className="block text-sm font-medium text-gray-500 mb-1">
+                <span className="block text-sm font-medium text-gray-500 mb-1">
                   Creada
-                </label>
+                </span>
                 <p className="text-sm text-gray-500">
                   {format(new Date(notification.created_at), 'dd/MM/yyyy HH:mm:ss')}
                 </p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-500 mb-1">
+                <span className="block text-sm font-medium text-gray-500 mb-1">
                   Actualizada
-                </label>
+                </span>
                 <p className="text-sm text-gray-500">
                   {format(new Date(notification.updated_at), 'dd/MM/yyyy HH:mm:ss')}
                 </p>
@@ -354,7 +354,11 @@ export default function NotificationDetailPage() {
           <div className="card">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Cambiar Estado</h2>
             <div className="space-y-2">
+              <label htmlFor="status-select" className="block text-sm font-medium text-gray-700 mb-2">
+                Estado
+              </label>
               <select
+                id="status-select"
                 value={notification.status}
                 onChange={(e) =>
                   handleStatusChange(e.target.value as 'pending' | 'validated' | 'inconsistent')
@@ -415,43 +419,43 @@ export default function NotificationDetailPage() {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-500 mb-1">
+            <span className="block text-sm font-medium text-gray-500 mb-1">
               ID de Notificación
-            </label>
+            </span>
             <p className="text-sm font-mono text-gray-700">{notification.id}</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-500 mb-1">
+            <span className="block text-sm font-medium text-gray-500 mb-1">
               ID de Usuario
-            </label>
+            </span>
             <p className="text-sm text-gray-700">{notification.user_id}</p>
           </div>
           {notification.commerce_id && (
             <div>
-              <label className="block text-sm font-medium text-gray-500 mb-1">
+              <span className="block text-sm font-medium text-gray-500 mb-1">
                 ID de Comercio
-              </label>
+              </span>
               <p className="text-sm text-gray-700">{notification.commerce_id}</p>
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-gray-500 mb-1">
+            <span className="block text-sm font-medium text-gray-500 mb-1">
               ID de Dispositivo
-            </label>
+            </span>
             <p className="text-sm text-gray-700">{notification.device_id}</p>
           </div>
           {notification.app_instance_id && (
             <div>
-              <label className="block text-sm font-medium text-gray-500 mb-1">
+              <span className="block text-sm font-medium text-gray-500 mb-1">
                 ID de Instancia de App
-              </label>
+              </span>
               <p className="text-sm text-gray-700">{notification.app_instance_id}</p>
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-gray-500 mb-1">
+            <span className="block text-sm font-medium text-gray-500 mb-1">
               Es Duplicado
-            </label>
+            </span>
             <p className="text-sm text-gray-700">
               {notification.is_duplicate ? 'Sí' : 'No'}
             </p>

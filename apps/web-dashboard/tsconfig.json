@@ -26,7 +26,8 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": ["src", "src/**/*.test.ts", "src/**/*.test.tsx", "src/**/*.spec.ts", "src/**/*.spec.tsx"],
+  "references": [{ "path": "./tsconfig.node.json" }],
+  "types": ["vitest/globals", "@testing-library/jest-dom"]
 }
 

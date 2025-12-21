@@ -91,11 +91,12 @@ export default function AppInstancesPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Filtro por dispositivo */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="filter-device" className="block text-sm font-medium text-gray-700 mb-2">
               <Filter className="h-4 w-4 inline mr-1" />
               Filtrar por dispositivo
             </label>
             <select
+              id="filter-device"
               value={selectedDeviceId || ''}
               onChange={(e) =>
                 setSelectedDeviceId(e.target.value ? Number(e.target.value) : null)
@@ -113,11 +114,12 @@ export default function AppInstancesPage() {
 
           {/* Búsqueda */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="search-instance" className="block text-sm font-medium text-gray-700 mb-2">
               <Search className="h-4 w-4 inline mr-1" />
               Buscar
             </label>
             <input
+              id="search-instance"
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -190,7 +192,7 @@ export default function AppInstancesPage() {
           <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4 rounded">
             <p className="text-sm text-yellow-700">
               Estas instancias no tienen un nombre asignado. Asigna un nombre para
-              identificarlas fácilmente (ej: "Yape Principal", "Yape Secundario").
+              identificarlas fácilmente (ej: &quot;Yape Principal&quot;, &quot;Yape Secundario&quot;).
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

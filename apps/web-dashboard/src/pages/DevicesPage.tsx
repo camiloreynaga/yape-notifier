@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '@/services/api';
-import type { Device, AppInstance } from '@/types';
-import { format } from 'date-fns';
+import type { Device, AppInstance, Notification } from '@/types';
+import { format, formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { Plus, Edit, Trash2, Power, PowerOff, Smartphone, QrCode, Battery, Wifi, WifiOff, CheckCircle, XCircle, AlertCircle, Package, ChevronDown, ChevronUp } from 'lucide-react';
 import AppInstanceCard from '@/components/AppInstanceCard';
 
@@ -18,10 +19,38 @@ export default function DevicesPage() {
   const [expandedDevices, setExpandedDevices] = useState<Set<number>>(new Set());
   const [deviceInstances, setDeviceInstances] = useState<Record<number, AppInstance[]>>({});
   const [loadingInstances, setLoadingInstances] = useState<Set<number>>(new Set());
+  const [lastNotifications, setLastNotifications] = useState<Record<number, Notification | null>>({});
 
   useEffect(() => {
     loadDevices();
   }, []);
+
+  useEffect(() => {
+    // Cargar última notificación por dispositivo
+    const loadLastNotifications = async () => {
+      for (const device of devices) {
+        try {
+          const notifications = await apiService.getNotifications({
+            device_id: device.id,
+            per_page: 1,
+            page: 1,
+          });
+          if (notifications.data.length > 0) {
+            setLastNotifications((prev) => ({
+              ...prev,
+              [device.id]: notifications.data[0],
+            }));
+          }
+        } catch (error) {
+          // Silenciar errores, no es crítico
+        }
+      }
+    };
+
+    if (devices.length > 0) {
+      loadLastNotifications();
+    }
+  }, [devices]);
 
   const loadDevices = async () => {
     setLoading(true);
@@ -103,6 +132,24 @@ export default function DevicesPage() {
     const now = Date.now();
     const diffMinutes = (now - heartbeatTime) / (1000 * 60);
     return diffMinutes < 5;
+  };
+
+  const getRelativeTime = (date: string | null): string => {
+    if (!date) return 'Nunca';
+    try {
+      return formatDistanceToNow(new Date(date), {
+        addSuffix: true,
+        locale: es,
+      });
+    } catch {
+      return format(new Date(date), 'dd/MM/yyyy HH:mm');
+    }
+  };
+
+  const getLastNotificationInfo = (deviceId: number): string | null => {
+    const notification = lastNotifications[deviceId];
+    if (!notification) return null;
+    return `${notification.source_app || 'N/A'} - ${getRelativeTime(notification.received_at)}`;
   };
 
   const toggleDeviceExpanded = async (deviceId: number) => {
@@ -220,14 +267,32 @@ export default function DevicesPage() {
                       Conexión:
                     </span>
                     {device.last_heartbeat && isDeviceOnline(device) ? (
-                      <span className="flex items-center gap-1 text-green-600">
-                        <Wifi className="h-3 w-3" />
+                      <span
+                        className="flex items-center gap-1 text-green-600 font-medium"
+                        title={`Último heartbeat: ${format(new Date(device.last_heartbeat), 'dd/MM/yyyy HH:mm')}`}
+                      >
+                        <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
                         <span>En línea</span>
+                        <span className="text-xs text-gray-500">
+                          ({getRelativeTime(device.last_heartbeat)})
+                        </span>
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1 text-gray-400">
+                      <span
+                        className="flex items-center gap-1 text-red-500"
+                        title={
+                          device.last_heartbeat
+                            ? `Último heartbeat: ${format(new Date(device.last_heartbeat), 'dd/MM/yyyy HH:mm')}`
+                            : 'Nunca conectado'
+                        }
+                      >
                         <WifiOff className="h-3 w-3" />
                         <span>Desconectado</span>
+                        {device.last_heartbeat && (
+                          <span className="text-xs text-gray-500 ml-1">
+                            ({getRelativeTime(device.last_heartbeat)})
+                          </span>
+                        )}
                       </span>
                     )}
                   </div>
@@ -307,8 +372,18 @@ export default function DevicesPage() {
                   {device.last_seen_at && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-500">Última actividad:</span>
-                      <span className="text-gray-700">
-                        {format(new Date(device.last_seen_at), 'dd/MM/yyyy HH:mm')}
+                      <span className="text-gray-700" title={format(new Date(device.last_seen_at), 'dd/MM/yyyy HH:mm:ss')}>
+                        {getRelativeTime(device.last_seen_at)}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Last Notification */}
+                  {getLastNotificationInfo(device.id) && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Último evento:</span>
+                      <span className="text-gray-700 text-xs" title={lastNotifications[device.id]?.received_at ? format(new Date(lastNotifications[device.id]!.received_at), 'dd/MM/yyyy HH:mm:ss') : ''}>
+                        {getLastNotificationInfo(device.id)}
                       </span>
                     </div>
                   )}
@@ -418,10 +493,11 @@ export default function DevicesPage() {
             </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="device-name" className="block text-sm font-medium text-gray-700 mb-2">
                   Nombre
                 </label>
                 <input
+                  id="device-name"
                   type="text"
                   required
                   value={formData.name}
@@ -432,10 +508,11 @@ export default function DevicesPage() {
               </div>
               {editingDevice && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="device-uuid" className="block text-sm font-medium text-gray-700 mb-2">
                     UUID
                   </label>
                   <input
+                    id="device-uuid"
                     type="text"
                     value={editingDevice.uuid}
                     disabled

@@ -85,6 +85,7 @@ El dashboard consume endpoints de:
 
 ## 📚 Documentación
 
+- **Testing**: Ver `README_TESTING.md` (guía rápida) o `../../docs/04-development/TESTING.md` (completa)
 - **Producción**: Ver `PRODUCTION_CHECKLIST.md`
 - **Deployment**: Ver `../../docs/02-deployment/DEPLOYMENT.md`
 - **Arquitectura**: Ver `../../docs/03-architecture/`
