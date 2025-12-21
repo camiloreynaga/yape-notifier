@@ -8,6 +8,7 @@ import AppInstancesPage from './pages/AppInstancesPage';
 import NotificationDetailPage from './pages/NotificationDetailPage';
 import CreateCommercePage from './pages/CreateCommercePage';
 import Layout from './components/Layout';
+import { NotificationToastContainer } from './components/NotificationToast';
 
 interface PrivateRouteProps {
   children: React.ReactNode;
@@ -95,6 +96,7 @@ function App() {
     <AuthProvider>
       <Router>
         <AppRoutes />
+        <NotificationToastContainer />
       </Router>
     </AuthProvider>
   );

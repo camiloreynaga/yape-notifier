@@ -1,14 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '@/services/api';
-import type { Notification, NotificationFilters, PaginatedResponse, Device, AppInstance } from '@/types';
+import { useNotifications } from '@/hooks/useNotifications';
+import type { Notification, NotificationFilters, Device, AppInstance } from '@/types';
 import { format } from 'date-fns';
-import { Download, Filter, Eye } from 'lucide-react';
+import { Download, Filter, Eye, RefreshCw } from 'lucide-react';
 
 export default function NotificationsPage() {
   const navigate = useNavigate();
-  const [notifications, setNotifications] = useState<PaginatedResponse<Notification> | null>(null);
-  const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<NotificationFilters>({
     per_page: 50,
     page: 1,
@@ -17,15 +16,34 @@ export default function NotificationsPage() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [appInstances, setAppInstances] = useState<AppInstance[]>([]);
 
+  // Callback para manejar nuevas notificaciones
+  const handleNewNotifications = useCallback((newNotifications: Notification[]) => {
+    // Mostrar toast para cada nueva notificación
+    newNotifications.forEach((notification) => {
+      if (window.addNotificationToast) {
+        window.addNotificationToast(notification);
+      }
+    });
+  }, []);
+
+  // Usar el hook con polling
+  const {
+    notifications,
+    loading,
+    error,
+    refetch,
+    isPolling,
+  } = useNotifications({
+    filters,
+    enabled: true,
+    refetchInterval: 10000, // 10 segundos
+    onNewNotifications: handleNewNotifications,
+  });
+
   useEffect(() => {
     loadDevices();
     loadAppInstances();
   }, []);
-
-  useEffect(() => {
-    loadNotifications();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters]);
 
   const loadDevices = async () => {
     try {
@@ -45,18 +63,6 @@ export default function NotificationsPage() {
     }
   };
 
-  const loadNotifications = async () => {
-    setLoading(true);
-    try {
-      const data = await apiService.getNotifications(filters);
-      setNotifications(data);
-    } catch (error: unknown) {
-      console.error('Error loading notifications:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleFilterChange = (key: keyof NotificationFilters, value: string | number | boolean | undefined) => {
     setFilters({ ...filters, [key]: value, page: 1 });
   };
@@ -68,7 +74,7 @@ export default function NotificationsPage() {
   const handleStatusChange = async (id: number, status: 'pending' | 'validated' | 'inconsistent') => {
     try {
       await apiService.updateNotificationStatus(id, status);
-      loadNotifications();
+      refetch();
     } catch (error: unknown) {
       console.error('Error updating status:', error);
       alert('Error al actualizar el estado');
@@ -139,8 +145,24 @@ export default function NotificationsPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">Notificaciones</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-gray-900">Notificaciones</h1>
+          {isPolling && (
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              <span className="sr-only">Sincronizando...</span>
+            </div>
+          )}
+        </div>
         <div className="flex gap-2">
+          <button
+            onClick={() => refetch()}
+            className="btn btn-secondary flex items-center gap-2"
+            title="Actualizar manualmente"
+          >
+            <RefreshCw className={`h-4 w-4 ${isPolling ? 'animate-spin' : ''}`} />
+            Actualizar
+          </button>
           <button
             onClick={() => setShowFilters(!showFilters)}
             className="btn btn-secondary flex items-center gap-2"
@@ -290,9 +312,22 @@ export default function NotificationsPage() {
         </div>
       )}
 
+      {/* Error message */}
+      {error && (
+        <div className="card bg-red-50 border-l-4 border-red-400">
+          <div className="flex">
+            <div className="ml-3">
+              <p className="text-sm text-red-700">
+                Error al cargar notificaciones: {error.message}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Notifications Table */}
       <div className="card">
-        {loading ? (
+        {loading && !notifications ? (
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
           </div>

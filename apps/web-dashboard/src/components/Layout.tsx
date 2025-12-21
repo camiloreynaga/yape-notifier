@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import CommerceBanner from './CommerceBanner';
+import NotificationBadge from './NotificationBadge';
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -59,6 +60,17 @@ export default function Layout() {
                   </Link>
                 );
               })}
+              <div
+                className={`
+                  group flex items-center px-2 py-2 text-sm font-medium rounded-md
+                  ${isActive('/dashboard?tab=notifications')
+                    ? 'bg-primary-50 text-primary-600'
+                    : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                  }
+                `}
+              >
+                <NotificationBadge showLabel={true} className="w-full" />
+              </div>
             </nav>
           </div>
           <div className="flex-shrink-0 flex border-t border-gray-200 p-4">
