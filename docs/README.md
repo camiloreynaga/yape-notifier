@@ -30,6 +30,7 @@ Documentación técnica de la arquitectura del sistema.
 
 - **[DUAL_APPS.md](03-architecture/DUAL_APPS.md)** - Sistema de apps duales
 - **[MULTI_TENANT.md](03-architecture/MULTI_TENANT.md)** - Sistema multi-tenant
+- **[ANDROID_USER_ID.md](03-architecture/ANDROID_USER_ID.md)** - Análisis técnico: Identificador de usuario Android
 - **OVERVIEW.md** - Arquitectura general del sistema (pendiente)
 - **API.md** - Referencia de endpoints y documentación de API (pendiente)
 - **DATABASE.md** - Esquema de base de datos y migraciones (pendiente)
@@ -40,7 +41,7 @@ Documentación técnica de la arquitectura del sistema.
 Guías para desarrolladores.
 
 - **[WORKFLOW.md](04-development/WORKFLOW.md)** - Flujo de trabajo de desarrollo
-- **TESTING.md** - Guía de testing (pendiente)
+- **[TESTING.md](04-development/TESTING.md)** - Guía completa de testing
 - **CONTRIBUTING.md** - Guía de contribución (pendiente)
 
 ---
@@ -64,11 +65,12 @@ Documentación para operaciones y mantenimiento.
 ---
 
 ### 07. Reference
-Referencia técnica: bugs, estado de implementación, roadmap.
+Referencia técnica: bugs, estado de implementación, roadmap, changelog.
 
 - **[KNOWN_ISSUES.md](07-reference/KNOWN_ISSUES.md)** - Bugs conocidos del proyecto
 - **[IMPLEMENTATION_STATUS.md](07-reference/IMPLEMENTATION_STATUS.md)** - Estado actual de implementación
 - **[ROADMAP.md](07-reference/ROADMAP.md)** - Pendientes y mejoras planificadas
+- **[CHANGELOG.md](07-reference/CHANGELOG.md)** - Historial de cambios y mejoras implementadas
 - **API_REFERENCE.md** - Referencia completa de API (pendiente)
 
 ---

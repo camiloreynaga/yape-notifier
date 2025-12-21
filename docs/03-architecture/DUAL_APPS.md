@@ -46,8 +46,25 @@ AppInstance = (device_id + package_name + android_user_id)
 
 **Captura de datos:**
 - `packageName`: `sbn.packageName`
-- `androidUserId`: `sbn.user?.identifier` ⚠️ **IMPORTANTE**: Debe usar `identifier`, no `hashCode()`
+- `androidUserId`: `sbn.userId` ✅ **CORRECTO**: Usa `userId` directamente (equivalente a `getIdentifier()` pero público)
 - `androidUid`: `sbn.uid` (opcional)
+
+**Implementación actual:**
+```kotlin
+@Suppress("DEPRECATION")
+val androidUserId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+    sbn.userId  // ✅ CORRECTO: Público, funcional, confiable
+} else {
+    null
+}
+```
+
+**⚠️ IMPORTANTE - Opciones NO recomendadas:**
+- ❌ `sbn.user?.hashCode()` - NO es un identificador único confiable
+- ❌ `sbn.user?.getIdentifier()` - Puede ser API oculta (error de compilación)
+- ✅ `sbn.userId` - **Usar esta opción** (público, funcional, equivalente a `getIdentifier()`)
+
+**Ver análisis técnico completo:** `docs/03-architecture/ANDROID_USER_ID.md`
 
 **Almacenamiento local:**
 - `CapturedNotification` incluye todos los campos dual
@@ -81,20 +98,21 @@ Las notificaciones se consideran duplicadas si tienen:
 - Mismo `body`
 - `posted_at` dentro de ±5 segundos
 
-## ⚠️ Bug Conocido
+## ✅ Estado Actual
 
-**Ubicación:** `PaymentNotificationListenerService.kt:67`
+**Implementación:** ✅ **CORRECTA**
 
-**Problema:** Usa `sbn.user?.hashCode()` en lugar de `sbn.user?.identifier`
+El código actual usa `sbn.userId` que es la solución correcta y funcional. Este valor es equivalente a `getIdentifier()` pero es público y accesible sin requerir APIs ocultas.
 
-**Impacto:** Las apps duales no se distinguen correctamente
+**Historial:**
+- ❌ Versión inicial usaba `hashCode()` (incorrecto)
+- ✅ Corregido a `sbn.userId` (correcto y funcional)
 
-**Solución:** Cambiar a `sbn.user?.identifier`
-
-Ver `docs/07-reference/KNOWN_ISSUES.md` para más detalles.
+Ver `docs/03-architecture/ANDROID_USER_ID.md` para análisis técnico detallado de todas las opciones.
 
 ## Referencias
 
+- **Análisis técnico androidUserId**: Ver `docs/03-architecture/ANDROID_USER_ID.md`
 - **Bugs conocidos**: Ver `docs/07-reference/KNOWN_ISSUES.md`
 - **Estado de implementación**: Ver `docs/07-reference/IMPLEMENTATION_STATUS.md`
 - **Roadmap**: Ver `docs/07-reference/ROADMAP.md`

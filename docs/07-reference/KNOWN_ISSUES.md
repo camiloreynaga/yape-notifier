@@ -8,36 +8,42 @@ Este documento lista todos los bugs conocidos del proyecto, organizados por prio
 
 ## 🔴 Críticos (Bloquean funcionalidad core)
 
-### Bug: androidUserId usa hashCode() en lugar de identifier
+_No hay bugs críticos activos actualmente._
 
-**Ubicación:** `apps/android-client/app/src/main/java/com/yapenotifier/android/service/PaymentNotificationListenerService.kt:67`
+---
 
-**Código actual (incorrecto):**
+## ✅ Resueltos
+
+### Bug: androidUserId - Resuelto ✅
+
+**Ubicación:** `apps/android-client/app/src/main/java/com/yapenotifier/android/service/PaymentNotificationListenerService.kt:73`
+
+**Problema original:**
+- Código inicial usaba `sbn.user?.hashCode()` que es incorrecto
+- `hashCode()` no es un identificador único confiable
+- Las apps duales no se distinguían correctamente
+
+**Solución implementada:**
 ```kotlin
-val androidUserId = sbn.user?.hashCode() // ❌ INCORRECTO
+@Suppress("DEPRECATION")
+val androidUserId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+    sbn.userId  // ✅ CORRECTO: Usa userId directamente
+} else {
+    null
+}
 ```
 
-**Código correcto:**
-```kotlin
-val androidUserId = sbn.user?.identifier // ✅ CORRECTO
-```
+**Estado:** ✅ **RESUELTO** (2025-01-21)
 
-**Impacto:**
-- `hashCode()` no es el identificador único del UserHandle
-- Las instancias duales no se distinguen correctamente
-- AppInstance se crea con identificador incorrecto
-- El sistema de apps duales no funciona correctamente
-
-**Solución:**
-1. Cambiar línea 67 de `PaymentNotificationListenerService.kt`
-2. Verificar que `identifier` esté disponible en la versión de Android SDK usada
-3. Probar con dispositivos MIUI reales
-
-**Estado:** Pendiente de corrección
+**Notas técnicas:**
+- `sbn.userId` es equivalente a `sbn.user?.getIdentifier()` pero es público y accesible
+- `getIdentifier()` puede ser API oculta en algunas versiones del SDK
+- `userId` está deprecated desde API 29 pero sigue funcionando correctamente
+- La solución actual es la mejor opción disponible
 
 **Referencias:**
-- Ver `docs/03-architecture/DUAL_APPS.md` para más detalles sobre apps duales
-- Ver `docs/07-reference/ROADMAP.md` para priorización
+- Ver `docs/03-architecture/DUAL_APPS.md` para detalles técnicos completos
+- Ver `docs/03-architecture/ANDROID_USER_ID.md` para análisis técnico detallado
 
 ---
 

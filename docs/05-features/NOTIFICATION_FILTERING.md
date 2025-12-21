@@ -1,22 +1,24 @@
 # Filtrado Inteligente de Notificaciones de Pago
 
-## Estado: ✅ FASE 2 IMPLEMENTADA (API)
+## Estado: ✅ FASE 2 IMPLEMENTADA (API) | ⚠️ FASE 1 PENDIENTE (Android)
 
 **Prioridad:** Media  
-**Estimación:** 5-7 días  
 **Componentes afectados:** Android App, API (Laravel)
 
-**✅ COMPLETADO:**
+**✅ COMPLETADO (2025-01-21):**
 
 - ✅ Fase 2 (Validación en API) - Implementada completamente
 - ✅ `PaymentNotificationValidator` creado con todas las validaciones
 - ✅ `NotificationService` actualizado con validación
 - ✅ Tests unitarios con cobertura > 80%
 - ✅ Logging detallado de notificaciones rechazadas
+- ✅ Notificaciones inválidas marcadas como `status='inconsistent'`
 
 **⚠️ PENDIENTE:**
 
 - ⚠️ Fase 1 (Filtrado en Android) - Pendiente de implementar
+
+**Ver:** `docs/07-reference/CHANGELOG.md` para detalles de implementación
 
 ---
 

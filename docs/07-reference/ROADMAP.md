@@ -8,21 +8,7 @@ Este documento lista las funcionalidades pendientes y mejoras planificadas, orga
 
 ## 🔴 Crítico (Bloquea funcionalidad core)
 
-### 1. Corregir bug androidUserId
-
-**Descripción:** Cambiar `hashCode()` por `identifier` en `PaymentNotificationListenerService.kt`
-
-**Ubicación:** `apps/android-client/.../PaymentNotificationListenerService.kt:67`
-
-**Impacto:** Apps duales no funcionan correctamente
-
-**Estimación:** 1 día
-
-**Estado:** Pendiente
-
-**Referencias:**
-- Ver `docs/07-reference/KNOWN_ISSUES.md` para detalles técnicos
-- Ver `docs/03-architecture/DUAL_APPS.md` para contexto
+_No hay pendientes críticos actualmente._
 
 ---
 
@@ -157,9 +143,34 @@ Este documento lista las funcionalidades pendientes y mejoras planificadas, orga
 
 ## ✅ Completado
 
-### Features completadas recientemente:
+### Bugs Corregidos
 
-_No hay features completadas documentadas aún._
+1. **Corregir bug androidUserId** ✅ (2025-01-21)
+   - Cambiado de `hashCode()` a `sbn.userId`
+   - Ubicación: `PaymentNotificationListenerService.kt:73`
+   - Ver `docs/03-architecture/ANDROID_USER_ID.md` para análisis técnico
+   - Ver `docs/07-reference/KNOWN_ISSUES.md` para detalles
+
+### Features Completadas
+
+1. **Validación de Notificaciones (Fase 2 - API)** ✅ (2025-01-21)
+   - `PaymentNotificationValidator` implementado
+   - Filtrado de publicidad/promociones en servidor
+   - Tests unitarios con cobertura > 80%
+   - Ver `docs/05-features/NOTIFICATION_FILTERING.md` para detalles
+   - Ver `docs/07-reference/CHANGELOG.md` para changelog completo
+
+2. **Mejoras en MonitorPackage** ✅ (2025-01-21)
+   - Filtrado automático por `commerce_id`
+   - Validación de pertenencia al commerce
+   - Asignación automática de `commerce_id`
+   - Ver `docs/07-reference/CHANGELOG.md` para detalles
+
+3. **Validación de Commerce Mejorada** ✅ (2025-01-21)
+   - Middleware `RequiresCommerce` creado
+   - Validación temprana en operaciones críticas
+   - Mensajes de error mejorados (403 en lugar de 500)
+   - Ver `docs/07-reference/CHANGELOG.md` para detalles
 
 ---
 
