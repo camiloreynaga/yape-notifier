@@ -49,6 +49,26 @@ test:api: ## Ejecutar tests del backend
 test:android: ## Ejecutar tests de Android
 	@cd apps/android-client && ./gradlew test
 
+test:prod: ## Ejecutar todos los tests usando Docker de producción
+	@echo "🧪 Ejecutando tests con Docker de producción..."
+	@cd infra/docker/environments/production && bash run-tests.sh all
+
+test:prod:api: ## Ejecutar tests de API usando Docker de producción
+	@echo "🧪 Ejecutando tests de API con Docker de producción..."
+	@cd infra/docker/environments/production && bash run-tests.sh api
+
+test:prod:dashboard: ## Ejecutar tests de Dashboard usando Docker de producción
+	@echo "🧪 Ejecutando tests de Dashboard con Docker de producción..."
+	@cd infra/docker/environments/production && bash run-tests.sh dashboard
+
+test:prod:build: ## Construir imágenes de prueba de producción
+	@echo "🔨 Construyendo imágenes de prueba de producción..."
+	@cd infra/docker/environments/production && bash run-tests.sh build
+
+test:prod:cleanup: ## Limpiar contenedores y volúmenes de pruebas de producción
+	@echo "🧹 Limpiando contenedores de prueba de producción..."
+	@cd infra/docker/environments/production && bash run-tests.sh cleanup
+
 build: ## Build de todas las apps
 	@echo "🔨 Building apps..."
 	@cd apps/api && composer install --no-dev --optimize-autoloader
