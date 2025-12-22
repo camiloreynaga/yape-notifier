@@ -46,19 +46,31 @@ class NotificationServiceTest extends TestCase
         $user = User::factory()->create();
         $device = Device::factory()->create(['user_id' => $user->id]);
 
+        // Use the same exact timestamp for both notifications to ensure they're within the 5-second window
+        $timestamp = now();
+        $timestampString = $timestamp->toIso8601String();
+
         $data = [
             'source_app' => 'yape',
             'body' => 'Duplicate test',
-            'received_at' => now()->toIso8601String(),
+            'received_at' => $timestampString,
         ];
 
         // Create first notification
-        $this->service->createNotification($data, $device);
+        $firstNotification = $this->service->createNotification($data, $device);
 
-        // Create duplicate
-        $notification = $this->service->createNotification($data, $device);
+        // Wait a tiny bit to ensure different received_at but still within 5-second window
+        // Actually, use the exact same timestamp string to ensure they match
+        $data2 = [
+            'source_app' => 'yape',
+            'body' => 'Duplicate test',
+            'received_at' => $timestampString, // Same exact timestamp
+        ];
 
-        $this->assertTrue($notification->is_duplicate);
+        // Create duplicate with the same timestamp (within 5-second window)
+        $notification = $this->service->createNotification($data2, $device);
+
+        $this->assertTrue($notification->is_duplicate, 'Second notification should be marked as duplicate');
     }
 
     public function test_it_filters_notifications_by_package_name(): void

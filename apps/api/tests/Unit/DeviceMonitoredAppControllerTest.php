@@ -260,7 +260,18 @@ class DeviceMonitoredAppControllerTest extends TestCase
 
     public function test_store_returns_error_when_device_has_no_commerce(): void
     {
+        // Create user with commerce_id
         $user = User::factory()->create();
+        $commerce = Commerce::factory()->create(['owner_user_id' => $user->id]);
+        $user->update(['commerce_id' => $commerce->id]);
+
+        // Create valid MonitorPackage for this commerce (needed for request validation to pass)
+        MonitorPackage::factory()->create([
+            'commerce_id' => $commerce->id,
+            'package_name' => 'com.bcp.innovacxion.yapeapp',
+        ]);
+
+        // Create Device WITHOUT commerce_id (this is what we're testing)
         $device = Device::factory()->create([
             'user_id' => $user->id,
             'commerce_id' => null,
@@ -268,12 +279,15 @@ class DeviceMonitoredAppControllerTest extends TestCase
 
         Sanctum::actingAs($user);
 
+        // Pass a valid package that exists for the user's commerce
+        // The request validation will pass, but the controller should check device commerce_id first
         $response = $this->postJson("/api/devices/{$device->id}/monitored-apps", [
             'package_names' => [
                 'com.bcp.innovacxion.yapeapp',
             ],
         ]);
 
+        // The controller checks device commerce_id at line 113 before validating packages
         $response->assertStatus(400)
             ->assertJson([
                 'message' => 'El dispositivo debe estar vinculado a un negocio',

@@ -107,6 +107,16 @@ class DeviceLinkService
 
         $linkCode = DeviceLinkCode::where('code', strtoupper($code))->first();
 
+        // Validate UUID format before querying database
+        $uuidPattern = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
+        if (!preg_match($uuidPattern, $deviceUuid)) {
+            return [
+                'success' => false,
+                'device' => null,
+                'message' => 'Formato de UUID inválido',
+            ];
+        }
+
         // Find or create device
         $device = Device::where('uuid', $deviceUuid)
             ->where('user_id', $user->id)

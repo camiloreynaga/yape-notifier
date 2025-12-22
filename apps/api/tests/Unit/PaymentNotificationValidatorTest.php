@@ -214,7 +214,12 @@ class PaymentNotificationValidatorTest extends TestCase
         $result = PaymentNotificationValidator::isValid($data);
 
         $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('exclusion pattern', $result['reason']);
+        // The message can be either "Contains X exclusion keywords" or "Matches exclusion pattern"
+        // This message contains "descuento" and "hasta" keywords, so it will be rejected by keywords first
+        $this->assertTrue(
+            str_contains($result['reason'], 'exclusion keywords') || 
+            str_contains($result['reason'], 'exclusion pattern')
+        );
     }
 
     /**

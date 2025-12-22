@@ -161,8 +161,23 @@ class NotificationService
         $endTime = $postedAt->copy()->addSeconds(5);
 
         $query = Notification::where('device_id', $device->id)
-            ->whereBetween('posted_at', [$startTime, $endTime])
             ->where('body', $data['body']);
+
+        // Search in both posted_at and received_at fields
+        // This handles cases where first notification has posted_at=null but received_at is set
+        // We search in both fields because:
+        // - If existing notification has posted_at, it will match in posted_at
+        // - If existing notification has posted_at=null, it will match in received_at
+        $query->where(function ($q) use ($startTime, $endTime) {
+            $q->where(function ($subQ) use ($startTime, $endTime) {
+                // Search in posted_at field (only if not null)
+                $subQ->whereNotNull('posted_at')
+                    ->whereBetween('posted_at', [$startTime, $endTime]);
+            })->orWhere(function ($subQ) use ($startTime, $endTime) {
+                // Search in received_at field (for cases where posted_at is null or to catch duplicates)
+                $subQ->whereBetween('received_at', [$startTime, $endTime]);
+            });
+        });
 
         // If we have dual app identifiers, use them for more precise deduplication
         if (isset($data['package_name']) && isset($data['android_user_id'])) {

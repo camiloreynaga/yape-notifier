@@ -106,9 +106,26 @@ class AppInstanceServiceTest extends TestCase
             'commerce_id' => $commerce->id,
         ]);
 
-        AppInstance::factory()->count(3)->create([
+        // Create instances with unique package_name and android_user_id combinations
+        AppInstance::factory()->create([
             'commerce_id' => $commerce->id,
             'device_id' => $device->id,
+            'package_name' => 'com.bcp.innovacxion.yapeapp',
+            'android_user_id' => 10,
+        ]);
+
+        AppInstance::factory()->create([
+            'commerce_id' => $commerce->id,
+            'device_id' => $device->id,
+            'package_name' => 'com.bcp.innovacxion.plinapp',
+            'android_user_id' => 11,
+        ]);
+
+        AppInstance::factory()->create([
+            'commerce_id' => $commerce->id,
+            'device_id' => $device->id,
+            'package_name' => 'com.bcp.innovacxion.yapeapp',
+            'android_user_id' => 12,
         ]);
 
         $instances = $this->service->getDeviceInstances($device);

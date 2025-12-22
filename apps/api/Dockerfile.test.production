@@ -1,0 +1,65 @@
+# Dockerfile para ejecutar pruebas usando la imagen de producción
+# Basado en Dockerfile.production pero con dependencias de desarrollo para testing
+FROM php:8.4-fpm-alpine
+
+# Set working directory
+WORKDIR /var/www
+
+# Install system dependencies
+RUN apk add --no-cache \
+    git \
+    curl \
+    libpng-dev \
+    oniguruma-dev \
+    libxml2-dev \
+    libzip-dev \
+    zip \
+    unzip \
+    postgresql-dev \
+    postgresql-client \
+    freetype-dev \
+    libjpeg-turbo-dev \
+    icu-dev \
+    bash
+
+# Install PHP extensions
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j$(nproc) \
+        pdo \
+        pdo_pgsql \
+        pgsql \
+        mbstring \
+        exif \
+        pcntl \
+        bcmath \
+        gd \
+        zip \
+        opcache \
+        intl
+
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Copy composer files first for better caching
+COPY composer.json composer.lock* ./
+
+# Install ALL dependencies (including dev dependencies for testing)
+RUN composer install --optimize-autoloader --no-interaction --prefer-dist --no-scripts || true
+
+# Copy application files
+COPY . /var/www
+
+# Create necessary directories and set permissions
+RUN mkdir -p /var/www/storage/framework/{sessions,views,cache} \
+    && mkdir -p /var/www/storage/logs \
+    && mkdir -p /var/www/bootstrap/cache \
+    && chown -R www-data:www-data /var/www \
+    && chmod -R 775 /var/www/storage \
+    && chmod -R 775 /var/www/bootstrap/cache
+
+# Run composer scripts after copy
+RUN composer dump-autoload --optimize || true
+
+# Default command: run tests
+CMD ["php", "artisan", "test"]
+

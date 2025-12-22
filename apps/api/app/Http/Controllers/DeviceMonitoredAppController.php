@@ -102,18 +102,18 @@ class DeviceMonitoredAppController extends Controller
                 ->where('user_id', $user->id)
                 ->firstOrFail();
 
+            // Verify device has commerce_id first (before checking if it matches user's commerce)
+            if (!$device->commerce_id) {
+                return response()->json([
+                    'message' => 'El dispositivo debe estar vinculado a un negocio',
+                ], 400);
+            }
+
             // Verify device belongs to user's commerce
             if ($user->commerce_id && $device->commerce_id !== $user->commerce_id) {
                 return response()->json([
                     'message' => 'Dispositivo no pertenece a tu negocio',
                 ], 403);
-            }
-
-            // Verify device has commerce_id
-            if (!$device->commerce_id) {
-                return response()->json([
-                    'message' => 'El dispositivo debe estar vinculado a un negocio',
-                ], 400);
             }
 
             // Verify all package names exist in MonitorPackage for this commerce

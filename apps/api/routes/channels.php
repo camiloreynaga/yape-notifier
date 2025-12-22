@@ -18,3 +18,4 @@ Broadcast::channel('commerce.{commerceId}', function ($user, $commerceId) {
     return $user->commerce_id === (int) $commerceId;
 });
 
+

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Commerce;
 use App\Models\Device;
 use App\Models\Notification;
 use App\Models\User;
@@ -19,8 +20,12 @@ class NotificationTest extends TestCase
 
     public function test_user_can_create_notification(): void
     {
-        $user = User::factory()->create();
-        $device = Device::factory()->create(['user_id' => $user->id]);
+        $commerce = Commerce::factory()->create();
+        $user = User::factory()->create(['commerce_id' => $commerce->id]);
+        $device = Device::factory()->create([
+            'user_id' => $user->id,
+            'commerce_id' => $commerce->id,
+        ]);
         $token = $this->getAuthToken($user);
 
         $response = $this->withHeader('Authorization', "Bearer $token")
@@ -83,15 +88,22 @@ class NotificationTest extends TestCase
 
     public function test_duplicate_notification_is_detected(): void
     {
-        $user = User::factory()->create();
-        $device = Device::factory()->create(['user_id' => $user->id]);
+        $commerce = Commerce::factory()->create();
+        $user = User::factory()->create(['commerce_id' => $commerce->id]);
+        $device = Device::factory()->create([
+            'user_id' => $user->id,
+            'commerce_id' => $commerce->id,
+        ]);
         $token = $this->getAuthToken($user);
 
+        // Use the same exact timestamp for both notifications to ensure they're within the 5-second window
+        $timestamp = now();
+        $timestampString = $timestamp->toIso8601String();
         $notificationData = [
             'device_id' => $device->uuid,
             'source_app' => 'yape',
             'body' => 'Recibiste S/ 150.00',
-            'received_at' => now()->toIso8601String(),
+            'received_at' => $timestampString,
         ];
 
         // Create first notification

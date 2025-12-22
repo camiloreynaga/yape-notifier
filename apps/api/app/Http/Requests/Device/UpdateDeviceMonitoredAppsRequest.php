@@ -25,16 +25,28 @@ class UpdateDeviceMonitoredAppsRequest extends FormRequest
         $user = $this->user();
         $commerceId = $user->commerce_id;
 
+        // Get device ID from route
+        $deviceId = $this->route('id');
+        $device = $deviceId ? \App\Models\Device::find($deviceId) : null;
+        $deviceCommerceId = $device?->commerce_id ?? $commerceId;
+
+        // Only validate package existence if we have a commerce_id to check against
+        $packageRules = [
+            'required',
+            'string',
+            'regex:/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/',
+        ];
+
+        // Only add exists rule if we have a commerce_id (from device or user)
+        if ($deviceCommerceId) {
+            $packageRules[] = Rule::exists('monitor_packages', 'package_name')
+                ->where('commerce_id', $deviceCommerceId)
+                ->where('is_active', true);
+        }
+
         return [
             'package_names' => ['required', 'array', 'min:1'],
-            'package_names.*' => [
-                'required',
-                'string',
-                'regex:/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/',
-                Rule::exists('monitor_packages', 'package_name')
-                    ->where('commerce_id', $commerceId)
-                    ->where('is_active', true),
-            ],
+            'package_names.*' => $packageRules,
         ];
     }
 
