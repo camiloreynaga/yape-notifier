@@ -119,6 +119,44 @@ else
     info "APP_KEY verificado correctamente (ya existe, no se regenerará)"
 fi
 
+# Verificar que composer.lock esté sincronizado con composer.json
+# Esto es crítico para builds reproducibles y estables en producción
+info "Verificando sincronización de composer.lock..."
+API_DIR="../../../../apps/api"
+if [ ! -f "$API_DIR/composer.json" ]; then
+    error "No se encontró composer.json en $API_DIR"
+    exit 1
+fi
+
+if [ ! -f "$API_DIR/composer.lock" ]; then
+    error "composer.lock no encontrado en $API_DIR"
+    error "Ejecuta 'composer install' o 'composer update' en apps/api y haz commit del composer.lock"
+    exit 1
+fi
+
+# Validar que composer.lock esté sincronizado usando Docker
+cd "$API_DIR"
+VALIDATION_OUTPUT=$(docker run --rm -v "$(pwd):/app" -w /app \
+    composer:latest install --dry-run --no-dev --no-interaction --prefer-dist 2>&1 || true)
+
+if echo "$VALIDATION_OUTPUT" | grep -q "lock file is not up to date\|not present in the lock file\|Required package.*is not present in the lock file"; then
+    error "❌ composer.lock está desactualizado con respecto a composer.json"
+    error ""
+    error "Detalles:"
+    echo "$VALIDATION_OUTPUT" | grep -E "lock file|not present|Required package" | head -3
+    error ""
+    error "SOLUCIÓN:"
+    error "  1. cd apps/api"
+    error "  2. composer update --no-interaction"
+    error "  3. git add composer.lock && git commit -m 'chore: update composer.lock'"
+    error "  4. git push"
+    error "  5. Vuelve a ejecutar este script"
+    cd - > /dev/null
+    exit 1
+fi
+cd - > /dev/null
+info "✅ composer.lock está sincronizado"
+
 # PASO 1: Detener contenedores existentes (con --remove-orphans para limpiar servicios huérfanos)
 # Esto debe hacerse ANTES de construir nuevas imágenes para evitar conflictos
 info "Deteniendo contenedores existentes..."
@@ -126,7 +164,10 @@ docker compose --env-file .env down --remove-orphans
 
 # PASO 2: Construir imágenes Docker
 # Se construye después de detener para evitar problemas con contenedores en ejecución
-info "Construyendo imágenes Docker..."
+# BuildKit está habilitado para usar cache mounts y optimizar builds
+info "Construyendo imágenes Docker (con BuildKit para cache optimizado)..."
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
 if [ -n "$BUILD_NO_CACHE" ]; then
     docker compose --env-file .env build $BUILD_NO_CACHE
 else

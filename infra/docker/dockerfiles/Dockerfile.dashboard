@@ -1,16 +1,19 @@
 # Dockerfile para Dashboard (React/Vite)
 # Ubicación: infra/docker/dockerfiles/Dockerfile.dashboard
-# Multi-stage build for production
+# Multi-stage build optimizado con BuildKit cache
 
 FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files first for better layer caching
 COPY package*.json ./
 
-# Install dependencies (using npm install if package-lock.json doesn't exist)
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+# Install dependencies with BuildKit cache mount
+# Cache mount acelera builds subsecuentes cacheando node_modules entre builds
+# Solo reinstala cuando package-lock.json cambia
+RUN --mount=type=cache,target=/root/.npm \
+    if [ -f package-lock.json ]; then npm ci --prefer-offline --no-audit; else npm install --prefer-offline --no-audit; fi
 
 # Copy source code
 COPY . .

@@ -1,5 +1,35 @@
 # Dockerfile para PHP-FPM (Laravel API)
 # Ubicación: infra/docker/dockerfiles/Dockerfile.php-fpm
+# Usa multi-stage build para optimizar cache de dependencias
+
+# ============================================
+# Stage 1: Dependencies
+# Instala dependencias de Composer en etapa separada para mejor cache
+# ============================================
+FROM php:8.2-fpm-alpine AS dependencies
+
+WORKDIR /var/www
+
+# Install system dependencies needed for composer
+RUN apk add --no-cache git unzip
+
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Copy only composer files (layer caching optimization)
+# Esta capa se cachea y solo se reconstruye cuando composer.json o composer.lock cambian
+COPY composer.json composer.lock* ./
+
+# Install PHP dependencies with BuildKit cache mount
+# Cache mount acelera builds subsecuentes cacheando paquetes descargados
+# El composer.lock DEBE estar sincronizado con composer.json en el repositorio
+RUN --mount=type=cache,target=/root/.composer/cache \
+    composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts
+
+# ============================================
+# Stage 2: Production
+# Imagen final con dependencias y código de aplicación
+# ============================================
 FROM php:8.2-fpm-alpine
 
 WORKDIR /var/www
@@ -54,14 +84,12 @@ RUN echo "pm = dynamic" >> /usr/local/etc/php-fpm.d/www.conf \
     && echo "php_admin_value[error_log] = /var/log/php-fpm-error.log" >> /usr/local/etc/php-fpm.d/www.conf \
     && echo "php_admin_flag[log_errors] = on" >> /usr/local/etc/php-fpm.d/www.conf
 
-# Install Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+# Copy vendor directory from dependencies stage
+# Esto copia las dependencias ya instaladas, evitando reinstalarlas
+COPY --from=dependencies /var/www/vendor /var/www/vendor
 
-# Copy composer files first for better caching
-COPY composer.json composer.lock* ./
-
-# Install PHP dependencies (production only, without scripts first)
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts
+# Copy composer files (needed for composer scripts and autoloader)
+COPY --from=dependencies /var/www/composer.json /var/www/composer.lock* ./
 
 # Copy application files
 COPY . /var/www
@@ -80,6 +108,9 @@ RUN chown -R www-data:www-data /var/www \
     && chmod -R 775 /var/www/storage \
     && chmod -R 775 /var/www/bootstrap/cache
 
+# Install Composer for running scripts (lightweight, only binary)
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
 # Run composer scripts after copy (post-install scripts like optimize, key:generate, etc.)
 RUN composer run-script post-install-cmd --no-interaction || true
 
@@ -89,5 +120,3 @@ RUN composer dump-autoload --optimize --classmap-authoritative
 EXPOSE 9000
 
 CMD ["php-fpm", "-F"]
-
-

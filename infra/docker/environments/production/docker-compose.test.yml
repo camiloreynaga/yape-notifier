@@ -1,0 +1,160 @@
+# ============================================
+# Yape Notifier - Production Testing Environment
+# ============================================
+# Este archivo ejecuta pruebas usando las imágenes de producción
+# pero con dependencias de desarrollo para testing
+#
+# Uso:
+#   cd infra/docker/environments/production
+#   docker compose -f docker-compose.test.yml --env-file .env up --build
+#   docker compose -f docker-compose.test.yml --env-file .env run --rm api-test
+#   docker compose -f docker-compose.test.yml --env-file .env run --rm dashboard-test
+#
+# Para ejecutar todas las pruebas:
+#   docker compose -f docker-compose.test.yml --env-file .env run --rm api-test php artisan test
+#   docker compose -f docker-compose.test.yml --env-file .env run --rm dashboard-test npm run test:ci
+# ============================================
+
+services:
+  # ============================================
+  # PostgreSQL Database for Testing
+  # ============================================
+  db-test:
+    image: postgres:15-alpine
+    container_name: yape-notifier-db-test-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-yape_notifier_test}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-test_password}
+      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
+    volumes:
+      - postgres_test_data_prod:/var/lib/postgresql/data
+    networks:
+      - yape-network-test-prod
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} || exit 1",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    labels:
+      - "com.yape-notifier.service=postgresql-test"
+      - "com.yape-notifier.environment=production-test"
+
+  # ============================================
+  # API Tests Service
+  # ============================================
+  api-test:
+    build:
+      context: ../../../../apps/api
+      dockerfile: Dockerfile.test.production
+    container_name: yape-notifier-api-test-prod
+    working_dir: /var/www
+    env_file:
+      - .env
+    environment:
+      - APP_ENV=testing
+      - APP_DEBUG=true
+      - DB_CONNECTION=pgsql
+      - DB_HOST=db-test
+      - DB_PORT=5432
+      - DB_DATABASE=${DB_DATABASE:-yape_notifier_test}
+      - DB_USERNAME=${DB_USERNAME:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-test_password}
+      - CACHE_DRIVER=array
+      - SESSION_DRIVER=array
+      - QUEUE_CONNECTION=sync
+      - MAIL_MAILER=array
+    networks:
+      - yape-network-test-prod
+    depends_on:
+      db-test:
+        condition: service_healthy
+    volumes:
+      # Montar el código fuente para desarrollo (opcional, comentar si no se necesita)
+      # - ../../../../apps/api:/var/www:cached
+      # Montar resultados de cobertura
+      - api_test_coverage_prod:/var/www/coverage
+    command: >
+      sh -c "
+        echo 'Waiting for database...' &&
+        until php artisan db:show 2>/dev/null; do sleep 1; done &&
+        echo 'Running migrations...' &&
+        php artisan migrate:fresh --force &&
+        echo 'Running tests...' &&
+        php artisan test --coverage --coverage-html=coverage/html --coverage-text
+      "
+    labels:
+      - "com.yape-notifier.service=api-test"
+      - "com.yape-notifier.environment=production-test"
+
+  # ============================================
+  # Dashboard Tests Service
+  # ============================================
+  dashboard-test:
+    build:
+      context: ../../../../apps/web-dashboard
+      dockerfile: Dockerfile.test
+    container_name: yape-notifier-dashboard-test-prod
+    working_dir: /app
+    environment:
+      - CI=true
+      - NODE_ENV=test
+    networks:
+      - yape-network-test-prod
+    volumes:
+      # Montar resultados de cobertura después de la ejecución (no durante)
+      - dashboard_test_coverage_prod:/app/coverage-output
+      # Montar el código fuente para desarrollo (opcional, comentar si no se necesita)
+      # - ../../../../apps/web-dashboard:/app:cached
+    command: >
+      sh -c "
+        # Limpiar directorio de cobertura si existe
+        rm -rf /app/coverage 2>/dev/null || true &&
+        # Ejecutar tests
+        npm run test:ci &&
+        # Copiar resultados de cobertura al volumen si existen
+        if [ -d /app/coverage ]; then
+          mkdir -p /app/coverage-output &&
+          cp -r /app/coverage/* /app/coverage-output/ 2>/dev/null || true
+        fi
+      "
+    labels:
+      - "com.yape-notifier.service=dashboard-test"
+      - "com.yape-notifier.environment=production-test"
+
+# ============================================
+# Volumes
+# ============================================
+volumes:
+  postgres_test_data_prod:
+    driver: local
+    labels:
+      - "com.yape-notifier.volume=postgres_test_data_prod"
+  api_test_coverage_prod:
+    driver: local
+    labels:
+      - "com.yape-notifier.volume=api_test_coverage_prod"
+  dashboard_test_coverage_prod:
+    driver: local
+    labels:
+      - "com.yape-notifier.volume=dashboard_test_coverage_prod"
+
+# ============================================
+# Networks
+# ============================================
+networks:
+  yape-network-test-prod:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+    labels:
+      - "com.yape-notifier.network=yape-network-test-prod"
+
