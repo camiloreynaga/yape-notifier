@@ -23,10 +23,28 @@ app/
 
 ## 🚀 Comandos Básicos
 
+### Gestión de Dependencias
+
+**⚠️ CRÍTICO**: Siempre usar Docker para actualizar dependencias PHP:
+
+```bash
+# Desde la raíz del proyecto
+make composer:update     # Actualizar dependencias
+make composer:require PACKAGE=nombre/paquete  # Agregar dependencia
+make composer:validate   # Validar compatibilidad
+
+# O desde apps/api
+./update-dependencies.sh
+```
+
+**NUNCA ejecutar `composer update` directamente** - esto genera `composer.lock` con la versión de PHP local (puede ser 8.3, 8.4, etc.) y causa incompatibilidades con Docker (PHP 8.2).
+
+Ver [README_DEPENDENCIES.md](README_DEPENDENCIES.md) para el proceso completo.
+
 ### Desarrollo
 
 ```bash
-# Instalar dependencias
+# Instalar dependencias (solo lectura, no modifica composer.lock)
 composer install
 
 # Configurar entorno
