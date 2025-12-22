@@ -1,5 +1,6 @@
 # Dockerfile para PHP-FPM (Laravel API)
 # Ubicación: infra/docker/dockerfiles/Dockerfile.php-fpm
+# PHP 8.2 LTS (Long Term Support hasta diciembre 2026)
 # Usa multi-stage build para optimizar cache de dependencias
 
 # ============================================
@@ -22,7 +23,8 @@ COPY composer.json composer.lock* ./
 
 # Install PHP dependencies with BuildKit cache mount
 # Cache mount acelera builds subsecuentes cacheando paquetes descargados
-# El composer.lock DEBE estar sincronizado con composer.json en el repositorio
+# El composer.lock DEBE estar sincronizado con composer.json y ser compatible con PHP 8.2 LTS
+# IMPORTANTE: composer.lock debe generarse usando PHP 8.2 para mantener consistencia
 RUN --mount=type=cache,target=/root/.composer/cache \
     composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts
 

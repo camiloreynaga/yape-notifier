@@ -119,43 +119,75 @@ else
     info "APP_KEY verificado correctamente (ya existe, no se regenerará)"
 fi
 
-# Verificar que composer.lock esté sincronizado con composer.json
-# Esto es crítico para builds reproducibles y estables en producción
-info "Verificando sincronización de composer.lock..."
+# ============================================
+# VALIDACIÓN CRÍTICA: PHP 8.2 LTS y composer.lock
+# ============================================
+# PHP 8.2 es LTS (Long Term Support) hasta diciembre 2026
+# Esta validación asegura que composer.lock sea compatible con PHP 8.2
+# y previene problemas de incompatibilidad en producción
+info "Validando compatibilidad con PHP 8.2 LTS..."
 API_DIR="../../../../apps/api"
+
 if [ ! -f "$API_DIR/composer.json" ]; then
     error "No se encontró composer.json en $API_DIR"
     exit 1
 fi
 
+# Verificar que composer.json especifica PHP 8.2
+PHP_VERSION_REQUIREMENT=$(grep -o '"php":\s*"[^"]*"' "$API_DIR/composer.json" | head -1)
+if ! echo "$PHP_VERSION_REQUIREMENT" | grep -q "8\.2"; then
+    error "❌ composer.json no especifica PHP 8.2 LTS"
+    error "Versión encontrada: $PHP_VERSION_REQUIREMENT"
+    error "Debe ser: \"php\": \">=8.2 <8.3\" para usar PHP 8.2 LTS"
+    exit 1
+fi
+info "✅ composer.json especifica PHP 8.2 LTS correctamente"
+
 if [ ! -f "$API_DIR/composer.lock" ]; then
     error "composer.lock no encontrado en $API_DIR"
-    error "Ejecuta 'composer install' o 'composer update' en apps/api y haz commit del composer.lock"
+    error "Ejecuta 'composer install' o 'composer update' en apps/api usando PHP 8.2 y haz commit del composer.lock"
     exit 1
 fi
 
-# Validar que composer.lock esté sincronizado usando Docker
+# Validar que composer.lock sea compatible con PHP 8.2 LTS
+# Usamos PHP 8.2 explícitamente para validar (mismo que Dockerfile)
+info "Validando compatibilidad de composer.lock con PHP 8.2 LTS..."
 cd "$API_DIR"
 VALIDATION_OUTPUT=$(docker run --rm -v "$(pwd):/app" -w /app \
-    composer:latest install --dry-run --no-dev --no-interaction --prefer-dist 2>&1 || true)
+    php:8.2-cli sh -c "curl -sS https://getcomposer.org/installer | php && php composer.phar install --dry-run --no-dev --no-interaction --prefer-dist" 2>&1 || true)
 
+# Detectar errores de compatibilidad
+HAS_ERRORS=false
 if echo "$VALIDATION_OUTPUT" | grep -q "lock file is not up to date\|not present in the lock file\|Required package.*is not present in the lock file"; then
-    error "❌ composer.lock está desactualizado con respecto a composer.json"
+    HAS_ERRORS=true
+    ERROR_TYPE="desactualizado"
+elif echo "$VALIDATION_OUTPUT" | grep -q "does not satisfy that requirement\|Your lock file does not contain a compatible set\|requires php >=8\.[34]"; then
+    HAS_ERRORS=true
+    ERROR_TYPE="incompatible con PHP 8.2"
+fi
+
+if [ "$HAS_ERRORS" = true ]; then
+    error "❌ composer.lock está $ERROR_TYPE"
     error ""
-    error "Detalles:"
-    echo "$VALIDATION_OUTPUT" | grep -E "lock file|not present|Required package" | head -3
+    error "Detalles del error:"
+    echo "$VALIDATION_OUTPUT" | grep -E "lock file|not present|Required package|does not satisfy|compatible set|requires php" | head -5
     error ""
-    error "SOLUCIÓN:"
+    error "CAUSA: composer.lock fue generado con una versión de PHP diferente a 8.2"
+    error ""
+    error "SOLUCIÓN PROFESIONAL (usar PHP 8.2 LTS):"
     error "  1. cd apps/api"
-    error "  2. composer update --no-interaction"
-    error "  3. git add composer.lock && git commit -m 'chore: update composer.lock'"
-    error "  4. git push"
-    error "  5. Vuelve a ejecutar este script"
+    error "  2. docker run --rm -v \$(pwd):/app -w /app php:8.2-cli sh -c 'curl -sS https://getcomposer.org/installer | php && php composer.phar update --no-interaction'"
+    error "  3. Verificar: docker run --rm -v \$(pwd):/app -w /app php:8.2-cli sh -c 'curl -sS https://getcomposer.org/installer | php && php composer.phar install --dry-run --no-dev --no-interaction'"
+    error "  4. git add composer.lock && git commit -m 'fix: update composer.lock for PHP 8.2 LTS compatibility'"
+    error "  5. git push"
+    error "  6. Vuelve a ejecutar este script de deploy"
+    error ""
+    error "⚠️  IMPORTANTE: Siempre usa PHP 8.2 LTS para mantener consistencia con producción"
     cd - > /dev/null
     exit 1
 fi
 cd - > /dev/null
-info "✅ composer.lock está sincronizado"
+info "✅ composer.lock es compatible con PHP 8.2 LTS"
 
 # PASO 1: Detener contenedores existentes (con --remove-orphans para limpiar servicios huérfanos)
 # Esto debe hacerse ANTES de construir nuevas imágenes para evitar conflictos

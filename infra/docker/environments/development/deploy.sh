@@ -48,12 +48,12 @@ else
         warn "composer.lock no encontrado en $API_DIR"
         warn "Ejecuta 'composer install' o 'composer update' en apps/api"
     else
-        # Validar que composer.lock esté sincronizado usando Docker
+        # Validar que composer.lock esté sincronizado usando Docker con PHP 8.2 (mismo que Dockerfile)
         cd "$API_DIR"
         VALIDATION_OUTPUT=$(docker run --rm -v "$(pwd):/app" -w /app \
-            composer:latest install --dry-run --no-dev --no-interaction --prefer-dist 2>&1 || true)
+            php:8.2-cli sh -c "curl -sS https://getcomposer.org/installer | php && php composer.phar install --dry-run --no-dev --no-interaction --prefer-dist" 2>&1 || true)
 
-        if echo "$VALIDATION_OUTPUT" | grep -q "lock file is not up to date\|not present in the lock file\|Required package.*is not present in the lock file"; then
+        if echo "$VALIDATION_OUTPUT" | grep -q "lock file is not up to date\|not present in the lock file\|Required package.*is not present in the lock file\|does not satisfy that requirement\|Your lock file does not contain a compatible set"; then
             warn "⚠️  composer.lock está desactualizado"
             warn "Ejecuta 'composer update' en apps/api para sincronizar"
         else
