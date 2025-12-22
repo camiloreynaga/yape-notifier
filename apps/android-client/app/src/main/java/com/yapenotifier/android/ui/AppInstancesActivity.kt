@@ -77,6 +77,18 @@ class AppInstancesActivity : AppCompatActivity() {
                 View.GONE
             }
 
+            // Show multiple instances alert
+            if (state.multipleInstancesDetected && state.multipleInstancesMessage != null) {
+                // Show alert card or banner
+                android.widget.TextView(this).apply {
+                    text = state.multipleInstancesMessage
+                    setBackgroundColor(android.graphics.Color.parseColor("#FFF3CD"))
+                    setTextColor(android.graphics.Color.parseColor("#856404"))
+                    setPadding(16, 12, 16, 12)
+                }
+                // You can add this to a card or alert in the layout
+            }
+
             // Show error
             if (state.error != null) {
                 binding.tvError.text = state.error

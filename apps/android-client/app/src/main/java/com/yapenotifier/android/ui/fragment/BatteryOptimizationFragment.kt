@@ -12,6 +12,7 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import com.yapenotifier.android.databinding.FragmentBatteryOptimizationBinding
 import com.yapenotifier.android.util.OemDetector
+import com.yapenotifier.android.util.OEMGuideHelper
 
 class BatteryOptimizationFragment : Fragment() {
     private var _binding: FragmentBatteryOptimizationBinding? = null
@@ -35,12 +36,20 @@ class BatteryOptimizationFragment : Fragment() {
     }
 
     private fun setupUI() {
-        val oem = OemDetector.detectOem()
-        val oemName = OemDetector.getOemDisplayName(oem)
-        val recommendations = OemDetector.getOemRecommendations(oem)
+        val guide = OEMGuideHelper.getBatteryOptimizationGuide(requireContext())
+        val oemName = OemDetector.getOemDisplayName(guide.oem)
 
         binding.tvOemInfo.text = "Dispositivo detectado: $oemName"
-        binding.tvRecommendations.text = recommendations.joinToString("\n")
+        binding.tvGuideTitle.text = guide.title
+        
+        // Display step-by-step guide
+        val guideText = buildString {
+            guide.steps.forEach { step ->
+                append("${step.number}. ${step.title}\n")
+                append("   ${step.description}\n\n")
+            }
+        }
+        binding.tvRecommendations.text = guideText.trim()
     }
 
     private fun checkBatteryOptimizationStatus() {
@@ -70,20 +79,29 @@ class BatteryOptimizationFragment : Fragment() {
     }
 
     private fun openBatteryOptimizationSettings() {
-        try {
-            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                data = Uri.parse("package:${requireContext().packageName}")
-            }
-            startActivity(intent)
-        } catch (e: Exception) {
-            // Fallback to battery settings
+        val guide = OEMGuideHelper.getBatteryOptimizationGuide(requireContext())
+        // Try to open the first step's action intent if available
+        val firstStepWithAction = guide.steps.firstOrNull { it.actionIntent != null }
+        
+        if (firstStepWithAction != null) {
+            OEMGuideHelper.openGuideStep(requireContext(), firstStepWithAction)
+        } else {
+            // Fallback to standard battery optimization settings
             try {
-                val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                    data = Uri.parse("package:${requireContext().packageName}")
+                }
                 startActivity(intent)
-            } catch (e2: Exception) {
-                // Last resort: general settings
-                val intent = Intent(Settings.ACTION_SETTINGS)
-                startActivity(intent)
+            } catch (e: Exception) {
+                // Fallback to battery settings
+                try {
+                    val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                    startActivity(intent)
+                } catch (e2: Exception) {
+                    // Last resort: general settings
+                    val intent = Intent(Settings.ACTION_SETTINGS)
+                    startActivity(intent)
+                }
             }
         }
     }

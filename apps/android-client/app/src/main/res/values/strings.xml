@@ -6,4 +6,12 @@
     <string name="filter_all">Todos</string>
     <string name="filter_today">Hoy</string>
     <string name="mark_all_as_read_toast">Todas las notificaciones marcadas como leídas</string>
+    <string name="monitored_apps_title">Apps Monitoreadas</string>
+    <string name="all_filter">Todas</string>
+    <string name="monitored_filter">Monitoreadas</string>
+    <string name="not_monitored_filter">No monitoreadas</string>
+    <string name="monitored_apps_stats">%1$d de %2$d apps monitoreadas</string>
+    <string name="last_updated">Última actualización: %1$s</string>
+    <string name="syncing">Sincronizando...</string>
+    <string name="updating">Actualizando...</string>
 </resources>

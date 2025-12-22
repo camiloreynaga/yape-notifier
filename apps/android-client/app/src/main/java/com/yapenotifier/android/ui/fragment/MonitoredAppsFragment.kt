@@ -10,10 +10,10 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.yapenotifier.android.data.api.ApiService
 import com.yapenotifier.android.data.api.RetrofitClient
 import com.yapenotifier.android.data.local.PreferencesManager
-import com.yapenotifier.android.data.model.MonitoredPackagesResponse
+import com.yapenotifier.android.data.model.MonitorPackage
 import com.yapenotifier.android.databinding.FragmentMonitoredAppsBinding
-import com.yapenotifier.android.ui.adapter.MonitoredAppAdapter
-import com.yapenotifier.android.ui.adapter.MonitoredAppItem
+import com.yapenotifier.android.ui.MonitoredAppsAdapter
+import com.yapenotifier.android.ui.MonitoredAppCheckableItem
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -22,7 +22,7 @@ class MonitoredAppsFragment : Fragment() {
     private val binding get() = _binding!!
     private lateinit var preferencesManager: PreferencesManager
     private lateinit var apiService: ApiService
-    private lateinit var adapter: MonitoredAppAdapter
+    private lateinit var adapter: MonitoredAppsAdapter
     private val selectedPackages = mutableSetOf<String>()
 
     override fun onCreateView(
@@ -46,12 +46,15 @@ class MonitoredAppsFragment : Fragment() {
     }
 
     private fun setupRecyclerView() {
-        adapter = MonitoredAppAdapter { packageName, isChecked ->
-            if (isChecked) {
-                selectedPackages.add(packageName)
-            } else {
-                selectedPackages.remove(packageName)
+        adapter = MonitoredAppsAdapter { item, isChecked ->
+            val newList = adapter.currentList.map {
+                if (it.packageName == item.packageName) {
+                    it.copy(isChecked = isChecked)
+                } else {
+                    it
+                }
             }
+            adapter.submitList(newList)
         }
         binding.rvMonitoredApps.layoutManager = LinearLayoutManager(requireContext())
         binding.rvMonitoredApps.adapter = adapter
@@ -69,7 +72,7 @@ class MonitoredAppsFragment : Fragment() {
         lifecycleScope.launch {
             try {
                 binding.progressBar.visibility = View.VISIBLE
-                val response = apiService.getMonitoredPackages()
+                val response = apiService.getMonitorPackages(activeOnly = false)
                 
                 if (response.isSuccessful) {
                     val packages = response.body()?.packages ?: emptyList()
@@ -94,24 +97,14 @@ class MonitoredAppsFragment : Fragment() {
         }
     }
 
-    private fun displayPackages(packages: List<String>) {
-        val items = packages.map { packageName ->
-            MonitoredAppItem(
-                packageName = packageName,
-                displayName = getAppDisplayName(packageName),
-                isSelected = selectedPackages.contains(packageName)
+    private fun displayPackages(packages: List<MonitorPackage>) {
+        val items = packages.map { packageItem ->
+            MonitoredAppCheckableItem(
+                packageName = packageItem.packageName,
+                isChecked = selectedPackages.contains(packageItem.packageName) || packageItem.isActive
             )
         }
         adapter.submitList(items)
-    }
-
-    private fun getAppDisplayName(packageName: String): String {
-        return when (packageName) {
-            "com.bcp.innovacxion.yape.movil" -> "Yape"
-            "pe.com.interbank.mobilebanking" -> "Interbank"
-            "com.scotiabank.mobile.android" -> "Scotiabank"
-            else -> packageName
-        }
     }
 
     private fun setupClickListeners() {
@@ -122,7 +115,9 @@ class MonitoredAppsFragment : Fragment() {
 
     private fun saveSelectedPackages() {
         lifecycleScope.launch {
-            preferencesManager.saveSelectedMonitoredPackages(selectedPackages)
+            // Get selected packages from adapter
+            val selected = adapter.getSelectedPackages().toSet()
+            preferencesManager.saveSelectedMonitoredPackages(selected)
             android.widget.Toast.makeText(
                 requireContext(),
                 "Apps seleccionadas guardadas",
@@ -131,7 +126,9 @@ class MonitoredAppsFragment : Fragment() {
         }
     }
 
-    fun getSelectedPackages(): Set<String> = selectedPackages
+    fun getSelectedPackages(): Set<String> {
+        return adapter.getSelectedPackages().toSet()
+    }
 
     override fun onDestroyView() {
         super.onDestroyView()

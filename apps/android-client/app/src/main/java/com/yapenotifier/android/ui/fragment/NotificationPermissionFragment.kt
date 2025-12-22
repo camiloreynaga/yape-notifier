@@ -10,6 +10,7 @@ import androidx.fragment.app.Fragment
 import com.yapenotifier.android.databinding.FragmentNotificationPermissionBinding
 import com.yapenotifier.android.util.NotificationAccessChecker
 import com.yapenotifier.android.util.OemDetector
+import com.yapenotifier.android.util.OEMGuideHelper
 
 class NotificationPermissionFragment : Fragment() {
     private var _binding: FragmentNotificationPermissionBinding? = null
@@ -33,12 +34,20 @@ class NotificationPermissionFragment : Fragment() {
     }
 
     private fun setupUI() {
-        val oem = OemDetector.detectOem()
-        val oemName = OemDetector.getOemDisplayName(oem)
-        val recommendations = OemDetector.getOemRecommendations(oem)
+        val guide = OEMGuideHelper.getNotificationGuide(requireContext())
+        val oemName = OemDetector.getOemDisplayName(guide.oem)
 
         binding.tvOemInfo.text = "Dispositivo detectado: $oemName"
-        binding.tvRecommendations.text = recommendations.joinToString("\n")
+        binding.tvGuideTitle.text = guide.title
+        
+        // Display step-by-step guide
+        val guideText = buildString {
+            guide.steps.forEach { step ->
+                append("${step.number}. ${step.title}\n")
+                append("   ${step.description}\n\n")
+            }
+        }
+        binding.tvRecommendations.text = guideText.trim()
     }
 
     private fun checkPermissionStatus() {
@@ -62,6 +71,19 @@ class NotificationPermissionFragment : Fragment() {
 
     private fun setupClickListeners() {
         binding.btnOpenSettings.setOnClickListener {
+            openNotificationSettings()
+        }
+    }
+
+    private fun openNotificationSettings() {
+        val guide = OEMGuideHelper.getNotificationGuide(requireContext())
+        // Try to open the first step's action intent if available
+        val firstStepWithAction = guide.steps.firstOrNull { it.actionIntent != null }
+        
+        if (firstStepWithAction != null) {
+            OEMGuideHelper.openGuideStep(requireContext(), firstStepWithAction)
+        } else {
+            // Fallback to standard notification listener settings
             NotificationAccessChecker.openNotificationListenerSettings(requireContext())
         }
     }

@@ -25,11 +25,14 @@ import com.yapenotifier.android.data.model.PaginatedResponse
 import com.yapenotifier.android.data.model.LinkCodeGenerateRequest
 import com.yapenotifier.android.data.model.LinkCodeGenerateResponse
 import com.yapenotifier.android.data.model.DevicesResponse
+import com.yapenotifier.android.data.model.MonitorPackage
+import com.yapenotifier.android.data.model.MonitorPackagesResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -136,4 +139,16 @@ interface ApiService {
 
     @GET("api/devices/link-codes")
     suspend fun getActiveLinkCodes(): Response<List<LinkCodeGenerateResponse>>
+
+    // --- Monitor Packages ---
+    @GET("api/monitor-packages")
+    suspend fun getMonitorPackages(
+        @Query("active_only") activeOnly: Boolean? = null
+    ): Response<MonitorPackagesResponse>
+
+    @POST("api/monitor-packages/{id}/toggle-status")
+    suspend fun toggleMonitorPackageStatus(
+        @Path("id") id: Long,
+        @Body request: Map<String, Boolean>
+    ): Response<MonitorPackage>
 }

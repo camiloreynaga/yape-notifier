@@ -41,7 +41,18 @@ class MonitoredAppsFragment : Fragment() {
     }
 
     private fun setupRecyclerView() {
+        adapter = MonitoredAppsAdapter { item, isChecked ->
+            val newList = adapter.currentList.map {
+                if (it.packageName == item.packageName) {
+                    it.copy(isChecked = isChecked)
+                } else {
+                    it
+                }
+            }
+            adapter.submitList(newList)
+        }
         binding.rvMonitoredApps.layoutManager = LinearLayoutManager(requireContext())
+        binding.rvMonitoredApps.adapter = adapter
     }
 
     private fun setupObservers() {
@@ -52,8 +63,7 @@ class MonitoredAppsFragment : Fragment() {
                 }
                 is MonitoredAppsViewModel.MonitoredAppsState.Success -> {
                     binding.progressBar.visibility = View.GONE
-                    adapter = MonitoredAppsAdapter(state.items.toMutableList())
-                    binding.rvMonitoredApps.adapter = adapter
+                    adapter.submitList(state.items)
                 }
                 is MonitoredAppsViewModel.MonitoredAppsState.Error -> {
                     binding.progressBar.visibility = View.GONE
@@ -85,10 +95,8 @@ class MonitoredAppsFragment : Fragment() {
 
     private fun setupClickListeners() {
         binding.btnSaveMonitoredApps.setOnClickListener {
-            if (::adapter.isInitialized) {
-                val selected = adapter.getSelectedPackages()
-                viewModel.saveMonitoredApps(selected)
-            }
+            val selected = adapter.getSelectedPackages()
+            viewModel.saveMonitoredApps(selected)
         }
     }
 

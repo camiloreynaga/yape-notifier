@@ -63,6 +63,13 @@
             android:label="Instancias de Aplicaciones"
             android:theme="@style/Theme.YapeNotifier" />
 
+        <!-- Monitored Apps Selection Activity -->
+        <activity
+            android:name=".ui.MonitoredAppsSelectionActivity"
+            android:exported="false"
+            android:label="Apps Monitoreadas"
+            android:theme="@style/Theme.YapeNotifier" />
+
         <!-- Permissions Wizard Activity -->
         <activity
             android:name=".ui.PermissionsWizardActivity"

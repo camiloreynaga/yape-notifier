@@ -1,22 +1,16 @@
 package com.yapenotifier.android.ui.adapter
 
-import android.widget.CompoundButton
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.yapenotifier.android.data.model.MonitorPackage
 import com.yapenotifier.android.databinding.ItemMonitoredAppBinding
 
-data class MonitoredAppItem(
-    val packageName: String,
-    val displayName: String,
-    var isSelected: Boolean
-)
-
 class MonitoredAppAdapter(
-    private val onItemCheckedChanged: (String, Boolean) -> Unit
-) : ListAdapter<MonitoredAppItem, MonitoredAppAdapter.MonitoredAppViewHolder>(MonitoredAppDiffCallback()) {
+    private val onToggleStatus: (Long) -> Unit
+) : ListAdapter<MonitorPackage, MonitoredAppAdapter.MonitoredAppViewHolder>(MonitoredAppDiffCallback()) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MonitoredAppViewHolder {
         val binding = ItemMonitoredAppBinding.inflate(
@@ -24,7 +18,7 @@ class MonitoredAppAdapter(
             parent,
             false
         )
-        return MonitoredAppViewHolder(binding, onItemCheckedChanged)
+        return MonitoredAppViewHolder(binding, onToggleStatus)
     }
 
     override fun onBindViewHolder(holder: MonitoredAppViewHolder, position: Int) {
@@ -33,35 +27,63 @@ class MonitoredAppAdapter(
 
     class MonitoredAppViewHolder(
         private val binding: ItemMonitoredAppBinding,
-        private val onItemCheckedChanged: (String, Boolean) -> Unit
+        private val onToggleStatus: (Long) -> Unit
     ) : RecyclerView.ViewHolder(binding.root) {
 
-        fun bind(item: MonitoredAppItem) {
+        fun bind(packageItem: MonitorPackage) {
             binding.apply {
-                tvAppName.text = item.displayName
-                tvPackageName.text = item.packageName
-                
-                // Remove listener first to avoid triggering during setChecked
-                checkbox.setOnCheckedChangeListener(null)
-                checkbox.isChecked = item.isSelected
-                
-                // Set listener with explicit types to help type inference
-                checkbox.setOnCheckedChangeListener { _: CompoundButton, isChecked: Boolean ->
-                    item.isSelected = isChecked
-                    onItemCheckedChanged(item.packageName, isChecked)
+                // App name or package name
+                tvAppName.text = packageItem.appName ?: packageItem.packageName
+                tvPackageName.text = packageItem.packageName
+
+                // Description
+                if (packageItem.description.isNullOrBlank()) {
+                    tvDescription.visibility = android.view.View.GONE
+                } else {
+                    tvDescription.text = packageItem.description
+                    tvDescription.visibility = android.view.View.VISIBLE
+                }
+
+                // Status
+                switchMonitor.isChecked = packageItem.isActive
+                tvStatus.text = if (packageItem.isActive) {
+                    "Monitoreada"
+                } else {
+                    "No monitoreada"
+                }
+                tvStatus.setTextColor(
+                    if (packageItem.isActive) {
+                        android.graphics.Color.parseColor("#4CAF50")
+                    } else {
+                        android.graphics.Color.parseColor("#757575")
+                    }
+                )
+
+                // Toggle listener
+                switchMonitor.setOnCheckedChangeListener { _, isChecked ->
+                    if (isChecked != packageItem.isActive) {
+                        onToggleStatus(packageItem.id)
+                    }
+                }
+
+                // Priority badge (if available)
+                if (packageItem.priority != null && packageItem.priority > 0) {
+                    tvPriority.text = "Prioridad: ${packageItem.priority}"
+                    tvPriority.visibility = android.view.View.VISIBLE
+                } else {
+                    tvPriority.visibility = android.view.View.GONE
                 }
             }
         }
     }
 
-    class MonitoredAppDiffCallback : DiffUtil.ItemCallback<MonitoredAppItem>() {
-        override fun areItemsTheSame(oldItem: MonitoredAppItem, newItem: MonitoredAppItem): Boolean {
-            return oldItem.packageName == newItem.packageName
+    class MonitoredAppDiffCallback : DiffUtil.ItemCallback<MonitorPackage>() {
+        override fun areItemsTheSame(oldItem: MonitorPackage, newItem: MonitorPackage): Boolean {
+            return oldItem.id == newItem.id
         }
 
-        override fun areContentsTheSame(oldItem: MonitoredAppItem, newItem: MonitoredAppItem): Boolean {
+        override fun areContentsTheSame(oldItem: MonitorPackage, newItem: MonitorPackage): Boolean {
             return oldItem == newItem
         }
     }
 }
-

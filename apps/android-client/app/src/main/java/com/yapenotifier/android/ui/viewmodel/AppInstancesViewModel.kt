@@ -15,6 +15,9 @@ import kotlinx.coroutines.launch
 
 data class AppInstancesUiState(
     val instances: List<AppInstance> = emptyList(),
+    val instancesByPackage: Map<String, List<AppInstance>> = emptyMap(),
+    val multipleInstancesDetected: Boolean = false,
+    val multipleInstancesMessage: String? = null,
     val loading: Boolean = false,
     val error: String? = null,
     val saving: Boolean = false,
@@ -37,8 +40,26 @@ class AppInstancesViewModel(application: Application) : AndroidViewModel(applica
                 
                 if (response.isSuccessful) {
                     val instances = response.body()?.instances ?: emptyList()
+                    
+                    // Group instances by package name
+                    val instancesByPackage = instances.groupBy { it.packageName }
+                    
+                    // Detect multiple instances
+                    val multipleInstances = instancesByPackage.values.any { it.size > 1 }
+                    val multipleInstancesMessage = if (multipleInstances) {
+                        val packagesWithMultiple = instancesByPackage.filter { it.value.size > 1 }
+                        if (packagesWithMultiple.size == 1) {
+                            "Se detectaron ${packagesWithMultiple.values.first().size} instancias de ${packagesWithMultiple.keys.first()}"
+                        } else {
+                            "Se detectaron múltiples instancias en ${packagesWithMultiple.size} aplicaciones"
+                        }
+                    } else null
+                    
                     _uiState.value = _uiState.value?.copy(
                         instances = instances,
+                        instancesByPackage = instancesByPackage,
+                        multipleInstancesDetected = multipleInstances,
+                        multipleInstancesMessage = multipleInstancesMessage,
                         loading = false
                     )
                 } else {

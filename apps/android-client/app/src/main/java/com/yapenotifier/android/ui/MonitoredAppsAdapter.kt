@@ -2,6 +2,8 @@ package com.yapenotifier.android.ui
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.yapenotifier.android.databinding.ItemMonitoredAppBinding
 
@@ -11,8 +13,8 @@ data class MonitoredAppCheckableItem(
 )
 
 class MonitoredAppsAdapter(
-    private val appItems: MutableList<MonitoredAppCheckableItem>
-) : RecyclerView.Adapter<MonitoredAppsAdapter.MonitoredAppViewHolder>() {
+    private val onAppChecked: (MonitoredAppCheckableItem, Boolean) -> Unit
+) : ListAdapter<MonitoredAppCheckableItem, MonitoredAppsAdapter.MonitoredAppViewHolder>(MonitoredAppDiffCallback()) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MonitoredAppViewHolder {
         val binding = ItemMonitoredAppBinding.inflate(LayoutInflater.from(parent.context), parent, false)
@@ -20,13 +22,11 @@ class MonitoredAppsAdapter(
     }
 
     override fun onBindViewHolder(holder: MonitoredAppViewHolder, position: Int) {
-        holder.bind(appItems[position])
+        holder.bind(getItem(position))
     }
 
-    override fun getItemCount(): Int = appItems.size
-
     fun getSelectedPackages(): List<String> {
-        return appItems.filter { it.isChecked }.map { it.packageName }
+        return currentList.filter { it.isChecked }.map { it.packageName }
     }
 
     private fun getAppDisplayName(packageName: String): String {
@@ -40,15 +40,25 @@ class MonitoredAppsAdapter(
 
     inner class MonitoredAppViewHolder(private val binding: ItemMonitoredAppBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(item: MonitoredAppCheckableItem) {
-            binding.checkbox.setOnCheckedChangeListener(null)
+            binding.switchMonitor.setOnCheckedChangeListener(null)
             binding.tvAppName.text = getAppDisplayName(item.packageName)
             binding.tvPackageName.text = item.packageName
-            binding.checkbox.isChecked = item.isChecked
-            binding.checkbox.setOnCheckedChangeListener { _, isChecked ->
+            binding.switchMonitor.isChecked = item.isChecked
+            binding.switchMonitor.setOnCheckedChangeListener { _, isChecked ->
                 if (bindingAdapterPosition != RecyclerView.NO_POSITION) {
-                    appItems[bindingAdapterPosition].isChecked = isChecked
+                    onAppChecked(getItem(bindingAdapterPosition), isChecked)
                 }
             }
+        }
+    }
+
+    private class MonitoredAppDiffCallback : DiffUtil.ItemCallback<MonitoredAppCheckableItem>() {
+        override fun areItemsTheSame(oldItem: MonitoredAppCheckableItem, newItem: MonitoredAppCheckableItem): Boolean {
+            return oldItem.packageName == newItem.packageName
+        }
+
+        override fun areContentsTheSame(oldItem: MonitoredAppCheckableItem, newItem: MonitoredAppCheckableItem): Boolean {
+            return oldItem == newItem
         }
     }
 }

@@ -45,9 +45,19 @@
             android:layout_marginBottom="8dp" />
 
         <TextView
+            android:id="@+id/tvGuideTitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Recomendaciones específicas para tu dispositivo:"
+            android:text=""
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="?attr/colorPrimary"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Instrucciones paso a paso:"
             android:textSize="14sp"
             android:textStyle="bold"
             android:layout_marginBottom="8dp" />
