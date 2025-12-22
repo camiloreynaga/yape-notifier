@@ -22,6 +22,8 @@ Guía profesional y consolidada para desplegar Yape Notifier en producción usan
 
 **Guía rápida de los pasos esenciales para desplegar en producción:**
 
+> 📌 **IMPORTANTE**: Antes de ejecutar el deploy, asegúrate de que `composer.lock` esté actualizado. Si ves el error "composer.lock está desactualizado", sigue las instrucciones en la sección [Solución de Problemas](#error-composerlock-está-desactualizado).
+
 ### 1️⃣ Preparación del Servidor
 
 ```bash
@@ -86,7 +88,30 @@ nano .env
 
 Las demás variables (APP_URL, DASHBOARD_API_URL, etc.) ya están configuradas correctamente para producción.
 
-### 5️⃣ Generar APP_KEY (OBLIGATORIO)
+### 5️⃣ Verificar composer.lock (OBLIGATORIO)
+
+**⚠️ IMPORTANTE**: Antes del deploy, asegúrate de que `composer.lock` esté sincronizado:
+
+```bash
+# Si estás en el servidor y necesitas actualizar composer.lock:
+cd /var/apps/yape-notifier/apps/api
+
+# Opción 1: Si tienes composer local
+composer update --no-interaction
+git add composer.lock
+git commit -m "chore: update composer.lock"
+git push
+
+# Opción 2: Usar Docker (si no tienes composer local)
+docker run --rm -v $(pwd):/app -w /app composer:latest update --no-interaction
+git add composer.lock
+git commit -m "chore: update composer.lock"
+git push
+```
+
+**Nota**: El script `deploy.sh` validará automáticamente esto, pero es mejor hacerlo antes.
+
+### 6️⃣ Generar APP_KEY (OBLIGATORIO)
 
 ```bash
 # Generar APP_KEY antes del despliegue
@@ -612,6 +637,26 @@ grep "^APP_KEY=base64:" .env
 
 > 📖 **Para más detalles y opciones, consulta la sección [Generar APP_KEY](#generar-app_key) más abajo.**
 
+### Paso 8.5: Verificar composer.lock (ANTES del Deploy)
+
+**⚠️ CRÍTICO**: El script de deploy validará automáticamente que `composer.lock` esté sincronizado. Si está desactualizado, el deploy fallará.
+
+**Verificar y actualizar si es necesario**:
+
+```bash
+# Ir al directorio de la API
+cd /var/apps/yape-notifier/apps/api
+
+# Verificar estado (opcional - el deploy lo hará automáticamente)
+docker run --rm -v $(pwd):/app -w /app composer:latest install --dry-run --no-dev --no-interaction
+
+# Si hay errores, actualizar:
+docker run --rm -v $(pwd):/app -w /app composer:latest update --no-interaction
+git add composer.lock
+git commit -m "chore: update composer.lock"
+git push
+```
+
 ### Paso 9: Desplegar la Aplicación
 
 #### 9.1. Usar el Script de Despliegue (Recomendado)
@@ -633,15 +678,19 @@ chmod +x deploy.sh
 El script `deploy.sh` automáticamente:
 
 1. **Valida configuración**: Verifica que `DB_PASSWORD` y `APP_KEY` estén configurados en `.env`
-2. **Detiene contenedores**: Ejecuta `docker compose down --remove-orphans` para limpiar servicios anteriores
-3. **Construye imágenes**: Construye las imágenes Docker (con cache por defecto, o sin cache si usas `--no-cache`)
-4. **Inicia servicios**: Levanta todos los contenedores
-5. **Espera PostgreSQL**: Usa un wait loop activo con `pg_isready` para asegurar que la base de datos esté lista
-6. **Configura permisos**: Crea directorios necesarios y configura permisos de Laravel
-7. **Ejecuta migraciones**: Ejecuta las migraciones de base de datos
-8. **Optimiza Laravel**: Cachea configuración y rutas para producción
+2. **Valida composer.lock**: Verifica que `composer.lock` esté sincronizado con `composer.json` (nuevo)
+3. **Detiene contenedores**: Ejecuta `docker compose down --remove-orphans` para limpiar servicios anteriores
+4. **Construye imágenes**: Construye las imágenes Docker con BuildKit para cache optimizado (con cache por defecto, o sin cache si usas `--no-cache`)
+5. **Inicia servicios**: Levanta todos los contenedores
+6. **Espera PostgreSQL**: Usa un wait loop activo con `pg_isready` para asegurar que la base de datos esté lista
+7. **Configura permisos**: Crea directorios necesarios y configura permisos de Laravel
+8. **Ejecuta migraciones**: Ejecuta las migraciones de base de datos
+9. **Optimiza Laravel**: Cachea configuración y rutas para producción
 
-**⚠️ IMPORTANTE**: El script validará que `APP_KEY` existe antes de continuar. Si no está configurado, el despliegue fallará. Debes generar `APP_KEY` manualmente antes del primer despliegue (ver sección "Generar APP_KEY" más abajo).
+**⚠️ IMPORTANTE**: 
+- El script validará que `APP_KEY` existe antes de continuar. Si no está configurado, el despliegue fallará. Debes generar `APP_KEY` manualmente antes del primer despliegue (ver sección "Generar APP_KEY" más abajo).
+- El script también validará que `composer.lock` esté sincronizado con `composer.json`. Si está desactualizado, el despliegue fallará con instrucciones claras para resolverlo.
+- **BuildKit está habilitado automáticamente** para optimizar el cache de dependencias entre builds, acelerando significativamente los builds subsecuentes.
 
 #### 9.2. Despliegue Manual (Alternativa)
 
@@ -651,8 +700,11 @@ Si prefieres hacerlo manualmente:
 # Ir al directorio de producción
 cd /var/apps/yape-notifier/infra/docker/environments/production
 
-# Construir imágenes (esto puede tardar varios minutos)
+# Construir imágenes (esto puede tardar varios minutos la primera vez)
 # Nota: Las imágenes incluyen todo el código y dependencias de Composer
+# BuildKit está habilitado automáticamente para cache optimizado
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
 docker compose --env-file .env build
 
 # Iniciar todos los servicios
@@ -670,6 +722,12 @@ docker compose --env-file .env ps --format "table {{.Name}}\t{{.Status}}\t{{.Hea
 - Las dependencias de Composer instaladas durante el build no se sobrescriban
 - Los archivos optimizados de Laravel se mantengan intactos
 - La aplicación sea completamente autocontenida y portable
+
+**Optimizaciones de Build:**
+- **Multi-stage builds**: Las dependencias se instalan en una etapa separada para mejor cache
+- **BuildKit cache mounts**: Los paquetes de Composer y npm se cachean entre builds
+- **Layer optimization**: Solo se reconstruyen las capas que cambian
+- **Validación previa**: `composer.lock` se valida antes del build para evitar errores
 
 Deberías ver algo como:
 
@@ -1203,6 +1261,42 @@ docker compose --env-file .env exec php-fpm php artisan tinker
 # Luego en tinker: DB::connection()->getPdo();
 ```
 
+### Error: "composer.lock está desactualizado"
+
+**Causa**: El archivo `composer.lock` no está sincronizado con `composer.json`. Esto ocurre cuando se agregan dependencias nuevas a `composer.json` sin actualizar el lock file.
+
+**Solución**:
+
+```bash
+# Opción 1: En el servidor (antes de deploy)
+cd /var/apps/yape-notifier/apps/api
+composer update --no-interaction
+git add composer.lock
+git commit -m "chore: update composer.lock"
+git push
+
+# Luego ejecutar deploy nuevamente
+cd ../../infra/docker/environments/production
+./deploy.sh
+```
+
+**Solución alternativa (si no tienes composer local)**:
+
+```bash
+# Usar Docker para actualizar composer.lock
+cd /var/apps/yape-notifier/apps/api
+docker run --rm -v $(pwd):/app -w /app composer:latest update --no-interaction
+git add composer.lock
+git commit -m "chore: update composer.lock"
+git push
+
+# Luego ejecutar deploy
+cd ../../infra/docker/environments/production
+./deploy.sh
+```
+
+**Prevención**: Siempre ejecuta `composer update` o `composer require` localmente y haz commit del `composer.lock` antes de hacer push al repositorio.
+
 ### Error: "Permission denied" en storage
 
 **Causa**: Los permisos de los directorios de Laravel no están configurados correctamente.
@@ -1263,9 +1357,11 @@ docker compose --env-file .env logs -f db
 **⚠️ IMPORTANTE**: Al actualizar, el script `deploy.sh` ahora:
 
 - Valida que `APP_KEY` existe (no lo regenera)
+- **Valida que `composer.lock` esté sincronizado** (nuevo - falla si está desactualizado)
 - Detiene contenedores ANTES de construir imágenes
 - Usa espera activa para PostgreSQL (no sleep fijo)
-- Usa cache por defecto (usa `--no-cache` solo si es necesario)
+- Usa BuildKit con cache optimizado por defecto (usa `--no-cache` solo si es necesario)
+- **Builds más rápidos**: BuildKit cachea dependencias entre builds
 
 ```bash
 # Ir al directorio del proyecto
@@ -1286,6 +1382,10 @@ cd infra/docker/environments/production
 ./deploy.sh --no-cache
 
 # Opción 2: Despliegue manual
+# IMPORTANTE: Habilitar BuildKit para cache optimizado
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+
 docker compose --env-file .env down --remove-orphans
 docker compose --env-file .env build  # O con --no-cache si necesitas rebuild completo
 docker compose --env-file .env up -d

@@ -84,8 +84,16 @@ docker compose --env-file .env down
 ### Reconstruir imágenes
 
 ```bash
+# Con BuildKit habilitado (recomendado - cache optimizado)
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+docker compose --env-file .env build
+
+# Sin cache (rebuild completo)
 docker compose --env-file .env build --no-cache
 ```
+
+**Nota**: BuildKit está habilitado automáticamente en los scripts `deploy.sh` y `update.sh`. Para builds manuales, exporta las variables de entorno antes de construir.
 
 ### Ejecutar comandos en contenedores
 
@@ -125,12 +133,41 @@ Para producción, considera usar:
 - Variables de entorno del sistema
 - Secret management tools (HashiCorp Vault, AWS Secrets Manager)
 
+## 🚀 Optimizaciones de Build
+
+### BuildKit y Cache Optimizado
+
+Todos los Dockerfiles usan **BuildKit** con cache mounts para optimizar builds:
+
+- **Multi-stage builds**: Dependencias instaladas en etapa separada
+- **Cache mounts**: Paquetes de Composer y npm se cachean entre builds
+- **Layer optimization**: Solo se reconstruyen capas que cambian
+- **Validación previa**: `composer.lock` se valida antes del build
+
+**Beneficios**:
+- Builds subsecuentes: **~1-2 min** (vs ~5-10 min sin cache)
+- Menor uso de ancho de banda
+- Builds más rápidos al cambiar solo código
+
+**BuildKit se habilita automáticamente** en los scripts `deploy.sh` y `update.sh`. Para builds manuales:
+
+```bash
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+docker compose --env-file .env build
+```
+
+### Validación de composer.lock
+
+Los scripts de deploy validan automáticamente que `composer.lock` esté sincronizado con `composer.json` antes del build. Si está desactualizado, el deploy falla con instrucciones claras.
+
 ## 📝 Notas Importantes
 
 1. **Base de Datos**: Cada entorno tiene su propia base de datos
 2. **Volúmenes**: Los volúmenes de Docker son específicos por entorno
 3. **Redes**: Cada entorno tiene su propia red Docker para aislamiento
 4. **Healthchecks**: Todos los servicios tienen healthchecks configurados
+5. **composer.lock**: Debe estar siempre sincronizado con composer.json (validado automáticamente)
 
 ## 🔍 Troubleshooting
 
