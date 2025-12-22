@@ -275,7 +275,12 @@ fi
 info "Verificando permisos y directorios..."
 docker compose --env-file .env exec -T php-fpm sh -c "mkdir -p /var/www/storage/framework/{sessions,views,cache} /var/www/storage/logs /var/www/bootstrap/cache && chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache && chmod -R 775 /var/www/storage /var/www/bootstrap/cache"
 
-# PASO 8: Limpiar caches de Laravel antes de migraciones
+# PASO 8: Descubrir packages de Laravel (necesario después del build sin scripts)
+# Esto asegura que todos los service providers estén registrados correctamente
+info "Descubriendo packages de Laravel..."
+docker compose --env-file .env exec -T php-fpm php artisan package:discover --ansi || warn "package:discover falló (puede ser normal si no hay packages nuevos)"
+
+# PASO 9: Limpiar caches de Laravel antes de migraciones
 # Esto asegura que Laravel use las variables de entorno actuales y no valores cacheados
 info "Limpiando caches de Laravel..."
 docker compose --env-file .env exec -T php-fpm php artisan config:clear
@@ -287,11 +292,11 @@ if ! docker compose --env-file .env exec -T php-fpm php artisan cache:clear 2>/d
     warn "Asegúrate de que CACHE_DRIVER=file en tu .env para evitar este warning"
 fi
 
-# PASO 9: Ejecutar migraciones (solo después de que PostgreSQL esté listo y caches limpiados)
+# PASO 10: Ejecutar migraciones (solo después de que PostgreSQL esté listo y caches limpiados)
 info "Ejecutando migraciones..."
 docker compose --env-file .env exec -T php-fpm php artisan migrate --force
 
-# PASO 10: Optimizar Laravel (después de migraciones)
+# PASO 11: Optimizar Laravel (después de migraciones)
 info "Optimizando Laravel..."
 docker compose --env-file .env exec -T php-fpm php artisan config:cache
 docker compose --env-file .env exec -T php-fpm php artisan route:cache

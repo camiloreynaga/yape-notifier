@@ -113,11 +113,10 @@ RUN chown -R www-data:www-data /var/www \
 # Install Composer for running scripts (lightweight, only binary)
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Run composer scripts after copy (post-install scripts like optimize, key:generate, etc.)
-RUN composer run-script post-install-cmd --no-interaction || true
-
 # Optimize autoloader for production
-RUN composer dump-autoload --optimize --classmap-authoritative
+# Usamos --no-scripts para evitar ejecutar scripts de Laravel que requieren variables de entorno
+# Los scripts se ejecutarán después cuando el contenedor esté corriendo con .env configurado
+RUN composer dump-autoload --optimize --classmap-authoritative --no-scripts
 
 EXPOSE 9000
 

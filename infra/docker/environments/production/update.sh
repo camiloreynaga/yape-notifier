@@ -350,6 +350,10 @@ else
     warn "⚠️  API no responde. Revisa los logs."
 fi
 
+# Descubrir packages de Laravel (necesario después del build sin scripts)
+info "Descubriendo packages de Laravel..."
+docker compose --env-file .env exec -T php-fpm php artisan package:discover --ansi || warn "package:discover falló (puede ser normal si no hay packages nuevos)"
+
 # Limpiar caches
 info "Limpiando caches..."
 docker compose --env-file .env exec -T php-fpm php artisan config:clear || true
