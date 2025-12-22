@@ -51,6 +51,10 @@ yape-notifier/
 ### Opción 1: Docker (Recomendado)
 
 ```bash
+# 1. Instalar git hooks (una vez, después de clonar)
+./scripts/setup-git-hooks.sh
+
+# 2. Iniciar entorno de desarrollo
 cd infra/docker/environments/development
 ./setup.sh
 ./deploy.sh
@@ -126,12 +130,32 @@ Ver [docs/README.md](docs/README.md) para índice completo de documentación.
 ### Usando Makefile
 
 ```bash
-make help          # Ver todos los comandos
-make install       # Instalar dependencias
-make dev           # Iniciar entorno de desarrollo
-make test          # Ejecutar tests
-make docker-up     # Iniciar contenedores Docker
+make help                # Ver todos los comandos
+make install             # Instalar dependencias
+make dev                 # Iniciar entorno de desarrollo
+make test                # Ejecutar tests
+make docker-up           # Iniciar contenedores Docker
+make composer:update     # Actualizar dependencias PHP (usa Docker)
+make composer:require    # Agregar dependencia (usa Docker)
+make composer:validate   # Validar compatibilidad composer.lock
 ```
+
+### Gestión de Dependencias PHP
+
+**⚠️ IMPORTANTE**: Siempre usar Docker para actualizar dependencias PHP:
+
+```bash
+# Actualizar dependencias (usa PHP 8.2 LTS - mismo que Dockerfile)
+make composer:update
+
+# Agregar nueva dependencia
+make composer:require PACKAGE=laravel/sanctum
+
+# Validar compatibilidad
+make composer:validate
+```
+
+Ver [apps/api/README_DEPENDENCIES.md](apps/api/README_DEPENDENCIES.md) para más detalles.
 
 ### Docker
 

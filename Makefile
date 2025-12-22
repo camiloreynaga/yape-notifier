@@ -11,6 +11,24 @@ install: ## Instalar dependencias (para desarrollo local sin Docker)
 	@cd apps/web-dashboard && npm install
 	@echo "✅ Dependencias instaladas"
 
+composer:update: ## Actualizar dependencias de Composer usando Docker (PHP 8.2 LTS)
+	@echo "🔄 Actualizando dependencias de Composer usando PHP 8.2 LTS (mismo que Dockerfile)..."
+	@cd apps/api && docker run --rm -v "$(PWD):/app" -w /app php:8.2-cli sh -c "curl -sS https://getcomposer.org/installer | php && php composer.phar update --no-interaction"
+	@echo "✅ Dependencias actualizadas. Revisa cambios con: git diff apps/api/composer.lock"
+
+composer:require: ## Agregar nueva dependencia usando Docker (ej: make composer:require PACKAGE=laravel/sanctum)
+	@if [ -z "$(PACKAGE)" ]; then \
+		echo "❌ Error: Especifica el paquete con PACKAGE=nombre/paquete"; \
+		exit 1; \
+	fi
+	@echo "➕ Agregando dependencia $(PACKAGE) usando PHP 8.2 LTS..."
+	@cd apps/api && docker run --rm -v "$(PWD):/app" -w /app php:8.2-cli sh -c "curl -sS https://getcomposer.org/installer | php && php composer.phar require $(PACKAGE) --no-interaction"
+	@echo "✅ Dependencia agregada. Revisa cambios con: git diff apps/api/composer.json apps/api/composer.lock"
+
+composer:validate: ## Validar que composer.lock sea compatible con PHP 8.2 LTS
+	@echo "🔍 Validando compatibilidad de composer.lock con PHP 8.2 LTS..."
+	@cd apps/api && docker run --rm -v "$(PWD):/app" -w /app php:8.2-cli sh -c "curl -sS https://getcomposer.org/installer | php && php composer.phar install --dry-run --no-dev --no-interaction" > /dev/null 2>&1 && echo "✅ composer.lock es compatible con PHP 8.2 LTS" || (echo "❌ composer.lock NO es compatible con PHP 8.2 LTS. Ejecuta: make composer:update" && exit 1)
+
 install:docker: ## Instalar dependencias en contenedores Docker
 	@echo "📦 Instalando dependencias en contenedores Docker..."
 	@cd infra/docker/environments/development && docker compose --env-file .env build
