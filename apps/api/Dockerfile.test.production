@@ -1,6 +1,6 @@
 # Dockerfile para ejecutar pruebas usando la imagen de producción
 # Basado en Dockerfile.production pero con dependencias de desarrollo para testing
-FROM php:8.4-fpm-alpine
+FROM php:8.2-fpm-alpine
 
 # Set working directory
 WORKDIR /var/www
