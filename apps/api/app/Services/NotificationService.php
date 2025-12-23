@@ -34,6 +34,20 @@ class NotificationService
      */
     public function createNotification(array $data, Device $device): Notification
     {
+        // Ensure user relationship is loaded
+        if (!$device->relationLoaded('user')) {
+            $device->load('user');
+        }
+
+        // Validate user exists
+        if (!$device->user) {
+            Log::error('Device has no associated user', [
+                'device_id' => $device->id,
+                'user_id' => $device->user_id,
+            ]);
+            throw new \RuntimeException('Device has no associated user');
+        }
+
         // Validate that this is a real payment notification (not publicity/promotion)
         $validation = PaymentNotificationValidator::isValid($data);
         

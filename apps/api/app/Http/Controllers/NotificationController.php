@@ -27,6 +27,14 @@ class NotificationController extends Controller
     {
         try {
             $user = $request->user();
+            
+            if (!$user) {
+                Log::error('Notification creation attempted without authenticated user');
+                return response()->json([
+                    'message' => 'Authentication required',
+                ], 401);
+            }
+
             $deviceUuid = $request->input('device_id');
 
             // Validate user has commerce (critical operation)
@@ -102,21 +110,25 @@ class NotificationController extends Controller
             ], 201);
         } catch (ValidationException $e) {
             Log::warning('Notification validation failed', [
-                'user_id' => $request->user()->id,
+                'user_id' => $request->user()?->id,
                 'errors' => $e->errors(),
             ]);
 
             throw $e;
         } catch (\Exception $e) {
+            $userId = $request->user()?->id ?? 'unknown';
+            
             Log::error('Failed to create notification', [
-                'user_id' => $request->user()->id,
+                'user_id' => $userId,
                 'device_uuid' => $request->input('device_id'),
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
-                'message' => 'Failed to create notification. Please try again.',
+                'message' => 'Server Error',
                 'error' => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
