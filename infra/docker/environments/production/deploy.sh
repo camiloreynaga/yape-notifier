@@ -275,22 +275,29 @@ fi
 info "Verificando permisos y directorios..."
 docker compose --env-file .env exec -T php-fpm sh -c "mkdir -p /var/www/storage/framework/{sessions,views,cache} /var/www/storage/logs /var/www/bootstrap/cache && chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache && chmod -R 775 /var/www/storage /var/www/bootstrap/cache"
 
-# PASO 8: Descubrir packages de Laravel (necesario después del build sin scripts)
-# Esto asegura que todos los service providers estén registrados correctamente
-info "Descubriendo packages de Laravel..."
-docker compose --env-file .env exec -T php-fpm php artisan package:discover --ansi || warn "package:discover falló (puede ser normal si no hay packages nuevos)"
-
-# PASO 9: Limpiar caches de Laravel antes de migraciones
-# Esto asegura que Laravel use las variables de entorno actuales y no valores cacheados
+# PASO 8: Limpiar caches de Laravel ANTES de package discovery
+# CRÍTICO: Eliminar TODOS los archivos de cache que puedan contener referencias
+# a dependencias de desarrollo (como nunomaduro/collision)
 info "Limpiando caches de Laravel..."
-docker compose --env-file .env exec -T php-fpm php artisan config:clear
+docker compose --env-file .env exec -T php-fpm php artisan config:clear || true
+docker compose --env-file .env exec -T php-fpm php artisan route:clear || true
+docker compose --env-file .env exec -T php-fpm php artisan view:clear || true
+
+# Eliminar archivos de cache del bootstrap manualmente para asegurar limpieza completa
+# Estos archivos pueden contener referencias a providers de desarrollo
+info "Eliminando archivos de cache del bootstrap..."
+docker compose --env-file .env exec -T php-fpm sh -c "rm -f /var/www/bootstrap/cache/packages.php /var/www/bootstrap/cache/services.php /var/www/bootstrap/cache/config.php 2>/dev/null || true" || true
 
 # Limpiar cache (puede fallar si CACHE_DRIVER=database y la tabla no existe, pero no es crítico)
-# Si falla, simplemente continuamos porque config:clear ya se ejecutó
 if ! docker compose --env-file .env exec -T php-fpm php artisan cache:clear 2>/dev/null; then
     warn "cache:clear falló (probablemente CACHE_DRIVER=database sin tabla). Continuando..."
     warn "Asegúrate de que CACHE_DRIVER=file en tu .env para evitar este warning"
 fi
+
+# PASO 9: Descubrir packages de Laravel DESPUÉS de limpiar caches
+# Esto regenera packages.php solo con dependencias de producción instaladas
+info "Descubriendo packages de Laravel..."
+docker compose --env-file .env exec -T php-fpm php artisan package:discover --ansi || warn "package:discover falló (puede ser normal si no hay packages nuevos)"
 
 # PASO 10: Ejecutar migraciones (solo después de que PostgreSQL esté listo y caches limpiados)
 info "Ejecutando migraciones..."

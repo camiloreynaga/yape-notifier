@@ -283,9 +283,33 @@ else
 fi
 
 # ============================================
-# PASO 5: EJECUTAR MIGRACIONES
+# PASO 5: LIMPIAR CACHES Y REGENERAR CONFIGURACIÓN
 # ============================================
-step "5/6: Ejecutando migraciones..."
+step "5/6: Limpiando caches y regenerando configuración..."
+
+# CRÍTICO: Limpiar TODOS los archivos de cache ANTES de ejecutar migraciones
+# Esto elimina archivos generados en desarrollo que pueden contener referencias
+# a dependencias de desarrollo (como nunomaduro/collision)
+info "Limpiando archivos de cache de Laravel..."
+docker compose --env-file .env exec -T php-fpm php artisan config:clear || true
+docker compose --env-file .env exec -T php-fpm php artisan route:clear || true
+docker compose --env-file .env exec -T php-fpm php artisan view:clear || true
+docker compose --env-file .env exec -T php-fpm php artisan cache:clear || true
+
+# Eliminar archivos de cache del bootstrap manualmente para asegurar limpieza completa
+# Estos archivos pueden contener referencias a providers de desarrollo
+info "Eliminando archivos de cache del bootstrap..."
+docker compose --env-file .env exec -T php-fpm sh -c "rm -f /var/www/bootstrap/cache/packages.php /var/www/bootstrap/cache/services.php /var/www/bootstrap/cache/config.php 2>/dev/null || true" || true
+
+# Regenerar package discovery DESPUÉS de limpiar caches
+# Esto regenera packages.php solo con dependencias de producción instaladas
+info "Regenerando package discovery (solo dependencias de producción)..."
+docker compose --env-file .env exec -T php-fpm php artisan package:discover --ansi || warn "package:discover falló (puede ser normal si no hay packages nuevos)"
+
+# ============================================
+# PASO 6: EJECUTAR MIGRACIONES
+# ============================================
+step "6/7: Ejecutando migraciones..."
 
 # Verificar qué migraciones se van a ejecutar
 info "Migraciones pendientes:"
@@ -314,9 +338,9 @@ info "Estado final de migraciones:"
 docker compose --env-file .env exec -T php-fpm php artisan migrate:status
 
 # ============================================
-# PASO 6: REINICIAR SERVICIOS Y VERIFICAR
+# PASO 7: REINICIAR SERVICIOS Y VERIFICAR
 # ============================================
-step "6/6: Reiniciando servicios y verificando..."
+step "7/7: Reiniciando servicios y verificando..."
 
 # Reiniciar servicios
 info "Reiniciando servicios..."
@@ -350,16 +374,11 @@ else
     warn "⚠️  API no responde. Revisa los logs."
 fi
 
-# Descubrir packages de Laravel (necesario después del build sin scripts)
-info "Descubriendo packages de Laravel..."
-docker compose --env-file .env exec -T php-fpm php artisan package:discover --ansi || warn "package:discover falló (puede ser normal si no hay packages nuevos)"
-
-# Limpiar caches
-info "Limpiando caches..."
-docker compose --env-file .env exec -T php-fpm php artisan config:clear || true
-docker compose --env-file .env exec -T php-fpm php artisan route:clear || true
-docker compose --env-file .env exec -T php-fpm php artisan view:clear || true
-docker compose --env-file .env exec -T php-fpm php artisan cache:clear || true
+# Optimizar caches para producción (después de migraciones exitosas)
+info "Optimizando caches para producción..."
+docker compose --env-file .env exec -T php-fpm php artisan config:cache || warn "config:cache falló"
+docker compose --env-file .env exec -T php-fpm php artisan route:cache || warn "route:cache falló"
+docker compose --env-file .env exec -T php-fpm php artisan view:cache || warn "view:cache falló"
 
 # ============================================
 # RESUMEN
