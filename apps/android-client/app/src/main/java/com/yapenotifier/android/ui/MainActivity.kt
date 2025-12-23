@@ -7,7 +7,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
@@ -25,13 +25,16 @@ import com.yapenotifier.android.R
 import com.yapenotifier.android.data.local.PreferencesManager
 import com.yapenotifier.android.databinding.ActivityMainBinding
 import com.yapenotifier.android.ui.viewmodel.MainViewModel
+import com.yapenotifier.android.ui.viewmodel.StatisticsState
 import com.yapenotifier.android.ui.viewmodel.StatisticsViewModel
 import com.yapenotifier.android.util.NotificationAccessChecker
 import com.yapenotifier.android.util.PaymentNotificationParser
 import com.yapenotifier.android.util.ServiceStatusManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -77,7 +80,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupUI() {
         binding.tvServiceLog.movementMethod = ScrollingMovementMethod()
-        updateCaptureStatus("Verificando...", android.graphics.Color.parseColor("#757575"))
+        updateCaptureStatus("Verificando...", Color.parseColor("#757575"))
     }
 
 
@@ -126,16 +129,16 @@ class MainActivity : AppCompatActivity() {
     private fun updateCaptureStatusFromServiceStatus(status: String) {
         when {
             status.contains("✅") || status.contains("OK") || status.contains("exitoso") -> {
-                updateCaptureStatus("✅ Capturando OK", android.graphics.Color.parseColor("#4CAF50"))
+                updateCaptureStatus("✅ Capturando OK", Color.parseColor("#4CAF50"))
             }
             status.contains("⚠️") || status.contains("advertencia") || status.contains("pendiente") -> {
-                updateCaptureStatus("⚠️ Advertencia", android.graphics.Color.parseColor("#FF9800"))
+                updateCaptureStatus("⚠️ Advertencia", Color.parseColor("#FF9800"))
             }
             status.contains("❌") || status.contains("ERROR") || status.contains("FAIL") || status.contains("error") -> {
-                updateCaptureStatus("❌ Error en Captura", android.graphics.Color.parseColor("#F44336"))
+                updateCaptureStatus("❌ Error en Captura", Color.parseColor("#F44336"))
             }
             else -> {
-                updateCaptureStatus("🔄 En Proceso", android.graphics.Color.parseColor("#2196F3"))
+                updateCaptureStatus("🔄 En Proceso", Color.parseColor("#2196F3"))
             }
         }
         binding.tvLastServiceStatus.text = status
@@ -146,10 +149,10 @@ class MainActivity : AppCompatActivity() {
         binding.tvCaptureStatus.setTextColor(color)
         // Update card stroke color dynamically
         binding.cardCaptureStatus.strokeColor = color
-        binding.cardCaptureStatus.strokeWidth = if (color != android.graphics.Color.parseColor("#757575")) 3 else 0
+        binding.cardCaptureStatus.strokeWidth = if (color != Color.parseColor("#757575")) 3 else 0
     }
 
-    private fun updateStatistics(state: com.yapenotifier.android.ui.viewmodel.StatisticsState) {
+    private fun updateStatistics(state: StatisticsState) {
         // Update counts
         binding.tvSentTodayCount.text = state.sentTodayCount.toString()
         binding.tvPendingCount.text = state.pendingCount.toString()
@@ -216,12 +219,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateAllPermissionStatus() {
-        checkNotificationPermission()
-        checkBatteryOptimizationStatus()
+        lifecycleScope.launch {
+            val notificationAccessEnabled = withContext(Dispatchers.IO) {
+                NotificationAccessChecker.isNotificationAccessEnabled(this@MainActivity)
+            }
+            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            val isIgnoringOptimizations = withContext(Dispatchers.IO) {
+                powerManager.isIgnoringBatteryOptimizations(packageName)
+            }
+            updateNotificationPermissionStatus(notificationAccessEnabled)
+            updateBatteryOptimizationStatus(isIgnoringOptimizations)
+        }
     }
 
-    private fun checkNotificationPermission() {
-        if (NotificationAccessChecker.isNotificationAccessEnabled(this)) {
+    private fun updateNotificationPermissionStatus(isGranted: Boolean) {
+        if (isGranted) {
             binding.tvStatus.text = "✅ Permiso de Notificación: Activado"
             binding.btnEnableNotifications.isEnabled = false
         } else {
@@ -230,23 +242,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkBatteryOptimizationStatus() {
-        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-        val isIgnoringOptimizations = powerManager.isIgnoringBatteryOptimizations(packageName)
-
-        if (isIgnoringOptimizations) {
+    private fun updateBatteryOptimizationStatus(isIgnoring: Boolean) {
+        if (isIgnoring) {
             binding.tvBatteryStatus.text = "✅ Ahorro de Batería: Desactivado"
             binding.btnBatteryOptimization.isEnabled = false
         } else {
             binding.tvBatteryStatus.text = "❌ Ahorro de Batería: Activado (puede detener el servicio)"
             binding.btnBatteryOptimization.isEnabled = true
         }
-    }
-
-    private fun requestNotificationPermission() {
-        val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-        startActivity(intent)
-        Toast.makeText(this, "Habilita 'Yape Notifier' en la lista de servicios", Toast.LENGTH_LONG).show()
     }
 
     private fun requestIgnoreBatteryOptimizations() {

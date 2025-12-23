@@ -29,15 +29,6 @@ class MonitoredAppsAdapter(
         return currentList.filter { it.isChecked }.map { it.packageName }
     }
 
-    private fun getAppDisplayName(packageName: String): String {
-        return when (packageName) {
-            "com.bcp.innovacxion.yape.movil" -> "Yape"
-            "pe.com.interbank.mobilebanking" -> "Interbank"
-            "com.scotiabank.mobile.android" -> "Scotiabank"
-            else -> packageName
-        }
-    }
-
     inner class MonitoredAppViewHolder(private val binding: ItemMonitoredAppBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(item: MonitoredAppCheckableItem) {
             binding.switchMonitor.setOnCheckedChangeListener(null)
@@ -45,8 +36,9 @@ class MonitoredAppsAdapter(
             binding.tvPackageName.text = item.packageName
             binding.switchMonitor.isChecked = item.isChecked
             binding.switchMonitor.setOnCheckedChangeListener { _, isChecked ->
-                if (bindingAdapterPosition != RecyclerView.NO_POSITION) {
-                    onAppChecked(getItem(bindingAdapterPosition), isChecked)
+                // Use the 'item' passed to bind for better safety inside a listener
+                if (item.isChecked != isChecked) {
+                    onAppChecked(item, isChecked)
                 }
             }
         }
@@ -59,6 +51,17 @@ class MonitoredAppsAdapter(
 
         override fun areContentsTheSame(oldItem: MonitoredAppCheckableItem, newItem: MonitoredAppCheckableItem): Boolean {
             return oldItem == newItem
+        }
+    }
+    
+    companion object {
+        private fun getAppDisplayName(packageName: String): String {
+            return when (packageName) {
+                "com.bcp.innovacxion.yape.movil" -> "Yape"
+                "pe.com.interbank.mobilebanking" -> "Interbank"
+                "com.scotiabank.mobile.android" -> "Scotiabank"
+                else -> packageName
+            }
         }
     }
 }
