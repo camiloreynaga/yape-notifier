@@ -42,44 +42,105 @@ if [ ! -f ".env" ]; then
     exit 1
 fi
 
-info "Generando keys de Reverb..."
-
-# Crear contenedor temporal para generar keys
-TEMP_CONTAINER=$(docker run -d --rm \
-    -v "$(pwd)/../../../../apps/api:/var/www" \
-    -w /var/www \
-    php:8.2-cli \
-    sh -c "sleep 3600")
-
-info "Instalando dependencias en contenedor temporal..."
-
-# Instalar composer y dependencias
-docker exec $TEMP_CONTAINER sh -c "
-    curl -sS https://getcomposer.org/installer | php && \
-    php composer.phar install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts
-" > /dev/null 2>&1
-
-# Copiar .env al contenedor si existe
-if [ -f ".env" ]; then
-    docker cp .env $TEMP_CONTAINER:/var/www/.env
+# Verificar que APP_KEY está configurado (necesario para Reverb)
+if ! grep -q "^APP_KEY=base64:" .env; then
+    error "APP_KEY no está configurado en .env"
+    error "Reverb requiere APP_KEY para generar las keys"
+    error "Ejecuta primero: docker compose --env-file .env exec php-fpm php artisan key:generate"
+    exit 1
 fi
 
 info "Generando keys de Reverb..."
 
-# Generar keys
-OUTPUT=$(docker exec $TEMP_CONTAINER php artisan reverb:install --show 2>&1)
+# Método 1: Intentar usar contenedor PHP-FPM existente (más rápido y confiable)
+USE_EXISTING_CONTAINER=false
+if docker compose --env-file .env ps php-fpm | grep -q "Up"; then
+    info "Usando contenedor PHP-FPM existente..."
+    USE_EXISTING_CONTAINER=true
+fi
 
-# Extraer keys del output
-REVERB_APP_KEY=$(echo "$OUTPUT" | grep -oP 'REVERB_APP_KEY=\K[^\s]+' || echo "")
-REVERB_APP_SECRET=$(echo "$OUTPUT" | grep -oP 'REVERB_APP_SECRET=\K[^\s]+' || echo "")
+if [ "$USE_EXISTING_CONTAINER" = true ]; then
+    # Usar contenedor existente
+    info "Generando keys usando contenedor PHP-FPM existente..."
+    
+    # Generar keys
+    OUTPUT=$(docker compose --env-file .env exec -T php-fpm php artisan reverb:install --show 2>&1 || true)
+    
+    # Mostrar output completo para debugging
+    if [ -n "$OUTPUT" ]; then
+        info "Output del comando reverb:install:"
+        echo "$OUTPUT"
+        echo ""
+    fi
+    
+    # Extraer keys del output (múltiples patrones para compatibilidad)
+    REVERB_APP_KEY=$(echo "$OUTPUT" | grep -oE 'REVERB_APP_KEY=([^[:space:]]+)' | cut -d'=' -f2 | head -1 || echo "")
+    REVERB_APP_SECRET=$(echo "$OUTPUT" | grep -oE 'REVERB_APP_SECRET=([^[:space:]]+)' | cut -d'=' -f2 | head -1 || echo "")
+    
+    # Si no se encontraron, intentar otro formato
+    if [ -z "$REVERB_APP_KEY" ]; then
+        REVERB_APP_KEY=$(echo "$OUTPUT" | grep -i "app_key" | grep -oE 'base64:[^[:space:]]+' | head -1 || echo "")
+    fi
+    if [ -z "$REVERB_APP_SECRET" ]; then
+        REVERB_APP_SECRET=$(echo "$OUTPUT" | grep -i "app_secret" | grep -oE '[a-zA-Z0-9+/=]{40,}' | head -1 || echo "")
+    fi
+else
+    # Método 2: Crear contenedor temporal
+    info "Creando contenedor temporal para generar keys..."
+    
+    # Crear contenedor temporal
+    TEMP_CONTAINER=$(docker run -d --rm \
+        -v "$(pwd)/../../../../apps/api:/var/www" \
+        -w /var/www \
+        php:8.2-cli \
+        sh -c "sleep 3600")
+    
+    info "Instalando dependencias en contenedor temporal..."
+    
+    # Instalar composer y dependencias
+    docker exec $TEMP_CONTAINER sh -c "
+        apk add --no-cache git unzip curl > /dev/null 2>&1 && \
+        curl -sS https://getcomposer.org/installer | php && \
+        php composer.phar install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts
+    " > /dev/null 2>&1 || warn "Algunas dependencias pueden no haberse instalado correctamente"
+    
+    # Copiar .env al contenedor
+    docker cp .env $TEMP_CONTAINER:/var/www/.env 2>/dev/null || warn "No se pudo copiar .env al contenedor"
+    
+    info "Generando keys de Reverb..."
+    
+    # Generar keys
+    OUTPUT=$(docker exec $TEMP_CONTAINER php artisan reverb:install --show 2>&1 || true)
+    
+    # Mostrar output completo
+    if [ -n "$OUTPUT" ]; then
+        info "Output del comando reverb:install:"
+        echo "$OUTPUT"
+        echo ""
+    fi
+    
+    # Extraer keys del output
+    REVERB_APP_KEY=$(echo "$OUTPUT" | grep -oE 'REVERB_APP_KEY=([^[:space:]]+)' | cut -d'=' -f2 | head -1 || echo "")
+    REVERB_APP_SECRET=$(echo "$OUTPUT" | grep -oE 'REVERB_APP_SECRET=([^[:space:]]+)' | cut -d'=' -f2 | head -1 || echo "")
+    
+    # Limpiar contenedor temporal
+    docker stop $TEMP_CONTAINER > /dev/null 2>&1 || true
+fi
 
-# Limpiar contenedor temporal
-docker stop $TEMP_CONTAINER > /dev/null 2>&1
-
+# Verificar que se generaron las keys
 if [ -z "$REVERB_APP_KEY" ] || [ -z "$REVERB_APP_SECRET" ]; then
-    error "No se pudieron generar las keys de Reverb"
-    error "Output del comando:"
-    echo "$OUTPUT"
+    error "❌ No se pudieron extraer las keys de Reverb del output"
+    error ""
+    error "SOLUCIÓN ALTERNATIVA:"
+    error "Ejecuta manualmente en el contenedor PHP-FPM:"
+    error "  docker compose --env-file .env exec php-fpm php artisan reverb:install --show"
+    error ""
+    error "Luego copia las keys mostradas y agrégalas manualmente al .env"
+    error ""
+    if [ -n "$OUTPUT" ]; then
+        error "Output completo recibido:"
+        echo "$OUTPUT"
+    fi
     exit 1
 fi
 

@@ -49,7 +49,25 @@ REVERB_SCHEME=http  # Reverb corre en HTTP internamente, Caddy maneja HTTPS
 
 ### 2. Generar Keys de Reverb
 
-**Opción A: Usar el script automatizado (Recomendado)**
+**Opción A: Método Simple (Recomendado - Más Confiable)**
+
+```bash
+cd /var/apps/yape-notifier/infra/docker/environments/production
+
+# Hacer ejecutable
+chmod +x generate-reverb-keys-simple.sh
+
+# Ejecutar (muestra output completo)
+./generate-reverb-keys-simple.sh
+```
+
+Este script:
+
+- Usa el contenedor PHP-FPM existente (más rápido)
+- Muestra el output completo del comando
+- Te permite copiar las keys manualmente
+
+**Opción B: Script Automatizado (Intenta extraer keys automáticamente)**
 
 ```bash
 cd /var/apps/yape-notifier/infra/docker/environments/production
@@ -57,26 +75,26 @@ chmod +x generate-reverb-keys.sh
 ./generate-reverb-keys.sh
 ```
 
-El script:
-
-1. Crea un contenedor temporal
-2. Genera las keys usando `php artisan reverb:install`
-3. Muestra las keys para copiar al `.env`
-4. Opcionalmente actualiza el `.env` automáticamente
-
-**Opción B: Generar manualmente**
+**Opción C: Método Manual Directo (Si los scripts fallan)**
 
 ```bash
 cd /var/apps/yape-notifier/infra/docker/environments/production
 
-# Iniciar contenedor PHP-FPM temporalmente
+# 1. Asegurar que PHP-FPM está corriendo
 docker compose --env-file .env up -d php-fpm
 
-# Generar keys
+# 2. Generar keys (muestra output completo)
 docker compose --env-file .env exec php-fpm php artisan reverb:install --show
 
-# Copiar las keys mostradas al .env
+# 3. Copiar manualmente las líneas REVERB_APP_KEY y REVERB_APP_SECRET
+#    que aparecen en el output y agregarlas al .env
 ```
+
+**⚠️ IMPORTANTE:**
+
+- El comando `reverb:install --show` muestra las keys en el formato correcto
+- Copia exactamente las líneas mostradas (incluyendo `REVERB_APP_KEY=` y `REVERB_APP_SECRET=`)
+- Asegúrate de que `APP_KEY` esté configurado en `.env` antes de generar keys de Reverb
 
 ### 3. Servicio Reverb en Docker Compose
 
