@@ -7,8 +7,10 @@ import android.view.MenuItem
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import android.text.TextWatcher
 import androidx.appcompat.widget.SearchView
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.chip.Chip
@@ -16,6 +18,9 @@ import com.yapenotifier.android.R
 import com.yapenotifier.android.databinding.ActivityAdminPanelBinding
 import com.yapenotifier.android.ui.admin.adapter.NotificationAdapter
 import com.yapenotifier.android.ui.admin.viewmodel.AdminPanelViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class AdminPanelActivity : AppCompatActivity() {
     private lateinit var binding: ActivityAdminPanelBinding
@@ -36,6 +41,8 @@ class AdminPanelActivity : AppCompatActivity() {
         setupRecyclerView()
         setupSwipeRefresh()
         setupBottomNavigation()
+        setupSearch()
+        setupClickListeners()
         setupObservers()
         setupFilters()
     }
@@ -157,21 +164,41 @@ class AdminPanelActivity : AppCompatActivity() {
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.menu_admin_panel, menu)
-
-        val searchItem = menu.findItem(R.id.action_search)
-        val searchView = searchItem.actionView as? SearchView
-        searchView?.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
-            override fun onQueryTextSubmit(query: String?): Boolean {
-                return false
-            }
-
-            override fun onQueryTextChange(newText: String?): Boolean {
-                viewModel.setSearchQuery(newText ?: "")
-                return true
+        return true
+    }
+    
+    private fun setupSearch() {
+        // Setup search from EditText in layout
+        binding.etSearch.setOnEditorActionListener { _, _, _ ->
+            viewModel.setSearchQuery(binding.etSearch.text.toString())
+            true
+        }
+        
+        // Debounce search input
+        var searchJob: Job? = null
+        binding.etSearch.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                searchJob?.cancel()
+                searchJob = lifecycleScope.launch {
+                    delay(500)
+                    viewModel.setSearchQuery(s?.toString() ?: "")
+                }
             }
         })
-
-        return true
+    }
+    
+    private fun setupClickListeners() {
+        binding.tvMarkAllRead.setOnClickListener {
+            viewModel.markAllAsRead()
+            Toast.makeText(this, "Todas las notificaciones marcadas como leídas", Toast.LENGTH_SHORT).show()
+        }
+        
+        binding.ivProfile.setOnClickListener {
+            val intent = Intent(this, AdminSettingsActivity::class.java)
+            startActivity(intent)
+        }
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {

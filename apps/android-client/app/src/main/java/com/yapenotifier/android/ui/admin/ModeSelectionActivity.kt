@@ -23,10 +23,9 @@ class ModeSelectionActivity : AppCompatActivity() {
     }
 
     private fun setupClickListeners() {
-        // Admin mode - navigate to login
+        // Admin mode - navigate to admin login
         binding.cardAdmin.setOnClickListener {
-            val intent = Intent(this, LoginActivity::class.java)
-            intent.putExtra("mode", "admin")
+            val intent = Intent(this, AdminLoginActivity::class.java)
             startActivity(intent)
         }
 

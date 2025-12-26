@@ -27,6 +27,7 @@ import com.yapenotifier.android.data.model.LinkCodeGenerateResponse
 import com.yapenotifier.android.data.model.DevicesResponse
 import com.yapenotifier.android.data.model.MonitorPackage
 import com.yapenotifier.android.data.model.MonitorPackagesResponse
+import com.yapenotifier.android.data.model.User
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -46,6 +47,9 @@ interface ApiService {
 
     @POST("api/logout")
     suspend fun logout(): Response<Unit>
+
+    @GET("api/auth/user")
+    suspend fun getCurrentUser(): Response<User>
 
     // --- Devices ---
     @POST("api/devices")

@@ -85,6 +85,12 @@
             android:theme="@style/Theme.YapeNotifier" />
         
         <activity
+            android:name=".ui.admin.AdminLoginActivity"
+            android:exported="false"
+            android:label="Admin Portal"
+            android:theme="@style/Theme.YapeNotifier" />
+        
+        <activity
             android:name=".ui.admin.AdminPanelActivity"
             android:exported="false"
             android:label="Panel Admin"

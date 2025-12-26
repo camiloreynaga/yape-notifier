@@ -4,7 +4,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="8dp"
+    android:layout_marginHorizontal="8dp"
+    android:layout_marginVertical="4dp"
     app:cardCornerRadius="12dp"
     app:cardElevation="2dp"
     app:strokeWidth="0dp">
@@ -12,100 +13,160 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:gravity="center_vertical">
 
-        <!-- Header: App Info and Time -->
+        <!-- App Icon -->
+        <ImageView
+            android:id="@+id/ivAppIcon"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_app_icon_yape"
+            android:padding="12dp"
+            android:contentDescription="App Icon"
+            tools:src="@drawable/ic_bell_notification" />
+
+        <!-- Content -->
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:orientation="vertical">
 
-            <TextView
-                android:id="@+id/tvAppInfo"
-                android:layout_width="0dp"
+            <!-- Header: App Info and Time -->
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Yape • Caja Principal • iPhone 13"
-                android:textSize="12sp"
-                android:textColor="#757575"
-                tools:text="Yape • Caja Principal • iPhone 13" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
 
+                <TextView
+                    android:id="@+id/tvAppInfo"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Yape • Caja Principal • iPhone 13"
+                    android:textSize="12sp"
+                    android:textColor="#757575"
+                    tools:text="Yape • Caja Principal • iPhone 13" />
+
+                <TextView
+                    android:id="@+id/tvTime"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="35 min"
+                    android:textSize="12sp"
+                    android:textColor="#757575"
+                    tools:text="35 min" />
+            </LinearLayout>
+
+            <!-- Title -->
             <TextView
-                android:id="@+id/tvTime"
+                android:id="@+id/tvTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="35 min"
-                android:textSize="12sp"
-                android:textColor="#757575"
-                tools:text="35 min" />
-        </LinearLayout>
-
-        <!-- Title -->
-        <TextView
-            android:id="@+id/tvTitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="Confirmación de Pago"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:textColor="@android:color/black"
-            tools:text="Confirmación de Pago" />
-
-        <!-- Body -->
-        <TextView
-            android:id="@+id/tvBody"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="SEGUNDINO RICSE DE LA CRUZ te envió un pago por S/70.00"
-            android:textSize="14sp"
-            android:textColor="#424242"
-            tools:text="SEGUNDINO RICSE DE LA CRUZ te envió un pago por S/70.00" />
-
-        <!-- Footer: Amount and Status -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <TextView
-                android:id="@+id/tvAmount"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="S/ 70.00"
-                android:textSize="18sp"
+                android:layout_marginTop="4dp"
+                android:text="Confirmación de Pago"
+                android:textSize="16sp"
                 android:textStyle="bold"
-                android:textColor="#4CAF50"
-                tools:text="S/ 70.00" />
+                android:textColor="@android:color/black"
+                tools:text="Confirmación de Pago" />
 
+            <!-- Body with Amount Highlighted -->
             <TextView
-                android:id="@+id/tvStatus"
-                android:layout_width="wrap_content"
+                android:id="@+id/tvBody"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Verificado"
-                android:textSize="12sp"
-                android:textColor="@android:color/white"
-                android:paddingHorizontal="8dp"
-                android:paddingVertical="4dp"
-                android:background="@drawable/bg_rounded_purple"
-                android:visibility="visible"
-                tools:text="Verificado" />
-
-            <TextView
-                android:id="@+id/tvDetails"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="Detalles >"
+                android:layout_marginTop="4dp"
+                android:text="SEGUNDINO RICSE DE LA CRUZ te envió un pago por S/70.00"
                 android:textSize="14sp"
-                android:textColor="#6200EE"
-                tools:text="Detalles >" />
+                android:textColor="#424242"
+                tools:text="SEGUNDINO RICSE DE LA CRUZ te envió un pago por S/70.00" />
+
+            <!-- Footer: Status Badge and Details -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <!-- Amount (if not in body) -->
+                <TextView
+                    android:id="@+id/tvAmount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="S/ 70.00"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="#4CAF50"
+                    android:visibility="gone"
+                    tools:text="S/ 70.00"
+                    tools:visibility="visible" />
+
+                <!-- Status Badge -->
+                <LinearLayout
+                    android:id="@+id/llStatusBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/bg_badge_verified"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="4dp"
+                    android:visibility="visible"
+                    tools:visibility="visible">
+
+                    <ImageView
+                        android:id="@+id/ivCheckmark"
+                        android:layout_width="12dp"
+                        android:layout_height="12dp"
+                        android:src="@drawable/ic_checkmark"
+                        android:contentDescription="Verified" />
+
+                    <TextView
+                        android:id="@+id/tvStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:text="Verificado"
+                        android:textSize="11sp"
+                        android:textColor="@android:color/white"
+                        android:textStyle="bold"
+                        tools:text="Verificado" />
+                </LinearLayout>
+
+                <!-- Code Badge (alternative to status) -->
+                <TextView
+                    android:id="@+id/tvCode"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="Cód: 262"
+                    android:textSize="12sp"
+                    android:textColor="#757575"
+                    android:visibility="gone"
+                    tools:text="Cód: 262" />
+
+                <!-- Details Link -->
+                <TextView
+                    android:id="@+id/tvDetails"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:text="Detalles >"
+                    android:textSize="14sp"
+                    android:textColor="#6200EE"
+                    android:gravity="end"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground"
+                    tools:text="Detalles >" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

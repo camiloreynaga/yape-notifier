@@ -34,41 +34,58 @@ class NotificationAdapter(
 
         fun bind(notification: Notification) {
             binding.apply {
-                // App icon and info
+                // App icon
+                val appIconBg = when (notification.sourceApp.lowercase()) {
+                    "yape" -> com.yapenotifier.android.R.drawable.bg_app_icon_yape
+                    "plin" -> com.yapenotifier.android.R.drawable.bg_app_icon_plin
+                    "bcp" -> com.yapenotifier.android.R.drawable.bg_app_icon_bcp
+                    else -> com.yapenotifier.android.R.drawable.bg_app_icon_yape
+                }
+                ivAppIcon.setBackgroundResource(appIconBg)
+                // You can set a specific icon here if needed
+                ivAppIcon.setImageResource(com.yapenotifier.android.R.drawable.ic_bell_notification)
+
+                // App info and time
                 tvAppInfo.text = buildAppInfo(notification)
                 tvTime.text = formatTime(notification.receivedAt)
 
                 // Title and body
                 tvTitle.text = "Confirmación de Pago"
-                tvBody.text = notification.body
-
-                // Amount
+                
+                // Build body with amount highlighted
                 notification.amount?.let { amount ->
                     val currency = notification.currency ?: "PEN"
-                    tvAmount.text = when (currency) {
-                        "PEN" -> "S/ ${String.format("%.2f", amount)}"
+                    val amountText = when (currency) {
+                        "PEN" -> "S/${String.format("%.2f", amount)}"
                         "USD" -> "$${String.format("%.2f", amount)}"
                         else -> "$currency ${String.format("%.2f", amount)}"
                     }
+                    val payerName = notification.payerName ?: "Usuario"
+                    tvBody.text = "$payerName te envió un pago por $amountText"
+                    tvAmount.text = amountText
                     tvAmount.visibility = android.view.View.VISIBLE
                 } ?: run {
+                    tvBody.text = notification.body
                     tvAmount.visibility = android.view.View.GONE
                 }
 
                 // Status badge
                 when (notification.status) {
                     "validated" -> {
+                        llStatusBadge.visibility = android.view.View.VISIBLE
+                        llStatusBadge.setBackgroundResource(com.yapenotifier.android.R.drawable.bg_badge_verified)
                         tvStatus.text = "Verificado"
-                        tvStatus.setBackgroundColor(android.graphics.Color.parseColor("#4CAF50"))
-                        tvStatus.visibility = android.view.View.VISIBLE
+                        ivCheckmark.visibility = android.view.View.VISIBLE
+                        tvCode.visibility = android.view.View.GONE
                     }
                     "pending" -> {
-                        tvStatus.visibility = android.view.View.GONE
+                        llStatusBadge.visibility = android.view.View.GONE
+                        tvCode.visibility = android.view.View.GONE
                     }
                     else -> {
-                        tvStatus.text = "Cód: ${notification.id}"
-                        tvStatus.setBackgroundColor(android.graphics.Color.parseColor("#757575"))
-                        tvStatus.visibility = android.view.View.VISIBLE
+                        llStatusBadge.visibility = android.view.View.GONE
+                        tvCode.text = "Cód: ${notification.id}"
+                        tvCode.visibility = android.view.View.VISIBLE
                     }
                 }
 

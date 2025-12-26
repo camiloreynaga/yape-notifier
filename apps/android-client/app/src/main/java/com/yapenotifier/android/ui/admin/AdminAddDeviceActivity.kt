@@ -37,8 +37,9 @@ class AdminAddDeviceActivity : AppCompatActivity() {
     }
 
     private fun setupToolbar() {
+        setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        supportActionBar?.title = "Connect Device"
+        supportActionBar?.setDisplayShowTitleEnabled(false)
     }
 
     private fun setupClickListeners() {

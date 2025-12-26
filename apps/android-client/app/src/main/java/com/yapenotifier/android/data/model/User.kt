@@ -5,7 +5,8 @@ import com.google.gson.annotations.SerializedName
 data class User(
     val id: Long,
     val name: String,
-    val email: String
+    val email: String,
+    val role: String? = null
 )
 
 data class LoginRequest(
