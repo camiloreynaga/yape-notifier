@@ -18,9 +18,12 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Middleware\HandleCors::class,
         ]);
         
-        $middleware->api(prepend: [
-            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-        ]);
+        // NOTA: EnsureFrontendRequestsAreStateful NO se aplica a rutas API
+        // Las rutas API usan tokens Bearer (stateless), no cookies (stateful)
+        // Si en el futuro necesitas cookies para alguna ruta específica, aplica el middleware solo a esa ruta
+        // $middleware->api(prepend: [
+        //     \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+        // ]);
 
         $middleware->alias([
             'verified' => \App\Http\Middleware\EnsureEmailIsVerified::class,
