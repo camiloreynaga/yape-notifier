@@ -48,11 +48,12 @@ if ! docker compose --env-file .env ps php-fpm | grep -q "Up"; then
     sleep 5
 fi
 
-info "Ejecutando: php artisan reverb:install --show"
+info "Ejecutando: php artisan reverb:install"
 info ""
 
-# Ejecutar comando directamente y mostrar output completo
-docker compose --env-file .env exec php-fpm php artisan reverb:install --show
+# Ejecutar comando directamente (sin --show, esa opción no existe)
+# El comando mostrará las keys en el output
+docker compose --env-file .env exec php-fpm php artisan reverb:install
 
 info ""
 info "=========================================="

@@ -84,7 +84,7 @@ cd /var/apps/yape-notifier/infra/docker/environments/production
 docker compose --env-file .env up -d php-fpm
 
 # 2. Generar keys (muestra output completo)
-docker compose --env-file .env exec php-fpm php artisan reverb:install --show
+docker compose --env-file .env exec php-fpm php artisan reverb:install
 
 # 3. Copiar manualmente las líneas REVERB_APP_KEY y REVERB_APP_SECRET
 #    que aparecen en el output y agregarlas al .env
@@ -92,7 +92,7 @@ docker compose --env-file .env exec php-fpm php artisan reverb:install --show
 
 **⚠️ IMPORTANTE:**
 
-- El comando `reverb:install --show` muestra las keys en el formato correcto
+- El comando `reverb:install` muestra las keys en el output (no necesita `--show`)
 - Copia exactamente las líneas mostradas (incluyendo `REVERB_APP_KEY=` y `REVERB_APP_SECRET=`)
 - Asegúrate de que `APP_KEY` esté configurado en `.env` antes de generar keys de Reverb
 

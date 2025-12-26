@@ -63,8 +63,8 @@ if [ "$USE_EXISTING_CONTAINER" = true ]; then
     # Usar contenedor existente
     info "Generando keys usando contenedor PHP-FPM existente..."
     
-    # Generar keys
-    OUTPUT=$(docker compose --env-file .env exec -T php-fpm php artisan reverb:install --show 2>&1 || true)
+    # Generar keys (sin --show, esa opción no existe en esta versión)
+    OUTPUT=$(docker compose --env-file .env exec -T php-fpm php artisan reverb:install 2>&1 || true)
     
     # Mostrar output completo para debugging
     if [ -n "$OUTPUT" ]; then
@@ -109,8 +109,8 @@ else
     
     info "Generando keys de Reverb..."
     
-    # Generar keys
-    OUTPUT=$(docker exec $TEMP_CONTAINER php artisan reverb:install --show 2>&1 || true)
+    # Generar keys (sin --show, esa opción no existe en esta versión)
+    OUTPUT=$(docker exec $TEMP_CONTAINER php artisan reverb:install 2>&1 || true)
     
     # Mostrar output completo
     if [ -n "$OUTPUT" ]; then
@@ -133,7 +133,7 @@ if [ -z "$REVERB_APP_KEY" ] || [ -z "$REVERB_APP_SECRET" ]; then
     error ""
     error "SOLUCIÓN ALTERNATIVA:"
     error "Ejecuta manualmente en el contenedor PHP-FPM:"
-    error "  docker compose --env-file .env exec php-fpm php artisan reverb:install --show"
+    error "  docker compose --env-file .env exec php-fpm php artisan reverb:install"
     error ""
     error "Luego copia las keys mostradas y agrégalas manualmente al .env"
     error ""
