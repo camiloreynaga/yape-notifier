@@ -142,6 +142,9 @@ class NotificationService
             ]);
         }
 
+        // Load relationships for broadcasting
+        $notification->load(['appInstance', 'device']);
+
         // Broadcast notification to WebSocket clients
         try {
             broadcast(new NotificationCreated($notification))->toOthers();

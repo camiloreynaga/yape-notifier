@@ -8,6 +8,7 @@ Backend Laravel 11 para el sistema de notificación de pagos multi-tenant con so
 - **Laravel 11**
 - **PostgreSQL**
 - **Laravel Sanctum** (autenticación)
+- **Laravel Reverb** (WebSocket server para notificaciones en tiempo real)
 
 ## 🏗️ Estructura
 
@@ -69,6 +70,35 @@ php artisan test --testsuite=Unit
 
 # Tests de integración
 php artisan test --testsuite=Feature
+```
+
+### WebSocket Server (Reverb)
+
+```bash
+# Iniciar servidor Reverb (desarrollo)
+php artisan reverb:start
+
+# Para producción, usar supervisor o systemd
+# Ver configuración en infra/docker/
+```
+
+**Variables de entorno requeridas (.env):**
+```env
+# Reverb WebSocket Server
+REVERB_APP_ID=yape-notifier
+REVERB_APP_KEY=base64:tu-key-generada
+REVERB_APP_SECRET=tu-secret-generado
+REVERB_HOST=0.0.0.0
+REVERB_PORT=8080
+REVERB_SCHEME=http
+
+# Broadcasting
+BROADCAST_CONNECTION=reverb
+```
+
+Para generar las keys de Reverb:
+```bash
+php artisan reverb:install
 ```
 
 ### Producción

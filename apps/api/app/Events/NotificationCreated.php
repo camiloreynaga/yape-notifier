@@ -65,6 +65,8 @@ class NotificationCreated implements ShouldBroadcast
             'source_app' => $this->notification->source_app,
             'package_name' => $this->notification->package_name,
             'app_instance_id' => $this->notification->app_instance_id,
+            'app_instance_label' => $this->notification->appInstance?->instance_label,
+            'device_alias' => $this->notification->device?->alias,
             'title' => $this->notification->title,
             'body' => $this->notification->body,
             'amount' => $this->notification->amount,
