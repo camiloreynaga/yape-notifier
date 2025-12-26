@@ -1,11 +1,11 @@
 # WebSockets para Notificaciones en Tiempo Real
 
-## Estado: ⚠️ PENDIENTE DE IMPLEMENTAR
+## Estado: ✅ CONFIGURACIÓN DISPONIBLE
 
 **Prioridad:** Media  
 **Componentes afectados:** API (Laravel), Web Dashboard (React)
 
-**Descripción:** Implementación de WebSockets usando Laravel Reverb para notificaciones en tiempo real en el dashboard web.
+**Descripción:** Implementación de WebSockets usando Laravel Reverb para notificaciones en tiempo real en el dashboard web. La configuración de producción con Docker está disponible.
 
 ---
 
@@ -101,7 +101,170 @@ php artisan reverb:start
 
 El servidor se iniciará en `http://127.0.0.1:8080` (o el puerto configurado).
 
-### Producción (con Supervisor)
+### Producción con Docker
+
+La configuración de producción usa Docker Compose con Caddy como reverse proxy.
+
+#### Arquitectura
+
+```
+Cliente (Dashboard/App) 
+    ↓ WebSocket (wss://api.notificaciones.space/app/{key})
+Caddy (Reverse Proxy con HTTPS)
+    ↓ WebSocket Proxy
+Reverb Container (Puerto 8080)
+    ↓ Broadcasting
+Laravel API (PHP-FPM)
+    ↓ Eventos
+PostgreSQL Database
+```
+
+#### Variables de Entorno para Producción
+
+```env
+# Broadcasting (Reverb) - WebSocket Server
+BROADCAST_CONNECTION=reverb
+
+# Reverb Configuration
+REVERB_APP_ID=yape-notifier
+REVERB_APP_KEY=base64:TU_KEY_GENERADA_AQUI
+REVERB_APP_SECRET=TU_SECRET_GENERADO_AQUI
+REVERB_HOST=0.0.0.0
+REVERB_PORT=8080
+REVERB_SCHEME=http  # Reverb corre en HTTP internamente, Caddy maneja HTTPS
+```
+
+**⚠️ IMPORTANTE:**
+- `REVERB_SCHEME=http` porque Reverb corre dentro de Docker en HTTP
+- Caddy maneja el HTTPS externo y hace proxy al Reverb interno
+- `REVERB_HOST=0.0.0.0` permite conexiones desde otros contenedores
+
+#### Generar Keys de Reverb
+
+**Opción A: Script automatizado (Recomendado)**
+
+```bash
+cd infra/docker/environments/production
+chmod +x generate-reverb-keys.sh
+./generate-reverb-keys.sh
+```
+
+**Opción B: Generar manualmente**
+
+```bash
+cd infra/docker/environments/production
+
+# Iniciar contenedor PHP-FPM temporalmente
+docker compose --env-file .env up -d php-fpm
+
+# Generar keys
+docker compose --env-file .env exec php-fpm php artisan reverb:install --show
+
+# Copiar las keys mostradas al .env
+```
+
+#### Servicio Reverb en Docker Compose
+
+El servicio Reverb está integrado en `docker-compose.yml`:
+
+```yaml
+reverb:
+  build:
+    context: ../../../../apps/api
+    dockerfile: ../../infra/docker/dockerfiles/Dockerfile.php-fpm
+  container_name: yape-notifier-reverb-prod
+  restart: always
+  command: php artisan reverb:start --host=0.0.0.0 --port=8080
+  # ... configuración completa
+```
+
+**Características:**
+- Usa la misma imagen que PHP-FPM (comparte código)
+- Corre en puerto 8080 interno
+- Se reinicia automáticamente si falla
+- Healthcheck para monitoreo
+- Límites de recursos configurados
+
+#### Configuración de Caddy (WebSocket Proxy)
+
+El `Caddyfile` tiene la configuración WebSocket:
+
+```caddyfile
+api.notificaciones.space {
+    # ... reverse_proxy a nginx-api ...
+    
+    # WebSocket proxy para Reverb
+    handle /app/* {
+        reverse_proxy reverb:8080 {
+            header_up Connection {>Connection}
+            header_up Upgrade {>Upgrade}
+            # ... configuración completa
+        }
+    }
+}
+```
+
+**Explicación:**
+- `/app/*` es la ruta que Laravel Echo usa para WebSocket
+- Caddy hace upgrade de HTTP a WebSocket automáticamente
+- Headers `Connection` y `Upgrade` son necesarios para WebSocket
+- Timeouts largos permiten mantener conexiones activas
+
+#### Despliegue
+
+```bash
+cd infra/docker/environments/production
+
+# Paso 1: Generar keys
+./generate-reverb-keys.sh
+
+# Paso 2: Agregar keys al .env (ver sección anterior)
+
+# Paso 3: Reconstruir y desplegar
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+docker compose --env-file .env build --no-cache
+docker compose --env-file .env up -d
+
+# Paso 4: Verificar que Reverb está corriendo
+docker compose --env-file .env ps reverb
+docker compose --env-file .env logs -f reverb
+```
+
+#### Verificar Funcionamiento
+
+```bash
+# Verificar que Reverb está escuchando
+docker compose --env-file .env exec reverb netstat -tuln | grep 8080
+
+# Verificar logs
+docker compose --env-file .env logs reverb --tail=50
+
+# Probar conexión WebSocket (desde el servidor)
+curl -i -N \
+  -H "Connection: Upgrade" \
+  -H "Upgrade: websocket" \
+  -H "Sec-WebSocket-Version: 13" \
+  -H "Sec-WebSocket-Key: test" \
+  http://localhost:8080/app/test
+```
+
+#### Monitoreo
+
+```bash
+# Estado del contenedor
+docker compose --env-file .env ps reverb
+
+# Uso de recursos
+docker stats yape-notifier-reverb-prod
+
+# Logs en tiempo real
+docker compose --env-file .env logs -f reverb
+```
+
+### Producción (con Supervisor - Alternativa)
+
+Si no usas Docker, puedes usar Supervisor:
 
 Crear archivo `/etc/supervisor/conf.d/reverb.conf`:
 
@@ -281,15 +444,71 @@ ws://127.0.0.1:8080/app/your-app-key
 - Verificar que el token Sanctum sea válido
 - Verificar que el usuario tenga `commerce_id` y coincida con el canal
 
+### Error: "Connection refused" (Docker)
+
+**Causa:** Reverb no está corriendo o no está accesible.
+
+**Solución:**
+```bash
+# Verificar que Reverb está corriendo
+docker compose --env-file .env ps reverb
+
+# Ver logs
+docker compose --env-file .env logs reverb
+
+# Reiniciar Reverb
+docker compose --env-file .env restart reverb
+```
+
+### Error: "WebSocket connection failed" (Docker)
+
+**Causa:** Caddy no está haciendo proxy correctamente o falta configuración.
+
+**Solución:**
+1. Verificar que Caddyfile tiene la sección `/app/*`
+2. Verificar logs de Caddy: `docker compose --env-file .env logs caddy`
+3. Reiniciar Caddy: `docker compose --env-file .env restart caddy`
+
+### Error: "Invalid key" o "Authentication failed"
+
+**Causa:** Las keys de Reverb no coinciden entre servidor y cliente.
+
+**Solución:**
+1. Verificar que `REVERB_APP_KEY` en `.env` del servidor coincide con `VITE_REVERB_APP_KEY` en el dashboard
+2. Regenerar keys si es necesario: `./generate-reverb-keys.sh`
+3. Reconstruir dashboard con las nuevas variables
+
+### Reverb se reinicia constantemente (Docker)
+
+**Causa:** Error en la configuración o falta de recursos.
+
+**Solución:**
+```bash
+# Ver logs detallados
+docker compose --env-file .env logs reverb
+
+# Verificar recursos
+docker stats yape-notifier-reverb-prod
+
+# Verificar configuración
+docker compose --env-file .env exec reverb php artisan config:show broadcasting
+```
+
 ---
 
 ## 📝 Notas Importantes
 
 1. **Rate Limiting:** Considerar implementar rate limiting para eventos si hay muchos clientes
 2. **Redis:** Para producción con múltiples servidores, usar Redis como driver de broadcasting
-3. **SSL/TLS:** En producción, usar HTTPS/WSS para seguridad
+3. **SSL/TLS:** En producción, usar HTTPS/WSS para seguridad (Caddy maneja esto automáticamente en Docker)
 4. **Escalabilidad:** Reverb puede manejar miles de conexiones simultáneas
 5. **Reconexión:** Laravel Echo maneja automáticamente la reconexión
+6. **Docker (Producción):**
+   - Reverb corre en HTTP internamente, Caddy maneja HTTPS externo
+   - Puerto 8080 es interno, no se expone directamente, solo a través de Caddy
+   - Keys deben coincidir entre servidor y cliente
+   - Restart automático si falla
+   - Healthcheck para monitoreo
 
 ---
 
@@ -310,10 +529,14 @@ Si necesitas cambiar la configuración:
 - [Laravel Echo Documentation](https://laravel.com/docs/echo)
 - **Arquitectura**: Ver `docs/03-architecture/` para más detalles
 - **Estado de implementación**: Ver `docs/07-reference/IMPLEMENTATION_STATUS.md`
+- **Configuración de producción**: Ver `infra/docker/environments/production/REVERB_SETUP.md` para detalles específicos del entorno de producción
+- **Docker**: Ver `docs/02-deployment/DOCKER.md` para infraestructura Docker
 
 ---
 
 **Última actualización:** 2025-01-21
+
+
 
 
 
