@@ -8,7 +8,7 @@ import { logger } from "./logger";
 declare global {
   interface Window {
     Pusher: typeof Pusher;
-    Echo: Echo;
+    Echo: Echo<any>;
   }
 }
 
@@ -24,16 +24,16 @@ const getAuthToken = (): string => {
 const isTokenValid = (): boolean => {
   const token = getAuthToken();
   if (!token) return false;
-  
+
   try {
     // Decodificar JWT básico (sin verificar firma, solo para verificar expiración)
-    const payload = JSON.parse(atob(token.split('.')[1]));
+    const payload = JSON.parse(atob(token.split(".")[1]));
     const exp = payload.exp;
     if (!exp) return true; // Si no tiene exp, asumimos válido
-    
+
     // Verificar si expiró (con margen de 5 minutos)
     const now = Math.floor(Date.now() / 1000);
-    return exp > (now + 300);
+    return exp > now + 300;
   } catch {
     // Si no es JWT válido, asumimos válido (puede ser otro formato)
     return true;
@@ -48,7 +48,7 @@ const maxReconnectAttempts = 5;
 let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
 // Crear instancia de Echo con configuración profesional
-export const echo = new Echo({
+export const echo: Echo<any> = new Echo({
   broadcaster: "reverb",
   key: env.REVERB_APP_KEY,
   wsHost: env.REVERB_HOST,
@@ -104,11 +104,17 @@ if (echo.connector?.pusher?.connection) {
 
     // Verificar si es error de autenticación (401/403)
     const errorMessage = error?.message || String(error);
-    if (errorMessage.includes("401") || errorMessage.includes("403") || errorMessage.includes("authentication")) {
+    if (
+      errorMessage.includes("401") ||
+      errorMessage.includes("403") ||
+      errorMessage.includes("authentication")
+    ) {
       logger.error("Error de autenticación en WebSocket", error, {
         action: "auth_error",
       });
-      window.dispatchEvent(new CustomEvent("echo:auth-error", { detail: error }));
+      window.dispatchEvent(
+        new CustomEvent("echo:auth-error", { detail: error })
+      );
       return; // No intentar reconectar si es error de auth
     }
 
@@ -185,13 +191,15 @@ export function disconnect() {
 // Función para actualizar token de autenticación (útil después de login)
 export function updateAuthToken(token: string) {
   localStorage.setItem("auth_token", token);
-  logger.info("Token de autenticación actualizado", { action: "token_updated" });
-  
+  logger.info("Token de autenticación actualizado", {
+    action: "token_updated",
+  });
+
   // Actualizar headers de autenticación en Echo
   if (echo.connector?.pusher?.config?.auth?.headers) {
     echo.connector.pusher.config.auth.headers.Authorization = `Bearer ${token}`;
   }
-  
+
   // Reconectar con nuevo token
   if (connectionState === "disconnected" || connectionState === "error") {
     resetReconnectAttempts();
@@ -206,4 +214,3 @@ export function updateAuthToken(token: string) {
 window.Echo = echo;
 
 export default echo;
-

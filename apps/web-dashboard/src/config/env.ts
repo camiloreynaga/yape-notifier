@@ -32,18 +32,23 @@ if (import.meta.env.DEV) {
   const validation = validateEnvVars();
   if (!validation.valid) {
     console.warn(
-      `⚠️ Faltan variables de entorno requeridas: ${validation.missing.join(", ")}\n` +
-        `Por favor, crea un archivo .env con estas variables.`
+      `⚠️ Faltan variables de entorno requeridas: ${validation.missing.join(
+        ", "
+      )}\n` + `Por favor, crea un archivo .env con estas variables.`
     );
   }
 }
 
 // Exportar variables tipadas
 export const env = {
-  API_URL: import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "http://localhost:8000",
+  API_URL:
+    import.meta.env.VITE_API_URL ||
+    import.meta.env.VITE_API_BASE_URL ||
+    "http://localhost:8000",
   REVERB_APP_KEY: import.meta.env.VITE_REVERB_APP_KEY || "",
   REVERB_HOST: import.meta.env.VITE_REVERB_HOST || window.location.hostname,
   REVERB_PORT: parseInt(import.meta.env.VITE_REVERB_PORT || "8080"),
-  REVERB_SCHEME: import.meta.env.VITE_REVERB_SCHEME || (window.location.protocol === "https:" ? "https" : "http"),
+  REVERB_SCHEME:
+    import.meta.env.VITE_REVERB_SCHEME ||
+    (window.location.protocol === "https:" ? "https" : "http"),
 } as const;
-

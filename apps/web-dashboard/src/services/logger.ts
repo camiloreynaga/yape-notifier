@@ -1,6 +1,16 @@
 // src/services/logger.ts
 // Servicio de logging estructurado para producción
 
+// Declarar tipo para Sentry (opcional, solo si está configurado)
+declare global {
+  interface Window {
+    Sentry?: {
+      captureException: (error: Error, options?: { extra?: LogContext }) => void;
+      captureMessage: (message: string, level?: string) => void;
+    };
+  }
+}
+
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 interface LogContext {
