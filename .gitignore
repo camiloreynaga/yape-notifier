@@ -48,3 +48,16 @@ backups/
 *.sql.gz
 *.sql
 rollback_*.sh
+
+# Docker BuildKit artifacts
+# Estos archivos son creados por BuildKit durante el proceso de build
+composer.phar
+CACHED
+exporting
+naming
+reading
+resolve
+transferring
+writing
+\[*
+=
