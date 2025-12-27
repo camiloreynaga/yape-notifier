@@ -1,5 +1,7 @@
 # 🚀 Guía Completa de Despliegue en Producción
 
+> **Nota**: Esta es la documentación específica del entorno de producción. Para la guía consolidada, ver `../../../../docs/02-deployment/DEPLOY_GUIDE_PRODUCTION.md`.
+
 Guía paso a paso profesional para desplegar Yape Notifier en producción, considerando todas las mejoras y soluciones implementadas.
 
 ## 📋 Prerequisitos
@@ -61,6 +63,7 @@ grep -E "DB_PASSWORD|APP_KEY|REVERB_APP_KEY" .env
 ```
 
 **Variables requeridas en `.env`:**
+
 - `DB_PASSWORD` - Contraseña de PostgreSQL
 - `APP_KEY` - Key de Laravel (se genera automáticamente si no existe)
 - `REVERB_APP_KEY` - Key de Reverb (si usas WebSockets)
@@ -196,7 +199,35 @@ docker compose --env-file .env exec caddy wget --quiet --tries=1 --spider --time
 docker compose --env-file .env exec dashboard wget --quiet --tries=1 --spider --timeout=5 http://localhost/health && echo "✅ Dashboard OK" || echo "❌ Dashboard no responde"
 ```
 
-### 4.3. Error 419 (CSRF Token Mismatch)
+### 4.3. Error 302 (Redirect HTTP incorrecto)
+
+Si ves un redirect HTML a `http://api.notificaciones.space` en lugar de una respuesta JSON:
+
+```bash
+# Opción A: Script automático
+./fix-302-redirect.sh
+
+# Opción B: Manual
+# 1. Verificar APP_URL en .env
+grep APP_URL .env
+# Debe ser: APP_URL=https://api.notificaciones.space
+
+# 2. Si no es HTTPS, actualizar
+sed -i 's|APP_URL=.*|APP_URL=https://api.notificaciones.space|' .env
+
+# 3. Reiniciar servicios
+docker compose --env-file .env restart nginx-api php-fpm
+
+# 4. Limpiar y regenerar caches
+docker compose --env-file .env exec -T php-fpm php artisan config:clear
+docker compose --env-file .env exec -T php-fpm php artisan route:clear
+docker compose --env-file .env exec -T php-fpm php artisan config:cache
+docker compose --env-file .env exec -T php-fpm php artisan route:cache
+```
+
+**Causa:** `APP_URL` está configurado como HTTP o los headers `X-Forwarded-Proto` no se están pasando correctamente.
+
+### 4.4. Error 419 (CSRF Token Mismatch)
 
 Ya está resuelto en el código (removido `EnsureFrontendRequestsAreStateful`), pero si persiste:
 
@@ -214,7 +245,7 @@ docker compose --env-file .env exec -T php-fpm php artisan route:cache
 docker compose --env-file .env restart php-fpm
 ```
 
-### 4.4. Error 502 Bad Gateway
+### 4.5. Error 502 Bad Gateway
 
 ```bash
 # Verificar que Nginx puede comunicarse con PHP-FPM
@@ -244,6 +275,7 @@ docker compose --env-file .env ps --format 'table {{.Name}}\t{{.Status}}\t{{.Hea
 ```
 
 **Estado esperado:**
+
 - ✅ `db`: healthy
 - ✅ `php-fpm`: healthy
 - ✅ `nginx-api`: healthy
@@ -327,6 +359,7 @@ docker compose --env-file .env logs caddy --tail=50 | grep -i error
 ## 🎯 Resumen de Comandos Rápidos
 
 ### Despliegue completo (primera vez)
+
 ```bash
 cd /var/apps/yape-notifier/infra/docker/environments/production
 git pull origin tenant-version
@@ -335,6 +368,7 @@ git pull origin tenant-version
 ```
 
 ### Actualización (código ya actualizado)
+
 ```bash
 cd /var/apps/yape-notifier/infra/docker/environments/production
 git pull origin tenant-version
@@ -342,6 +376,7 @@ git pull origin tenant-version
 ```
 
 ### Resolver problemas
+
 ```bash
 cd /var/apps/yape-notifier/infra/docker/environments/production
 
@@ -357,6 +392,7 @@ cd /var/apps/yape-notifier/infra/docker/environments/production
 ```
 
 ### Verificar estado
+
 ```bash
 cd /var/apps/yape-notifier/infra/docker/environments/production
 
@@ -393,14 +429,15 @@ Antes de desplegar, verifica:
 
 ## 🆘 Troubleshooting Rápido
 
-| Problema | Comando de Diagnóstico | Solución |
-|----------|------------------------|----------|
-| Migraciones fallan | `docker compose --env-file .env exec php-fpm php artisan migrate:status` | `./fix-migrations.sh` |
-| Servicios unhealthy | `./diagnose-health.sh` | `./fix-healthchecks.sh` |
-| Error 419 CSRF | `docker compose --env-file .env logs php-fpm \| grep -i csrf` | Limpiar caches y regenerar |
-| Error 502 Bad Gateway | `docker compose --env-file .env logs nginx-api` | Reiniciar nginx-api y php-fpm |
-| API no responde | `curl -f https://api.notificaciones.space/up` | Verificar logs y healthchecks |
-| Artefactos en Git | `git status` | `./clean-buildkit-artifacts.sh` |
+| Problema              | Comando de Diagnóstico                                                   | Solución                        |
+| --------------------- | ------------------------------------------------------------------------ | ------------------------------- |
+| Migraciones fallan    | `docker compose --env-file .env exec php-fpm php artisan migrate:status` | `./fix-migrations.sh`           |
+| Servicios unhealthy   | `./diagnose-health.sh`                                                   | `./fix-healthchecks.sh`         |
+| Error 302 Redirect    | `curl -X POST https://api.notificaciones.space/api/login ...`            | `./fix-302-redirect.sh`         |
+| Error 419 CSRF        | `docker compose --env-file .env logs php-fpm \| grep -i csrf`            | Limpiar caches y regenerar      |
+| Error 502 Bad Gateway | `docker compose --env-file .env logs nginx-api`                          | Reiniciar nginx-api y php-fpm   |
+| API no responde       | `curl -f https://api.notificaciones.space/up`                            | Verificar logs y healthchecks   |
+| Artefactos en Git     | `git status`                                                             | `./clean-buildkit-artifacts.sh` |
 
 ---
 
@@ -444,6 +481,7 @@ curl -X POST https://api.notificaciones.space/api/login \
 ```
 
 **Resultado esperado:**
+
 - ✅ Todos los servicios corriendo
 - ✅ Servicios críticos (db, php-fpm, nginx-api) healthy
 - ✅ No hay migraciones pendientes con errores
@@ -453,4 +491,3 @@ curl -X POST https://api.notificaciones.space/api/login \
 ---
 
 ¡Despliegue completado! 🎉
-

@@ -1,18 +1,17 @@
 # Caddyfile para Producción
+
 # Maneja HTTPS automático con Let's Encrypt
 
 # API - api.notificaciones.space
-api.notificaciones.space {
-    # WebSocket proxy para Reverb (debe ir ANTES del reverse_proxy general)
-    # Ruta específica para WebSocket connections (Laravel Echo usa /app/{key})
-    handle /app/* {
-        reverse_proxy reverb:8080 {
-            # Headers necesarios para WebSocket upgrade
-            header_up Connection {>Connection}
-            header_up Upgrade {>Upgrade}
-            header_up X-Real-IP {remote_host}
-            header_up Host {host}
-            
+
+api.notificaciones.space { # WebSocket proxy para Reverb (debe ir ANTES del reverse_proxy general) # Ruta específica para WebSocket connections (Laravel Echo usa /app/{key})
+handle /app/\* {
+reverse_proxy reverb:8080 { # Headers necesarios para WebSocket upgrade
+header_up Connection {>Connection}
+header_up Upgrade {>Upgrade}
+header_up X-Real-IP {remote_host}
+header_up Host {host}
+
             # Timeout largo para mantener conexiones WebSocket activas
             transport http {
                 dial_timeout 30s
@@ -25,10 +24,16 @@ api.notificaciones.space {
     reverse_proxy nginx-api:80 {
         header_up X-Real-IP {remote_host}
         header_up Host {host}
-        
+        header_up X-Forwarded-Proto https
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Host {host}
+
         health_uri /up
         health_interval 30s
         health_timeout 5s
+
+        # Asegurar que no se hagan redirects
+        header_down Location {http.header.Location}
     }
 
     # Logging
@@ -39,15 +44,16 @@ api.notificaciones.space {
 
     # Compression
     encode gzip zstd
+
 }
 
 # Dashboard - dashboard.notificaciones.space
-dashboard.notificaciones.space {
-    # Reverse proxy a Dashboard
-    reverse_proxy dashboard:80 {
-        header_up X-Real-IP {remote_host}
-        header_up Host {host}
-        
+
+dashboard.notificaciones.space { # Reverse proxy a Dashboard
+reverse_proxy dashboard:80 {
+header_up X-Real-IP {remote_host}
+header_up Host {host}
+
         health_uri /
         health_interval 30s
         health_timeout 5s
@@ -61,6 +67,5 @@ dashboard.notificaciones.space {
 
     # Compression
     encode gzip zstd
+
 }
-
-
