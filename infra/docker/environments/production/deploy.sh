@@ -301,7 +301,71 @@ docker compose --env-file .env exec -T php-fpm php artisan package:discover --an
 
 # PASO 10: Ejecutar migraciones (solo después de que PostgreSQL esté listo y caches limpiados)
 info "Ejecutando migraciones..."
-docker compose --env-file .env exec -T php-fpm php artisan migrate --force
+
+# Función para sincronizar migraciones desincronizadas
+sync_migrations() {
+    # Intentar ejecutar migraciones
+    MIGRATE_OUTPUT=$(docker compose --env-file .env exec -T php-fpm php artisan migrate --force 2>&1 || true)
+    
+    # Detectar errores de "Duplicate table"
+    if echo "$MIGRATE_OUTPUT" | grep -q "Duplicate table\|relation.*already exists"; then
+        warn "⚠️  Detectado error de migraciones desincronizadas (tablas ya existen)"
+        warn "Intentando sincronizar migraciones..."
+        
+        # Obtener el batch actual
+        CURRENT_BATCH=$(docker compose --env-file .env exec -T php-fpm php artisan tinker --execute="echo DB::table('migrations')->max('batch') ?? 0;" 2>/dev/null || echo "0")
+        NEXT_BATCH=$((CURRENT_BATCH + 1))
+        
+        # Extraer nombres de migraciones que fallaron
+        FAILED_MIGRATIONS=$(echo "$MIGRATE_OUTPUT" | grep -oE "[0-9]{4}_[0-9]{2}_[0-9]{2}_[0-9]{6}_[a-z_]+" | sort -u || echo "")
+        
+        if [ -n "$FAILED_MIGRATIONS" ]; then
+            for MIGRATION in $FAILED_MIGRATIONS; do
+                # Verificar si la migración ya está registrada
+                EXISTS=$(docker compose --env-file .env exec -T php-fpm php artisan tinker --execute="echo DB::table('migrations')->where('migration', '$MIGRATION')->exists() ? '1' : '0';" 2>/dev/null || echo "0")
+                
+                if [ "$EXISTS" = "0" ]; then
+                    warn "  → Marcando migración como ejecutada: $MIGRATION"
+                    docker compose --env-file .env exec -T php-fpm php artisan tinker --execute="DB::table('migrations')->insert(['migration' => '$MIGRATION', 'batch' => $NEXT_BATCH]);" 2>/dev/null || true
+                fi
+            done
+            
+            # Intentar ejecutar migraciones de nuevo
+            info "Reintentando migraciones después de sincronización..."
+            RETRY_OUTPUT=$(docker compose --env-file .env exec -T php-fpm php artisan migrate --force 2>&1 || true)
+            
+            if echo "$RETRY_OUTPUT" | grep -q "Nothing to migrate"; then
+                info "✅ Todas las migraciones están sincronizadas"
+                return 0
+            elif echo "$RETRY_OUTPUT" | grep -q "Migrating\|Migrated"; then
+                info "✅ Migraciones ejecutadas exitosamente"
+                return 0
+            else
+                error "❌ Error al ejecutar migraciones después de sincronización"
+                echo "$RETRY_OUTPUT" | tail -20
+                return 1
+            fi
+        fi
+    elif echo "$MIGRATE_OUTPUT" | grep -q "Nothing to migrate"; then
+        info "✅ No hay migraciones pendientes"
+        return 0
+    elif echo "$MIGRATE_OUTPUT" | grep -q "Migrating\|Migrated"; then
+        info "✅ Migraciones ejecutadas exitosamente"
+        return 0
+    else
+        error "❌ Error al ejecutar migraciones"
+        echo "$MIGRATE_OUTPUT" | tail -20
+        return 1
+    fi
+    
+    return 0
+}
+
+# Ejecutar función de sincronización
+if ! sync_migrations; then
+    error "Error en el proceso de migraciones"
+    exit 1
+fi
 
 # PASO 11: Optimizar Laravel (después de migraciones)
 info "Optimizando Laravel..."
@@ -310,9 +374,57 @@ docker compose --env-file .env exec -T php-fpm php artisan route:cache
 # No cachear vistas en producción inicialmente (puede causar problemas si faltan directorios)
 # docker compose --env-file .env exec -T php-fpm php artisan view:cache
 
-# PASO 11: Verificar estado
+# PASO 12: Verificación post-deploy
 info "Verificando estado de los contenedores..."
 docker compose --env-file .env ps
+
+# Verificar healthchecks con diagnóstico detallado
+info "Verificando healthchecks..."
+sleep 10  # Dar tiempo adicional para que los healthchecks se ejecuten
+
+HEALTHY_COUNT=$(docker compose --env-file .env ps --format json 2>/dev/null | grep -c '"Health":"healthy"' || echo "0")
+UNHEALTHY_COUNT=$(docker compose --env-file .env ps --format json 2>/dev/null | grep -c '"Health":"unhealthy"' || echo "0")
+TOTAL_COUNT=$(docker compose --env-file .env ps --format json 2>/dev/null | grep -c '"Name"' || echo "0")
+
+if [ "$TOTAL_COUNT" -gt 0 ]; then
+    if [ "$HEALTHY_COUNT" -eq "$TOTAL_COUNT" ]; then
+        info "✅ Todos los servicios están healthy ($HEALTHY_COUNT/$TOTAL_COUNT)"
+    else
+        warn "⚠️  Algunos servicios no están healthy ($HEALTHY_COUNT/$TOTAL_COUNT healthy, $UNHEALTHY_COUNT/$TOTAL_COUNT unhealthy)"
+        
+        # Mostrar servicios unhealthy
+        UNHEALTHY_SERVICES=$(docker compose --env-file .env ps --format json 2>/dev/null | grep -B 5 '"Health":"unhealthy"' | grep -o '"Name":"[^"]*"' | cut -d'"' -f4 || echo "")
+        if [ -n "$UNHEALTHY_SERVICES" ]; then
+            warn "Servicios unhealthy:"
+            for SERVICE in $UNHEALTHY_SERVICES; do
+                warn "  - $SERVICE"
+            done
+            warn ""
+            warn "Para diagnosticar: ./diagnose-health.sh"
+            warn "O ver logs: docker compose --env-file .env logs [nombre-servicio]"
+        fi
+    fi
+fi
+
+# Verificar API
+info "Verificando API..."
+sleep 5  # Dar tiempo a que los servicios estén completamente listos
+if curl -f -s http://localhost/up > /dev/null 2>&1 || curl -f -s https://api.notificaciones.space/up > /dev/null 2>&1; then
+    info "✅ API respondiendo correctamente"
+else
+    warn "⚠️  API no responde inmediatamente (puede tardar unos segundos más)"
+    warn "Verifica manualmente: curl https://api.notificaciones.space/up"
+fi
+
+# Verificar migraciones finales
+info "Verificando estado final de migraciones..."
+PENDING_COUNT=$(docker compose --env-file .env exec -T php-fpm php artisan migrate:status 2>/dev/null | grep -c "Pending" || echo "0")
+if [ "$PENDING_COUNT" -eq 0 ]; then
+    info "✅ Todas las migraciones están ejecutadas"
+else
+    warn "⚠️  Hay $PENDING_COUNT migraciones pendientes"
+    warn "Revisa: docker compose --env-file .env exec php-fpm php artisan migrate:status"
+fi
 
 info ""
 info "✅ Despliegue completado!"
