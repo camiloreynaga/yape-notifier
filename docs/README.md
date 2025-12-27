@@ -19,8 +19,10 @@ Documentación para nuevos usuarios y desarrolladores que se inician en el proye
 Guías de despliegue y operaciones en diferentes entornos.
 
 - **[DEPLOYMENT.md](02-deployment/DEPLOYMENT.md)** - Guía completa de despliegue en producción
+- **[DEPLOY_GUIDE_PRODUCTION.md](02-deployment/DEPLOY_GUIDE_PRODUCTION.md)** - Guía detallada paso a paso para despliegue en producción
 - **[DOCKER.md](02-deployment/DOCKER.md)** - Documentación técnica de Docker
 - **[DEVICE_FEATURES.md](02-deployment/DEVICE_FEATURES.md)** - Sistema de vinculación y salud de dispositivos
+- **[DASHBOARD_DEPLOYMENT.md](02-deployment/DASHBOARD_DEPLOYMENT.md)** - Guía de deployment específica del dashboard web
 - **PRODUCTION.md** - Checklist y mejores prácticas de producción (pendiente)
 
 ---
@@ -31,6 +33,7 @@ Documentación técnica de la arquitectura del sistema.
 - **[DUAL_APPS.md](03-architecture/DUAL_APPS.md)** - Sistema de apps duales
 - **[MULTI_TENANT.md](03-architecture/MULTI_TENANT.md)** - Sistema multi-tenant
 - **[ANDROID_USER_ID.md](03-architecture/ANDROID_USER_ID.md)** - Análisis técnico: Identificador de usuario Android
+- **[ANDROID_IMPLEMENTATION.md](03-architecture/ANDROID_IMPLEMENTATION.md)** - Análisis completo de implementación de la app Android
 - **OVERVIEW.md** - Arquitectura general del sistema (pendiente)
 - **API.md** - Referencia de endpoints y documentación de API (pendiente)
 - **DATABASE.md** - Esquema de base de datos y migraciones (pendiente)
@@ -51,8 +54,8 @@ Documentación de funcionalidades y features del sistema.
 
 - **[NOTIFICATION_FILTERING.md](05-features/NOTIFICATION_FILTERING.md)** - Filtrado inteligente de notificaciones (Fase 2 implementada)
 - **[WEBSOCKETS.md](05-features/WEBSOCKETS.md)** - WebSockets para notificaciones en tiempo real (configuración disponible)
+- **[DEVICE_LINKING.md](05-features/DEVICE_LINKING.md)** - Vinculación de dispositivos mediante QR/código (implementado)
 - **COMMERCE.md** - Sistema de comercios (pendiente)
-- **DEVICE_LINKING.md** - Vinculación de dispositivos (pendiente)
 
 ---
 
@@ -61,6 +64,7 @@ Documentación para operaciones y mantenimiento.
 
 - **[MONITORING.md](06-operations/MONITORING.md)** - Monitoreo del sistema
 - **[BACKUP.md](06-operations/BACKUP.md)** - Backup y recuperación
+- **[UPDATE_CHECKLIST.md](06-operations/UPDATE_CHECKLIST.md)** - Checklist de actualización del servidor
 - **MAINTENANCE.md** - Mantenimiento y actualizaciones (pendiente)
 
 ---

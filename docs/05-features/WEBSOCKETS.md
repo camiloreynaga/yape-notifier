@@ -522,6 +522,95 @@ Si necesitas cambiar la configuración:
 
 ---
 
+## 🔐 Configuración de Scheme: HTTP vs HTTPS
+
+### ⚠️ Importante: Diferencia entre Backend y Frontend
+
+**Backend (Laravel API):**
+- `REVERB_SCHEME=http` ✅ **CORRECTO**
+
+**Dashboard (Frontend):**
+- `VITE_REVERB_SCHEME=https` ✅ **CORRECTO**
+
+**¿Por qué son diferentes?** Porque el backend y el frontend se comunican con Reverb desde contextos diferentes.
+
+### Arquitectura de Comunicación
+
+```
+Navegador (Cliente)
+    ↓ HTTPS (wss://)
+    ↓ VITE_REVERB_SCHEME=https
+Caddy (Reverse Proxy)
+    ↓ HTTP (ws://) interno
+    ↓ REVERB_SCHEME=http
+Reverb Container (Puerto 8080)
+    ↓ HTTP (interno)
+Laravel API (PHP-FPM)
+```
+
+### Backend: `REVERB_SCHEME=http`
+
+**Ubicación:** `.env` del backend (Laravel API)
+
+```env
+REVERB_SCHEME=http
+REVERB_HOST=0.0.0.0
+REVERB_PORT=8080
+```
+
+**Razón:**
+- Reverb corre **dentro de Docker** en la red interna
+- Se comunica con Laravel API en **HTTP** (comunicación interna)
+- Caddy hace el proxy de HTTPS externo → HTTP interno
+- `0.0.0.0` permite que otros contenedores se conecten
+
+### Frontend: `VITE_REVERB_SCHEME=https`
+
+**Ubicación:** Variables de entorno para build del Dashboard
+
+```env
+VITE_REVERB_SCHEME=https
+VITE_REVERB_HOST=api.notificaciones.space
+VITE_REVERB_PORT=8080
+```
+
+**Razón:**
+- El navegador se conecta **desde Internet** (no desde Docker)
+- Debe usar **HTTPS** (wss://) porque la página está en HTTPS
+- El navegador se conecta a `wss://api.notificaciones.space:8080/app/{key}`
+- Caddy intercepta esta conexión y hace proxy a Reverb interno
+
+### Errores Comunes
+
+**❌ Error 1: Usar `REVERB_SCHEME=https` en el backend**
+- Problema: Reverb intentará usar HTTPS internamente, pero no hay certificado SSL en el contenedor
+- Solución: Usar `REVERB_SCHEME=http` (comunicación interna)
+
+**❌ Error 2: Usar `VITE_REVERB_SCHEME=http` en el dashboard**
+- Problema: El navegador intentará conectarse con `ws://` (no seguro), causando errores de Mixed Content
+- Solución: Usar `VITE_REVERB_SCHEME=https` (comunicación externa)
+
+**❌ Error 3: Usar `localhost` o `0.0.0.0` en el dashboard**
+- Problema: El navegador no puede conectarse a `localhost` o `0.0.0.0` desde Internet
+- Solución: Usar el dominio público `api.notificaciones.space`
+
+### Configuración Correcta
+
+**Backend (.env):**
+```env
+REVERB_HOST=0.0.0.0          # ✅ Interno en Docker
+REVERB_PORT=8080
+REVERB_SCHEME=http          # ✅ HTTP interno
+```
+
+**Dashboard (Variables de Build):**
+```env
+REVERB_HOST_PUBLIC=api.notificaciones.space  # ✅ Dominio público
+REVERB_SCHEME_PUBLIC=https                  # ✅ HTTPS externo
+```
+
+---
+
 ## 📚 Referencias
 
 - [Laravel Reverb Documentation](https://laravel.com/docs/reverb)
