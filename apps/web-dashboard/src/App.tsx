@@ -1,4 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -9,6 +11,19 @@ import NotificationDetailPage from './pages/NotificationDetailPage';
 import CreateCommercePage from './pages/CreateCommercePage';
 import Layout from './components/Layout';
 import { NotificationToastContainer } from './components/NotificationToast';
+import { updateAuthToken } from './services/echo';
+import { logger } from './services/logger';
+
+// Configurar React Query Client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: true,
+      retry: 1,
+      staleTime: 30000, // 30 segundos
+    },
+  },
+});
 
 interface PrivateRouteProps {
   children: React.ReactNode;
@@ -91,14 +106,61 @@ function AppRoutes() {
   );
 }
 
+// Componente para manejar eventos de WebSocket a nivel de app
+function WebSocketErrorHandler() {
+  const { logout } = useAuth();
+
+  useEffect(() => {
+    const handleTokenExpired = () => {
+      logger.warn("Token expirado, cerrando sesión");
+      logout();
+    };
+
+    const handleAuthError = (event: CustomEvent) => {
+      logger.error("Error de autenticación en WebSocket", event.detail);
+      // Opcional: mostrar notificación al usuario
+      // Por ahora solo cerramos sesión
+      logout();
+    };
+
+    window.addEventListener("echo:token-expired", handleTokenExpired);
+    window.addEventListener("echo:auth-error", handleAuthError as EventListener);
+
+    return () => {
+      window.removeEventListener("echo:token-expired", handleTokenExpired);
+      window.removeEventListener("echo:auth-error", handleAuthError as EventListener);
+    };
+  }, [logout]);
+
+  return null;
+}
+
+// Componente para actualizar token en Echo
+function EchoTokenUpdater() {
+  const { token } = useAuth();
+
+  // Actualizar token en Echo cuando cambia
+  useEffect(() => {
+    if (token) {
+      updateAuthToken(token);
+    }
+  }, [token]);
+
+  return null;
+}
+
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <AppRoutes />
-        <NotificationToastContainer />
-      </Router>
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <WebSocketErrorHandler />
+        <EchoTokenUpdater />
+        <Router>
+          <AppRoutes />
+          <NotificationToastContainer />
+        </Router>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 

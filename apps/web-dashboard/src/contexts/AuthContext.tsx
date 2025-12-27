@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { apiService } from '@/services/api';
+import { updateAuthToken } from '@/services/echo';
 import type { User } from '@/types';
 
 interface AuthContextType {
@@ -100,6 +101,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.setItem('auth_token', response.token);
     localStorage.setItem('user', JSON.stringify(response.user));
     
+    // Actualizar token en Echo para WebSockets
+    updateAuthToken(response.token);
+    
     // Verificar commerce después de login
     await checkCommerce();
   };
@@ -110,6 +114,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(response.user);
     localStorage.setItem('auth_token', response.token);
     localStorage.setItem('user', JSON.stringify(response.user));
+    
+    // Actualizar token en Echo para WebSockets
+    updateAuthToken(response.token);
     
     // Verificar commerce después de registro
     await checkCommerce();

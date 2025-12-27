@@ -4,7 +4,9 @@ import { apiService } from '@/services/api';
 import { useNotifications } from '@/hooks/useNotifications';
 import type { Notification, NotificationFilters, Device, AppInstance } from '@/types';
 import { format } from 'date-fns';
-import { Download, Filter, Eye, RefreshCw } from 'lucide-react';
+import { Download, Filter, Eye, RefreshCw, Calendar, X, Inbox } from 'lucide-react';
+import WebSocketStatus from '@/components/WebSocketStatus';
+import EmptyState from '@/components/EmptyState';
 
 export default function NotificationsPage() {
   const navigate = useNavigate();
@@ -15,29 +17,25 @@ export default function NotificationsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [devices, setDevices] = useState<Device[]>([]);
   const [appInstances, setAppInstances] = useState<AppInstance[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Callback para manejar nuevas notificaciones
-  const handleNewNotifications = useCallback((newNotifications: Notification[]) => {
-    // Mostrar toast para cada nueva notificación
-    newNotifications.forEach((notification) => {
-      if (window.addNotificationToast) {
-        window.addNotificationToast(notification);
-      }
-    });
+  // Callback para manejar nuevas notificaciones (ya manejado por WebSocket)
+  const handleNewNotification = useCallback((notification: Notification) => {
+    // eslint-disable-next-line no-console
+    console.log('Nueva notificación recibida:', notification);
+    // El toast se maneja automáticamente por NotificationToastContainer
   }, []);
 
-  // Usar el hook con polling
+  // Usar el hook con WebSockets
   const {
     notifications,
     loading,
     error,
     refetch,
-    isPolling,
   } = useNotifications({
     filters,
     enabled: true,
-    refetchInterval: 10000, // 10 segundos
-    onNewNotifications: handleNewNotifications,
+    onNewNotification: handleNewNotification,
   });
 
   useEffect(() => {
@@ -69,6 +67,7 @@ export default function NotificationsPage() {
 
   const clearFilters = () => {
     setFilters({ per_page: 50, page: 1 });
+    setSearchQuery('');
   };
 
   const handleStatusChange = async (id: number, status: 'pending' | 'validated' | 'inconsistent') => {
@@ -101,7 +100,7 @@ export default function NotificationsPage() {
       'Duplicado',
     ];
 
-    const rows = notifications.data.map((n) => [
+    const rows = notifications.data.map((n: Notification) => [
       n.id,
       format(new Date(n.received_at), 'yyyy-MM-dd HH:mm:ss'),
       n.source_app || 'N/A',
@@ -117,7 +116,7 @@ export default function NotificationsPage() {
 
     const csvContent = [
       headers.join(','),
-      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
+      ...rows.map((row: (string | number)[]) => row.map((cell: string | number) => `"${cell}"`).join(',')),
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -142,17 +141,34 @@ export default function NotificationsPage() {
     }
   };
 
+  // Filtros rápidos tipo chips
+  const quickFilters = [
+    { key: 'all', label: 'Todos', value: undefined },
+    { key: 'today', label: 'Hoy', value: format(new Date(), 'yyyy-MM-dd') },
+    { key: 'pending', label: 'Pendientes', value: 'pending' },
+  ];
+
+  const handleQuickFilter = (filterKey: string) => {
+    if (filterKey === 'all') {
+      clearFilters();
+    } else if (filterKey === 'today') {
+      setFilters({ ...filters, start_date: format(new Date(), 'yyyy-MM-dd'), page: 1 });
+    } else if (filterKey === 'pending') {
+      setFilters({ ...filters, status: 'pending', page: 1 });
+    }
+  };
+
+  const activeQuickFilter = 
+    !filters.status && !filters.start_date ? 'all' :
+    filters.start_date === format(new Date(), 'yyyy-MM-dd') ? 'today' :
+    filters.status === 'pending' ? 'pending' : '';
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-3">
           <h1 className="text-3xl font-bold text-gray-900">Notificaciones</h1>
-          {isPolling && (
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              <span className="sr-only">Sincronizando...</span>
-            </div>
-          )}
+          <WebSocketStatus />
         </div>
         <div className="flex gap-2">
           <button
@@ -160,7 +176,7 @@ export default function NotificationsPage() {
             className="btn btn-secondary flex items-center gap-2"
             title="Actualizar manualmente"
           >
-            <RefreshCw className={`h-4 w-4 ${isPolling ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Actualizar
           </button>
           <button
@@ -178,6 +194,53 @@ export default function NotificationsPage() {
             Exportar CSV
           </button>
         </div>
+      </div>
+
+      {/* Filtros rápidos tipo chips */}
+      <div className="flex gap-2 overflow-x-auto pb-2">
+        {quickFilters.map((filter) => (
+          <button
+            key={filter.key}
+            onClick={() => handleQuickFilter(filter.key)}
+            className={`
+              px-4 py-2 rounded-full flex items-center gap-2 whitespace-nowrap
+              transition-colors
+              ${
+                activeQuickFilter === filter.key
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }
+            `}
+          >
+            {filter.key === 'today' && <Calendar className="w-4 h-4" />}
+            {filter.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Búsqueda */}
+      <div className="relative">
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            // Aquí podrías implementar búsqueda en tiempo real
+            // Por ahora solo actualizamos el estado
+          }}
+          placeholder="Buscar transacción, alias o monto..."
+          className="w-full pl-10 pr-10 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => {
+              setSearchQuery('');
+            }}
+            className="absolute right-3 top-1/2 transform -translate-y-1/2"
+          >
+            <X className="w-5 h-5 text-gray-400" />
+          </button>
+        )}
       </div>
 
       {/* Filters */}
@@ -367,7 +430,7 @@ export default function NotificationsPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {notifications.data.map((notification) => (
+                  {notifications.data.map((notification: Notification) => (
                     <tr key={notification.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {format(new Date(notification.received_at), 'dd/MM/yyyy HH:mm')}
@@ -460,12 +523,25 @@ export default function NotificationsPage() {
             )}
           </>
         ) : (
-          <div className="text-center py-12">
-            <p className="text-gray-500">No se encontraron notificaciones</p>
-          </div>
+          <EmptyState
+            icon={<Inbox className="w-16 h-16 text-gray-400" />}
+            title="No se encontraron notificaciones"
+            message={
+              Object.keys(filters).length > 2
+                ? "No hay notificaciones que coincidan con los filtros seleccionados. Intenta ajustar los filtros."
+                : "Aún no has recibido notificaciones. Las notificaciones aparecerán aquí cuando lleguen."
+            }
+            action={
+              Object.keys(filters).length > 2
+                ? {
+                    label: "Limpiar filtros",
+                    onClick: clearFilters,
+                  }
+                : undefined
+            }
+          />
         )}
       </div>
     </div>
   );
 }
-

@@ -1,10 +1,13 @@
 /**
  * Contenedor para gestionar múltiples toasts de notificaciones
+ * Actualizado para usar WebSockets directamente
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import NotificationToast from './NotificationToast';
-import type { Notification } from '@/types';
+import { useState, useEffect, useCallback } from "react";
+import NotificationToast from "./NotificationToast";
+import type { Notification } from "@/types";
+import { echo } from "@/services/echo";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface ToastNotification {
   notification: Notification;
@@ -15,8 +18,12 @@ interface NotificationToastContainerProps {
   maxToasts?: number;
 }
 
-export default function NotificationToastContainer({ maxToasts = 5 }: NotificationToastContainerProps) {
+export default function NotificationToastContainer({
+  maxToasts = 5,
+}: NotificationToastContainerProps) {
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
+  const { user } = useAuth();
+  const commerceId = user?.commerce_id;
 
   const addToast = useCallback(
     (notification: Notification) => {
@@ -38,12 +45,37 @@ export default function NotificationToastContainer({ maxToasts = 5 }: Notificati
     setToasts((prev) => prev.filter((toast) => toast.toastId !== toastId));
   }, []);
 
-  // Exponer addToast globalmente
+  // Escuchar eventos WebSocket para nuevas notificaciones
   useEffect(() => {
-    (window as Window & { addNotificationToast?: (notification: Notification) => void }).addNotificationToast = addToast;
+    if (!commerceId || !echo) return;
+
+    const channel = echo.private(`commerce.${commerceId}`);
+
+    // Escuchar evento de notificación creada
+    channel.listen(
+      ".notification.created",
+      (data: { notification: Notification }) => {
+        // eslint-disable-next-line no-console
+        console.log("🔔 Nueva notificación recibida vía WebSocket para toast:", data.notification);
+        addToast(data.notification);
+      }
+    );
 
     return () => {
-      delete (window as Window & { addNotificationToast?: (notification: Notification) => void }).addNotificationToast;
+      channel.stopListening(".notification.created");
+    };
+  }, [commerceId, addToast]);
+
+  // Exponer addToast globalmente (para compatibilidad con código existente)
+  useEffect(() => {
+    (window as Window & {
+      addNotificationToast?: (notification: Notification) => void;
+    }).addNotificationToast = addToast;
+
+    return () => {
+      delete (window as Window & {
+        addNotificationToast?: (notification: Notification) => void;
+      }).addNotificationToast;
     };
   }, [addToast]);
 
@@ -68,4 +100,3 @@ export default function NotificationToastContainer({ maxToasts = 5 }: Notificati
     </div>
   );
 }
-

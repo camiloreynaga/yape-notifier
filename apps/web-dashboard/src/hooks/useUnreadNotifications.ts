@@ -1,11 +1,11 @@
-/**
- * Hook para manejar el contador de notificaciones no leídas
- */
+// src/hooks/useUnreadNotifications.ts (actualizado para usar WebSockets)
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useCallback, useState } from "react";
+import { apiService } from "@/services/api";
+import { echo } from "@/services/echo";
+import { useAuth } from "@/contexts/AuthContext";
 
-import { useEffect, useState, useCallback } from 'react';
-import { apiService } from '@/services/api';
-
-const STORAGE_KEY = 'yape_notifier_read_notifications';
+const STORAGE_KEY = "yape_notifier_read_notifications";
 
 interface UseUnreadNotificationsReturn {
   unreadCount: number;
@@ -15,19 +15,55 @@ interface UseUnreadNotificationsReturn {
 }
 
 export function useUnreadNotifications(): UseUnreadNotificationsReturn {
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [readNotificationIds, setReadNotificationIds] = useState<Set<number>>(new Set());
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const commerceId = user?.commerce_id;
+
+  // Query inicial para obtener contador
+  const query = useQuery({
+    queryKey: ["notifications", "unread-count"],
+    queryFn: async () => {
+      const response = await apiService.getNotifications({
+        per_page: 1,
+        page: 1,
+        status: "pending",
+      });
+      return response.total; // Total de notificaciones pendientes
+    },
+    enabled: !!commerceId,
+    staleTime: Infinity, // No hacer refetch automático, WebSocket actualizará
+  });
+
+  // Escuchar eventos WebSocket para actualizar contador
+  useEffect(() => {
+    if (!commerceId || !echo) return;
+
+    const channel = echo.private(`commerce.${commerceId}`);
+
+    channel.listen(".notification.created", () => {
+      // Incrementar contador cuando llega nueva notificación
+      queryClient.setQueryData<number>(
+        ["notifications", "unread-count"],
+        (oldCount: number | undefined) => (oldCount ?? 0) + 1
+      );
+    });
+
+    return () => {
+      channel.stopListening(".notification.created");
+    };
+  }, [commerceId, queryClient]);
 
   // Cargar IDs leídos desde localStorage
+  const [readNotificationIds, setReadNotificationIds] = useState<Set<number>>(new Set());
+
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        const ids = JSON.parse(stored) as number[];
-        setReadNotificationIds(new Set(ids));
+        setReadNotificationIds(new Set(JSON.parse(stored) as number[]));
       }
     } catch (error) {
-      console.error('Error loading read notifications:', error);
+      console.error("Error loading read notifications:", error);
     }
   }, []);
 
@@ -37,35 +73,9 @@ export function useUnreadNotifications(): UseUnreadNotificationsReturn {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(ids)));
       setReadNotificationIds(ids);
     } catch (error) {
-      console.error('Error saving read notifications:', error);
+      console.error("Error saving read notifications:", error);
     }
   }, []);
-
-  // Calcular notificaciones no leídas
-  const calculateUnreadCount = useCallback(async () => {
-    try {
-      // Obtener notificaciones pendientes (las más recientes)
-      const response = await apiService.getNotifications({
-        status: 'pending',
-        per_page: 100,
-        page: 1,
-      });
-
-      // Filtrar las que no están marcadas como leídas
-      const unread = response.data.filter(
-        (notification) => !readNotificationIds.has(notification.id)
-      );
-
-      setUnreadCount(unread.length);
-    } catch (error) {
-      console.error('Error calculating unread count:', error);
-    }
-  }, [readNotificationIds]);
-
-  // Refrescar contador
-  const refresh = useCallback(async () => {
-    await calculateUnreadCount();
-  }, [calculateUnreadCount]);
 
   // Marcar notificaciones como leídas
   const markAsRead = useCallback(
@@ -74,16 +84,16 @@ export function useUnreadNotifications(): UseUnreadNotificationsReturn {
       notificationIds.forEach((id) => newReadIds.add(id));
       saveReadNotifications(newReadIds);
       // Recalcular contador
-      calculateUnreadCount();
+      queryClient.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
     },
-    [readNotificationIds, saveReadNotifications, calculateUnreadCount]
+    [readNotificationIds, saveReadNotifications, queryClient]
   );
 
   // Marcar todas como leídas
   const markAllAsRead = useCallback(async () => {
     try {
       const response = await apiService.getNotifications({
-        status: 'pending',
+        status: "pending",
         per_page: 1000,
         page: 1,
       });
@@ -91,27 +101,21 @@ export function useUnreadNotifications(): UseUnreadNotificationsReturn {
       const allIds = response.data.map((n) => n.id);
       const newReadIds = new Set([...readNotificationIds, ...allIds]);
       saveReadNotifications(newReadIds);
-      setUnreadCount(0);
+      queryClient.setQueryData<number>(["notifications", "unread-count"], 0);
     } catch (error) {
-      console.error('Error marking all as read:', error);
+      console.error("Error marking all as read:", error);
     }
-  }, [readNotificationIds, saveReadNotifications]);
+  }, [readNotificationIds, saveReadNotifications, queryClient]);
 
-  // Refrescar contador periódicamente
-  useEffect(() => {
-    calculateUnreadCount();
-    const interval = setInterval(() => {
-      calculateUnreadCount();
-    }, 10000); // Cada 10 segundos
-
-    return () => clearInterval(interval);
-  }, [calculateUnreadCount]);
+  // Refrescar contador
+  const refresh = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
+  }, [queryClient]);
 
   return {
-    unreadCount,
+    unreadCount: query.data ?? 0,
     markAsRead,
     markAllAsRead,
     refresh,
   };
 }
-

@@ -40,6 +40,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      // Mock laravel-echo and pusher-js for tests (they're not installed in host, only in Docker)
+      'laravel-echo': path.resolve(__dirname, './src/test/mocks/laravel-echo.ts'),
+      'pusher-js': path.resolve(__dirname, './src/test/mocks/pusher-js.ts'),
     },
   },
 });

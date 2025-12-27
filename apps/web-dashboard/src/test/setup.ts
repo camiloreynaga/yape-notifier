@@ -49,6 +49,44 @@ Object.defineProperty(window, 'matchMedia', {
   unobserve() {}
 } as unknown as typeof ResizeObserver;
 
+// Mock laravel-echo and pusher-js for tests
+// These modules are not installed in the host (only in Docker), so we need to mock them
+vi.mock('laravel-echo', () => {
+  const mockChannel = {
+    listen: vi.fn(),
+    stopListening: vi.fn(),
+    error: vi.fn(),
+  };
+
+  return {
+    default: vi.fn(() => ({
+      private: vi.fn(() => mockChannel),
+      leave: vi.fn(),
+      disconnect: vi.fn(),
+      connector: {
+        pusher: {
+          connection: {
+            bind: vi.fn(),
+            connect: vi.fn(),
+          },
+        },
+      },
+    })),
+  };
+});
+
+vi.mock('pusher-js', () => {
+  return {
+    default: vi.fn(() => ({
+      connection: {
+        bind: vi.fn(),
+        connect: vi.fn(),
+        state: 'connected',
+      },
+    })),
+  };
+});
+
 // Suppress console errors in tests (optional, uncomment if needed)
 // global.console = {
 //   ...console,
