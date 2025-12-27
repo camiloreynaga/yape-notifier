@@ -6,7 +6,7 @@ Este documento contiene los prompts listos para copiar y pegar para desarrollar 
 
 ## PROMPT 1: Android App - Módulo Admin Móvil y Mejoras Captador
 
-```
+````
 # PROMPT: Implementar Módulo Admin Móvil y Mejoras para Captador - Yape Notifier Android
 
 ## CONTEXTO DEL PROYECTO
@@ -160,6 +160,279 @@ Requisitos:
    - Marcar como leído (llamar PUT /api/notifications/{id}/status)
    - Indicador de carga mientras carga datos
    - Manejo de estados vacíos (sin notificaciones)
+   - **Actualización automática** (ver sección 6.5)
+
+6.5. Actualización Automática de Notificaciones (Implementación Profesional)
+
+**⚠️ IMPORTANTE:** El backend YA tiene WebSockets implementados (NotificationCreated event, canal `commerce.{commerce_id}`, evento `notification.created`).
+
+**Recomendación:** Para Android, usar **Polling Inteligente** es la mejor opción porque:
+- ✅ Más simple de implementar y mantener
+- ✅ Mejor consumo de batería (no mantiene conexión abierta)
+- ✅ Funciona mejor con el ciclo de vida de Android
+- ✅ Latencia aceptable (15 segundos es razonable en móvil)
+- ✅ Manejo de errores más robusto
+
+**Implementación Profesional con Polling Inteligente:**
+
+```kotlin
+// En AdminPanelViewModel.kt
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import androidx.lifecycle.ProcessLifecycleOwner
+import android.util.Log
+
+class AdminPanelViewModel(application: Application) : AndroidViewModel(application) {
+    // ... código existente ...
+
+    // Estados de polling
+    private var pollingJob: Job? = null
+    private var isPollingActive = false
+    private var isUserTyping = false
+    private var consecutiveErrors = 0
+    private val maxConsecutiveErrors = 3
+
+    private val _pollingState = MutableStateFlow<PollingState>(PollingState.Idle)
+    val pollingState: StateFlow<PollingState> = _pollingState
+
+    sealed class PollingState {
+        object Idle : PollingState()
+        object Active : PollingState()
+        object Paused : PollingState()
+        data class Error(val message: String) : PollingState()
+    }
+
+    /**
+     * Inicia polling inteligente con manejo de errores y optimización de batería
+     */
+    fun startPolling() {
+        if (isPollingActive) return
+
+        isPollingActive = true
+        consecutiveErrors = 0
+        _pollingState.value = PollingState.Active
+
+        pollingJob?.cancel()
+        pollingJob = viewModelScope.launch {
+            var pollInterval = 15000L // 15 segundos por defecto
+
+            while (isActive && isPollingActive) {
+                try {
+                    // Verificar condiciones antes de hacer polling
+                    if (!shouldPoll()) {
+                        delay(5000) // Esperar 5 segundos antes de verificar de nuevo
+                        continue
+                    }
+
+                    // Hacer polling
+                    val success = loadNotifications(refresh = true, silent = true)
+
+                    if (success) {
+                        consecutiveErrors = 0
+                        pollInterval = 15000L // Resetear intervalo a 15s si fue exitoso
+                    } else {
+                        consecutiveErrors++
+                        // Aumentar intervalo exponencialmente en caso de errores
+                        pollInterval = minOf(pollInterval * 2, 120000L) // Máximo 2 minutos
+
+                        if (consecutiveErrors >= maxConsecutiveErrors) {
+                            _pollingState.value = PollingState.Error("Error de conexión. Reintentando...")
+                            // Esperar más tiempo antes de reintentar
+                            delay(30000)
+                            consecutiveErrors = 0 // Resetear después de esperar
+                        }
+                    }
+
+                    delay(pollInterval)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error en polling", e)
+                    consecutiveErrors++
+                    pollInterval = minOf(pollInterval * 2, 120000L)
+                    delay(pollInterval)
+                }
+            }
+        }
+    }
+
+    /**
+     * Detiene el polling
+     */
+    fun stopPolling() {
+        isPollingActive = false
+        pollingJob?.cancel()
+        pollingJob = null
+        _pollingState.value = PollingState.Idle
+    }
+
+    /**
+     * Pausa temporalmente el polling (ej: cuando usuario está escribiendo)
+     */
+    fun pausePolling() {
+        if (isPollingActive) {
+            _pollingState.value = PollingState.Paused
+        }
+    }
+
+    /**
+     * Reanuda el polling después de una pausa
+     */
+    fun resumePolling() {
+        if (isPollingActive && _pollingState.value is PollingState.Paused) {
+            _pollingState.value = PollingState.Active
+        }
+    }
+
+    /**
+     * Verifica si se debe hacer polling
+     */
+    private fun shouldPoll(): Boolean {
+        // No hacer polling si:
+        // 1. App no está en foreground
+        if (!isAppInForeground()) return false
+
+        // 2. Usuario está escribiendo (evitar interrupciones)
+        if (isUserTyping) return false
+
+        // 3. Ya hay una carga en progreso
+        if (_uiState.value?.loading == true) return false
+
+        return true
+    }
+
+    /**
+     * Verifica si la app está en foreground
+     */
+    private fun isAppInForeground(): Boolean {
+        return ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(
+            androidx.lifecycle.Lifecycle.State.STARTED
+        )
+    }
+
+    /**
+     * Carga notificaciones con opción de modo silencioso (sin mostrar loading)
+     */
+    private suspend fun loadNotifications(refresh: Boolean = false, silent: Boolean = false): Boolean {
+        return try {
+            val currentState = _uiState.value ?: AdminPanelUiState()
+            val page = if (refresh) 1 else currentState.currentPage
+
+            if (!silent) {
+                _uiState.value = currentState.copy(loading = true, error = null)
+            }
+
+            val response = apiService.getNotifications(
+                deviceId = currentFilters["device_id"] as? Long,
+                sourceApp = currentFilters["source_app"] as? String,
+                packageName = currentFilters["package_name"] as? String,
+                appInstanceId = currentFilters["app_instance_id"] as? Long,
+                startDate = currentFilters["start_date"] as? String,
+                endDate = currentFilters["end_date"] as? String,
+                status = currentFilters["status"] as? String,
+                excludeDuplicates = currentFilters["exclude_duplicates"] as? Boolean,
+                perPage = 50,
+                page = page
+            )
+
+            if (response.isSuccessful) {
+                val paginatedResponse = response.body()
+                if (paginatedResponse != null) {
+                    val newNotifications = if (refresh) {
+                        paginatedResponse.data
+                    } else {
+                        currentState.notifications + paginatedResponse.data
+                    }
+
+                    _uiState.value = AdminPanelUiState(
+                        notifications = newNotifications,
+                        loading = false,
+                        hasMore = paginatedResponse.currentPage < paginatedResponse.lastPage,
+                        currentPage = paginatedResponse.currentPage,
+                        total = paginatedResponse.total
+                    )
+                    true
+                } else {
+                    if (!silent) {
+                        _uiState.value = currentState.copy(loading = false, error = "No se pudieron cargar las notificaciones")
+                    }
+                    false
+                }
+            } else {
+                if (!silent) {
+                    _uiState.value = currentState.copy(loading = false, error = "Error ${response.code()}")
+                }
+                false
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error loading notifications", e)
+            if (!silent) {
+                _uiState.value = _uiState.value?.copy(
+                    loading = false,
+                    error = e.message ?: "Error de conexión"
+                )
+            }
+            false
+        }
+    }
+
+    /**
+     * Marca que el usuario está escribiendo (pausa polling)
+     */
+    fun setUserTyping(typing: Boolean) {
+        isUserTyping = typing
+        if (typing) {
+            pausePolling()
+        } else {
+            resumePolling()
+        }
+    }
+
+    companion object {
+        private const val TAG = "AdminPanelViewModel"
+    }
+}
+```
+
+**En AdminPanelActivity.kt:**
+
+```kotlin
+override fun onResume() {
+    super.onResume()
+    viewModel.startPolling() // Iniciar polling cuando Activity está visible
+}
+
+override fun onPause() {
+    super.onPause()
+    viewModel.stopPolling() // Detener polling cuando Activity está en background
+}
+
+override fun onDestroy() {
+    super.onDestroy()
+    viewModel.stopPolling() // Asegurar que se detiene al destruir
+}
+
+// En el SearchView o EditText de búsqueda:
+searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+    override fun onQueryTextSubmit(query: String?): Boolean = false
+
+    override fun onQueryTextChange(newText: String?): Boolean {
+        viewModel.setUserTyping(newText?.isNotEmpty() == true)
+        viewModel.setSearchQuery(newText ?: "")
+        return true
+    }
+})
+```
+
+**Características Profesionales Implementadas:**
+- ✅ **Backoff exponencial**: Aumenta intervalo en caso de errores (15s → 30s → 60s → 120s max)
+- ✅ **Detección de errores consecutivos**: Pausa temporal después de 3 errores
+- ✅ **Optimización de batería**: No hace polling cuando app está en background
+- ✅ **Evita interrupciones**: Pausa cuando usuario está escribiendo
+- ✅ **Modo silencioso**: Polling no muestra loading spinner
+- ✅ **Manejo robusto de errores**: No crashea la app, solo registra errores
+- ✅ **Estado observable**: `pollingState` permite mostrar indicador de estado
 
 7. ViewModel: AdminPanelViewModel.kt
    - LiveData/StateFlow para lista de notificaciones
@@ -170,6 +443,9 @@ Requisitos:
    - Función markAsRead(notificationId: Int)
    - Función markAllAsRead()
    - Función loadMore() para paginación
+   - **NUEVO:** Función startPolling() para actualización automática
+   - **NUEVO:** Función stopPolling() para detener actualización
+   - **NUEVO:** Manejo de ciclo de vida (pausar cuando app en background)
 
 8. Layout: activity_admin_panel.xml
    - CoordinatorLayout como root
@@ -512,21 +788,154 @@ Agregar a build.gradle (Module: app):
 dependencies {
     // QR Code generation
     implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
-    
+
     // Material Design 3
     implementation 'com.google.android.material:material:1.11.0'
-    
+
     // Navigation Component (si no está)
     implementation 'androidx.navigation:navigation-fragment-ktx:2.7.6'
     implementation 'androidx.navigation:navigation-ui-ktx:2.7.6'
-    
+
     // Ya deberían estar:
     // Retrofit, Coroutines, Room, WorkManager, etc.
 }
 
+## CONSIDERACIONES DE CALIDAD Y DEVOPS
+
+### Tests Automatizados
+
+**Requisitos:**
+1. Tests unitarios para ViewModels:
+   - Crear: `app/src/test/java/com/yapenotifier/android/ui/admin/viewmodel/`
+   - Testear lógica de negocio, filtros, búsqueda
+   - Cobertura mínima: 70% de ViewModels
+
+2. Tests de instrumentación para Activities:
+   - Crear: `app/src/androidTest/java/com/yapenotifier/android/ui/admin/`
+   - Testear navegación, interacciones de usuario
+   - Usar Espresso para UI testing
+
+3. Configurar CI/CD:
+   - Crear: `.github/workflows/android-ci.yml`
+   - Ejecutar tests en cada PR
+   - Build automático en cada commit
+
+**Ejemplo de test unitario:**
+```kotlin
+// AdminPanelViewModelTest.kt
+@Test
+fun `loadNotifications should update UI state with notifications`() = runTest {
+    // Given
+    val mockNotifications = listOf(createMockNotification())
+    coEvery { apiService.getNotifications(any()) } returns mockResponse(mockNotifications)
+
+    // When
+    viewModel.loadNotifications()
+
+    // Then
+    assertEquals(mockNotifications, viewModel.uiState.value.notifications)
+}
+````
+
+### Variables de Entorno
+
+**Requisitos:**
+
+1. NO hardcodear URLs de API:
+
+   - Usar `BuildConfig.API_BASE_URL`
+   - Configurar en `build.gradle`:
+
+   ```gradle
+   buildTypes {
+       debug {
+           buildConfigField "String", "API_BASE_URL", '"http://10.0.2.2:8000/"'
+       }
+       release {
+           buildConfigField "String", "API_BASE_URL", '"https://api.notificaciones.space/"'
+       }
+   }
+   ```
+
+2. NO hardcodear secretos:
+
+   - Usar `gradle.properties` para desarrollo local
+   - Usar variables de entorno en CI/CD
+   - Documentar en `README.md`
+
+3. Validar configuración al iniciar:
+   - Verificar que API_URL esté configurada
+   - Mostrar error claro si falta configuración
+
+### Logging Estructurado
+
+**Requisitos:**
+
+1. Usar Timber para logging:
+
+   ```kotlin
+   implementation 'com.jakewharton.timber:timber:5.0.1'
+   ```
+
+2. NO loggear información sensible:
+
+   - No loggear tokens, passwords, datos personales
+   - Usar niveles apropiados (DEBUG, INFO, WARN, ERROR)
+
+3. Agregar contexto útil:
+   ```kotlin
+   Timber.tag("AdminPanel").d("Loading notifications for commerce: ${commerceId}")
+   ```
+
+### CI/CD Pipeline
+
+**Requisitos:**
+
+1. Crear `.github/workflows/android-ci.yml`:
+
+   ```yaml
+   name: Android CI
+   on: [push, pull_request]
+   jobs:
+     test:
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v3
+         - uses: actions/setup-java@v3
+         - run: ./gradlew test
+         - run: ./gradlew connectedAndroidTest
+   ```
+
+2. Build automático:
+   - Build debug APK en cada commit
+   - Build release AAB en tags
+   - Upload artifacts
+
+### Security Best Practices
+
+**Requisitos:**
+
+1. ProGuard/R8 para release:
+
+   - Obfuscar código
+   - Reducir tamaño de APK
+   - Proteger contra reverse engineering
+
+2. Certificados:
+
+   - Usar keystore seguro
+   - No commitear keystore al repositorio
+   - Documentar proceso de firma
+
+3. Validación de entrada:
+   - Validar todos los inputs del usuario
+   - Sanitizar datos antes de enviar a API
+   - Manejar errores de red apropiadamente
+
 ## CRITERIOS DE ACEPTACIÓN
 
 Módulo Admin:
+
 1. ✅ Pantalla de selección de modo funciona y navega correctamente
 2. ✅ Login admin funciona y valida rol
 3. ✅ Feed de notificaciones carga y muestra datos reales
@@ -539,14 +948,19 @@ Módulo Admin:
 10. ✅ Polling detecta cuando dispositivo se vincula
 11. ✅ Lista de dispositivos muestra estado correcto
 12. ✅ Detalle de notificación muestra toda la información
+13. ✅ **Actualización automática funciona** (polling inteligente cada 15s cuando app visible)
+14. ✅ **Polling se pausa automáticamente** cuando app está en background
+15. ✅ **Polling se pausa** cuando usuario está escribiendo en búsqueda
+16. ✅ **Backoff exponencial** en caso de errores (15s → 30s → 60s → 120s max)
+17. ✅ **Detección de errores consecutivos** (pausa temporal después de 3 errores)
+18. ✅ **Modo silencioso** (polling no muestra loading spinner)
+19. ✅ **Estado observable** de polling (permite mostrar indicador visual)
+20. ✅ **Manejo robusto de errores** sin crashear la app
+21. ✅ **Optimización de batería** (no hace polling innecesario)
 
-Mejoras Captador:
-13. ✅ Detecta automáticamente instancias múltiples
-14. ✅ Permite asignar nombres a instancias
-15. ✅ Sincroniza con backend correctamente
-16. ✅ Lista de apps carga desde API
-17. ✅ Switches actualizan estado en tiempo real
-18. ✅ Wizard detecta OEM y muestra guía específica
+Mejoras Captador: 13. ✅ Detecta automáticamente instancias múltiples 14. ✅ Permite asignar nombres a instancias 15. ✅ Sincroniza con backend correctamente 16. ✅ Lista de apps carga desde API 17. ✅ Switches actualizan estado en tiempo real 18. ✅ Wizard detecta OEM y muestra guía específica
+
+Calidad y DevOps: 19. ✅ Tests unitarios implementados (cobertura mínima 70%) 20. ✅ Tests de instrumentación para flujos críticos 21. ✅ CI/CD pipeline configurado y funcionando 22. ✅ Variables de entorno documentadas y validadas 23. ✅ Logging estructurado implementado 24. ✅ ProGuard configurado para release builds
 
 ## NOTAS IMPORTANTES
 
@@ -561,6 +975,11 @@ Mejoras Captador:
 - Manejar estados offline (guardar en local, sincronizar después)
 - Probar en dispositivos reales de diferentes OEMs
 - Seguir las convenciones de código existentes en el proyecto
+- **NUEVO:** Implementar tests automatizados antes de considerar completo
+- **NUEVO:** Configurar CI/CD para validación automática
+- **NUEVO:** Documentar y validar variables de entorno
+- **NUEVO:** Implementar logging estructurado para debugging
+
 ```
 
 ---
@@ -568,6 +987,7 @@ Mejoras Captador:
 ## PROMPT 2: Dashboard Web - Notificaciones en Tiempo Real y Mejoras UX
 
 ```
+
 # PROMPT: Implementar Notificaciones en Tiempo Real y Mejoras UX - Yape Notifier Dashboard Web
 
 ## CONTEXTO DEL PROYECTO
@@ -575,6 +995,7 @@ Mejoras Captador:
 Eres un desarrollador trabajando en el Dashboard Web de Yape Notifier. Necesitas implementar actualización en tiempo real del feed de notificaciones y mejorar la UX según los diseños proporcionados.
 
 Stack Tecnológico:
+
 - React 18
 - TypeScript
 - Vite
@@ -583,20 +1004,26 @@ Stack Tecnológico:
 - Tailwind CSS
 - Lucide React (iconos)
 - date-fns (formateo de fechas)
-- WebSockets o Polling (implementar primero polling, luego WebSockets)
+- Laravel Echo + Pusher JS (para WebSockets con Laravel Reverb)
 
 Estado Actual:
+
 - ✅ Feed de notificaciones implementado (NotificationsPage.tsx)
 - ✅ Filtros funcionando (dispositivo, app, instancia, fechas, estado)
 - ✅ Paginación implementada
 - ✅ Gestión de dispositivos completa
 - ✅ Gestión de instancias completa
 - ✅ Estadísticas y KPIs
-- ❌ No hay actualización automática (requiere refresh manual)
+- ✅ **Backend con WebSockets implementado** (NotificationCreated event, Reverb configurado)
+- ❌ No hay actualización automática en frontend (requiere refresh manual)
 - ❌ No hay badge de notificaciones no leídas
+- ❌ **Frontend no está conectado a WebSockets** (debe implementarse)
 - ⚠️ UX no coincide completamente con diseños (filtros, búsqueda, estados vacíos)
 
+**IMPORTANTE:** El backend YA tiene WebSockets implementados (NotificationCreated event, Reverb configurado). Debes implementar WebSockets directamente en el frontend, NO usar polling.
+
 Estructura del Proyecto:
+
 - src/
   - pages/ (NotificationsPage.tsx, DevicesPage.tsx, etc.)
   - components/ (componentes reutilizables)
@@ -607,125 +1034,513 @@ Estructura del Proyecto:
 
 ## TAREAS CRÍTICAS
 
-### 1. Implementar Actualización en Tiempo Real con Polling
+### 1. Implementar Actualización en Tiempo Real con WebSockets (Implementación Profesional)
 
-Ubicación: src/hooks/useNotifications.ts (crear o modificar)
+**⚠️ IMPORTANTE:** El backend YA tiene WebSockets implementados con:
 
-Requisitos:
-1. Usar React Query para polling inteligente:
-   - Poll cada 10 segundos cuando la página está activa
-   - NO hacer polling cuando el tab está en background
-   - Usar document.visibilityState para detectar visibilidad
-   - Pausar polling cuando el usuario está escribiendo en búsqueda
+- **Canal:** `commerce.{commerce_id}` (PrivateChannel)
+- **Evento:** `notification.created`
+- **Datos completos:** id, user_id, commerce_id, device_id, source_app, package_name, app_instance_id, app_instance_label, device_alias, title, body, amount, currency, payer_name, posted_at, received_at, status, is_duplicate, created_at
 
-2. Implementación:
+Debes conectarte a Laravel Reverb usando Laravel Echo, **NO usar polling**.
+
+Ubicación: `src/services/echo.ts` (crear) y `src/hooks/useNotifications.ts` (modificar)
+
+**Requisitos Profesionales:**
+
+1. Instalar dependencias:
+
+```bash
+npm install laravel-echo pusher-js
+```
+
+2. Configurar Laravel Echo con manejo robusto de errores y reconexión:
+
 ```typescript
-import { useQuery } from '@tanstack/react-query';
-import { apiService } from '@/services/api';
-import type { NotificationFilters, PaginatedResponse, Notification } from '@/types';
+// src/services/echo.ts
+import Echo from "laravel-echo";
+import Pusher from "pusher-js";
 
-export function useNotifications(filters: NotificationFilters, options?: {
-  enabled?: boolean;
-  refetchInterval?: number;
-}) {
-  const isVisible = useDocumentVisibility();
-  
-  return useQuery<PaginatedResponse<Notification>>({
-    queryKey: ['notifications', filters],
-    queryFn: () => apiService.getNotifications(filters),
-    refetchInterval: (query) => {
-      // Solo hacer polling si el tab está visible y no hay errores
-      if (!isVisible || query.state.error) return false;
-      return options?.refetchInterval ?? 10000; // 10 segundos por defecto
+// Declarar tipos globales
+declare global {
+  interface Window {
+    Pusher: typeof Pusher;
+    Echo: Echo;
+  }
+}
+
+// Configurar Pusher como global (requerido por Laravel Echo)
+window.Pusher = Pusher;
+
+// Obtener token de autenticación (desde tu AuthContext o similar)
+const getAuthToken = (): string => {
+  return localStorage.getItem("auth_token") || "";
+};
+
+// Estado de conexión
+let connectionState: "connected" | "disconnected" | "connecting" | "error" =
+  "disconnected";
+let reconnectAttempts = 0;
+const maxReconnectAttempts = 5;
+let reconnectTimeout: NodeJS.Timeout | null = null;
+
+// Crear instancia de Echo con configuración profesional
+export const echo = new Echo({
+  broadcaster: "reverb",
+  key: import.meta.env.VITE_REVERB_APP_KEY,
+  wsHost: import.meta.env.VITE_REVERB_HOST || window.location.hostname,
+  wsPort: import.meta.env.VITE_REVERB_PORT || 8080,
+  wssPort: import.meta.env.VITE_REVERB_PORT || 8080,
+  forceTLS: (import.meta.env.VITE_REVERB_SCHEME || "https") === "https",
+  enabledTransports: ["ws", "wss"],
+  authEndpoint: `${import.meta.env.VITE_API_URL}/api/broadcasting/auth`,
+  auth: {
+    headers: {
+      Authorization: `Bearer ${getAuthToken()}`,
+      Accept: "application/json",
     },
-    refetchIntervalInBackground: false,
-    staleTime: 5000, // Considerar datos frescos por 5 segundos
-    enabled: options?.enabled !== false,
+  },
+  // Configuración de reconexión automática
+  cluster: undefined, // No necesario para Reverb
+});
+
+// Manejo de eventos de conexión
+echo.connector.pusher.connection.bind("connected", () => {
+  console.log("✅ WebSocket conectado");
+  connectionState = "connected";
+  reconnectAttempts = 0;
+
+  // Notificar a listeners
+  window.dispatchEvent(new CustomEvent("echo:connected"));
+});
+
+echo.connector.pusher.connection.bind("disconnected", () => {
+  console.log("⚠️ WebSocket desconectado");
+  connectionState = "disconnected";
+
+  // Notificar a listeners
+  window.dispatchEvent(new CustomEvent("echo:disconnected"));
+
+  // Intentar reconexión automática
+  attemptReconnect();
+});
+
+echo.connector.pusher.connection.bind("error", (error: any) => {
+  console.error("❌ Error de WebSocket:", error);
+  connectionState = "error";
+
+  // Notificar a listeners
+  window.dispatchEvent(new CustomEvent("echo:error", { detail: error }));
+
+  // Intentar reconexión si no se ha excedido el límite
+  if (reconnectAttempts < maxReconnectAttempts) {
+    attemptReconnect();
+  }
+});
+
+// Función de reconexión con backoff exponencial
+function attemptReconnect() {
+  if (reconnectAttempts >= maxReconnectAttempts) {
+    console.error("❌ Máximo de intentos de reconexión alcanzado");
+    window.dispatchEvent(new CustomEvent("echo:max-reconnect-attempts"));
+    return;
+  }
+
+  reconnectAttempts++;
+  const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 30000); // Max 30s
+
+  console.log(
+    `🔄 Intentando reconectar en ${delay}ms (intento ${reconnectAttempts}/${maxReconnectAttempts})`
+  );
+
+  reconnectTimeout = setTimeout(() => {
+    connectionState = "connecting";
+    echo.connector.pusher.connect();
+  }, delay);
+}
+
+// Función para resetear intentos de reconexión (útil después de login)
+export function resetReconnectAttempts() {
+  reconnectAttempts = 0;
+  if (reconnectTimeout) {
+    clearTimeout(reconnectTimeout);
+    reconnectTimeout = null;
+  }
+}
+
+// Función para obtener estado de conexión
+export function getConnectionState() {
+  return connectionState;
+}
+
+// Función para desconectar manualmente
+export function disconnect() {
+  if (reconnectTimeout) {
+    clearTimeout(reconnectTimeout);
+    reconnectTimeout = null;
+  }
+  echo.disconnect();
+}
+
+// Exportar instancia global
+window.Echo = echo;
+
+export default echo;
+```
+
+3. Hook profesional para escuchar notificaciones en tiempo real:
+
+```typescript
+// src/hooks/useNotifications.ts (modificar completamente)
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useCallback } from "react";
+import { apiService } from "@/services/api";
+import { echo, getConnectionState } from "@/services/echo";
+import type {
+  NotificationFilters,
+  PaginatedResponse,
+  Notification,
+} from "@/types";
+import { useAuth } from "@/contexts/AuthContext"; // Ajustar según tu contexto
+
+interface UseNotificationsOptions {
+  filters?: NotificationFilters;
+  enabled?: boolean;
+  onNewNotification?: (notification: Notification) => void;
+}
+
+export function useNotifications(options: UseNotificationsOptions = {}) {
+  const { filters = {}, enabled = true, onNewNotification } = options;
+  const queryClient = useQueryClient();
+  const { user } = useAuth(); // Obtener usuario autenticado
+  const commerceId = user?.commerce_id;
+
+  const channelRef = useRef<any>(null);
+  const onNewNotificationRef = useRef(onNewNotification);
+
+  // Actualizar ref cuando cambia el callback
+  useEffect(() => {
+    onNewNotificationRef.current = onNewNotification;
+  }, [onNewNotification]);
+
+  // Query inicial para cargar notificaciones
+  const query = useQuery<PaginatedResponse<Notification>>({
+    queryKey: ["notifications", filters],
+    queryFn: () => apiService.getNotifications(filters),
+    enabled: enabled && !!commerceId,
+    staleTime: 30000, // 30 segundos (WebSockets actualizará antes)
+    refetchOnWindowFocus: true, // Refetch cuando ventana recupera foco
   });
+
+  // Escuchar eventos de WebSocket
+  useEffect(() => {
+    if (!commerceId || !enabled || !echo) {
+      return;
+    }
+
+    // Verificar estado de conexión
+    const connectionState = getConnectionState();
+    if (connectionState !== "connected") {
+      console.warn("⚠️ WebSocket no está conectado, estado:", connectionState);
+    }
+
+    // Suscribirse al canal privado
+    const channelName = `commerce.${commerceId}`;
+    channelRef.current = echo.private(channelName);
+
+    // Escuchar evento de notificación creada
+    // IMPORTANTE: El backend envía el evento como 'notification.created'
+    channelRef.current.listen(
+      ".notification.created",
+      (data: { notification: Notification }) => {
+        const notification = data.notification;
+        console.log(
+          "🔔 Nueva notificación recibida vía WebSocket:",
+          notification
+        );
+
+        // Llamar callback si existe
+        if (onNewNotificationRef.current) {
+          onNewNotificationRef.current(notification);
+        }
+
+        // Actualizar cache de React Query de forma optimista
+        queryClient.setQueryData<PaginatedResponse<Notification>>(
+          ["notifications", filters],
+          (oldData) => {
+            if (!oldData) {
+              // Si no hay datos, hacer refetch
+              queryClient.invalidateQueries({ queryKey: ["notifications"] });
+              return oldData;
+            }
+
+            // Verificar si la notificación ya existe (evitar duplicados)
+            const exists = oldData.data.some((n) => n.id === notification.id);
+            if (exists) {
+              // Actualizar notificación existente si cambió
+              return {
+                ...oldData,
+                data: oldData.data.map((n) =>
+                  n.id === notification.id ? notification : n
+                ),
+              };
+            }
+
+            // Agregar nueva notificación al inicio
+            return {
+              ...oldData,
+              data: [notification, ...oldData.data],
+              total: oldData.total + 1,
+            };
+          }
+        );
+
+        // Invalidar queries relacionadas para mantener consistencia
+        queryClient.invalidateQueries({
+          queryKey: ["notifications"],
+          exact: false, // Invalidar todas las variaciones de filtros
+        });
+      }
+    );
+
+    // Manejar errores de suscripción
+    channelRef.current.error((error: any) => {
+      console.error("❌ Error en canal WebSocket:", error);
+    });
+
+    // Limpiar suscripción al desmontar
+    return () => {
+      if (channelRef.current) {
+        channelRef.current.stopListening(".notification.created");
+        echo.leave(channelName);
+        channelRef.current = null;
+      }
+    };
+  }, [commerceId, enabled, filters, queryClient]);
+
+  // Escuchar cambios en estado de conexión
+  useEffect(() => {
+    const handleConnected = () => {
+      console.log("✅ WebSocket reconectado, refrescando notificaciones...");
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    };
+
+    const handleDisconnected = () => {
+      console.warn("⚠️ WebSocket desconectado");
+    };
+
+    window.addEventListener("echo:connected", handleConnected);
+    window.addEventListener("echo:disconnected", handleDisconnected);
+
+    return () => {
+      window.removeEventListener("echo:connected", handleConnected);
+      window.removeEventListener("echo:disconnected", handleDisconnected);
+    };
+  }, [queryClient]);
+
+  return {
+    ...query,
+    connectionState: getConnectionState(),
+  };
 }
 ```
 
-3. Hook para detectar visibilidad del documento:
-```typescript
-// src/hooks/useDocumentVisibility.ts
-import { useState, useEffect } from 'react';
+4. Componente de indicador de estado de conexión:
 
-export function useDocumentVisibility(): boolean {
-  const [isVisible, setIsVisible] = useState(!document.hidden);
-  
+```typescript
+// src/components/WebSocketStatus.tsx
+import { useEffect, useState } from "react";
+import { Wifi, WifiOff, AlertCircle } from "lucide-react";
+import { getConnectionState } from "@/services/echo";
+
+export default function WebSocketStatus() {
+  const [status, setStatus] = useState<
+    "connected" | "disconnected" | "connecting" | "error"
+  >(getConnectionState());
+
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      setIsVisible(!document.hidden);
+    const updateStatus = () => {
+      setStatus(getConnectionState());
     };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    window.addEventListener("echo:connected", updateStatus);
+    window.addEventListener("echo:disconnected", updateStatus);
+    window.addEventListener("echo:error", updateStatus);
+
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener("echo:connected", updateStatus);
+      window.removeEventListener("echo:disconnected", updateStatus);
+      window.removeEventListener("echo:error", updateStatus);
     };
   }, []);
-  
-  return isVisible;
+
+  const statusConfig = {
+    connected: {
+      icon: Wifi,
+      color: "text-green-500",
+      label: "Conectado",
+    },
+    disconnected: {
+      icon: WifiOff,
+      color: "text-gray-400",
+      label: "Desconectado",
+    },
+    connecting: {
+      icon: Wifi,
+      color: "text-yellow-500",
+      label: "Conectando...",
+    },
+    error: {
+      icon: AlertCircle,
+      color: "text-red-500",
+      label: "Error de conexión",
+    },
+  };
+
+  const config = statusConfig[status];
+  const Icon = config.icon;
+
+  return (
+    <div
+      className={`flex items-center gap-2 ${config.color}`}
+      title={config.label}
+    >
+      <Icon className="w-4 h-4" />
+      <span className="text-xs">{config.label}</span>
+    </div>
+  );
 }
 ```
 
-4. Actualizar NotificationsPage.tsx:
-   - Reemplazar llamada directa a API con useNotifications hook
-   - Agregar indicador visual de "sincronizando..." cuando está haciendo polling
-   - Mostrar timestamp de última actualización
+5. Actualizar NotificationsPage.tsx:
+
+```typescript
+// src/pages/NotificationsPage.tsx
+import { useNotifications } from "@/hooks/useNotifications";
+import WebSocketStatus from "@/components/WebSocketStatus";
+
+export default function NotificationsPage() {
+  const { data, loading, error, connectionState, refetch } = useNotifications({
+    filters: { per_page: 50, page: 1 },
+    enabled: true,
+    onNewNotification: (notification) => {
+      // Mostrar toast o notificación
+      console.log("Nueva notificación:", notification);
+      // Aquí puedes integrar tu sistema de toasts
+    },
+  });
+
+  return (
+    <div>
+      {/* Indicador de estado de conexión */}
+      <div className="flex justify-end p-4">
+        <WebSocketStatus />
+      </div>
+
+      {/* Resto del componente */}
+      {/* ... */}
+    </div>
+  );
+}
+```
+
+**Características Profesionales Implementadas:**
+
+- ✅ **Reconexión automática** con backoff exponencial
+- ✅ **Manejo robusto de errores** sin crashear la app
+- ✅ **Actualización optimista** del cache (sin refetch innecesario)
+- ✅ **Prevención de duplicados** verificando IDs
+- ✅ **Indicador visual de estado** de conexión
+- ✅ **Limpieza adecuada** de suscripciones
+- ✅ **Sincronización con React Query** para consistencia
+- ✅ **Callback para nuevas notificaciones** (toasts, sonidos, etc.)
 
 ### 2. Badge de Notificaciones No Leídas
 
 Ubicación: src/components/NotificationBadge.tsx (crear)
 
 Requisitos:
+
 1. Componente de badge:
+
    - Mostrar contador de notificaciones no leídas
-   - Actualizar automáticamente cuando llegan nuevas
+   - Actualizar automáticamente cuando llegan nuevas (vía WebSocket)
    - Mostrar en header/navbar junto al icono de notificaciones
    - Animación cuando cambia el número
 
 2. Lógica:
+
    - Contar notificaciones con status='pending' o is_read=false
+   - Actualizar automáticamente cuando llega evento WebSocket
    - Usar React Query para mantener contador actualizado
    - Persistir en localStorage como backup
 
 3. Implementación:
+
 ```typescript
 // src/hooks/useUnreadNotificationsCount.ts
-import { useQuery } from '@tanstack/react-query';
-import { apiService } from '@/services/api';
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { apiService } from "@/services/api";
+import { echo } from "@/services/echo";
 
 export function useUnreadNotificationsCount() {
-  return useQuery({
-    queryKey: ['notifications', 'unread-count'],
+  const queryClient = useQueryClient();
+  const commerceId = useCommerceId();
+
+  // Query inicial para obtener contador
+  const query = useQuery({
+    queryKey: ["notifications", "unread-count"],
     queryFn: async () => {
       const response = await apiService.getNotifications({
         per_page: 1,
         page: 1,
-        status: 'pending',
+        status: "pending",
       });
       return response.total; // Total de notificaciones pendientes
     },
-    refetchInterval: 10000, // Actualizar cada 10 segundos
+    staleTime: Infinity, // No hacer refetch automático, WebSocket actualizará
   });
+
+  // Escuchar eventos WebSocket para actualizar contador
+  useEffect(() => {
+    if (!commerceId || !echo) return;
+
+    const channel = echo.private(`commerce.${commerceId}`);
+
+    channel.listen(".notification.created", () => {
+      // Incrementar contador cuando llega nueva notificación
+      queryClient.setQueryData<number>(
+        ["notifications", "unread-count"],
+        (oldCount) => (oldCount ?? 0) + 1
+      );
+    });
+
+    return () => {
+      channel.stopListening(".notification.created");
+    };
+  }, [commerceId, queryClient]);
+
+  return query;
 }
 ```
 
 4. Componente:
+
 ```typescript
 // src/components/NotificationBadge.tsx
-import { Bell } from 'lucide-react';
-import { useUnreadNotificationsCount } from '@/hooks/useUnreadNotificationsCount';
+import { Bell } from "lucide-react";
+import { useUnreadNotificationsCount } from "@/hooks/useUnreadNotificationsCount";
 
 export default function NotificationBadge() {
   const { data: count = 0 } = useUnreadNotificationsCount();
-  
+
   return (
     <div className="relative">
       <Bell className="w-6 h-6" />
       {count > 0 && (
         <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-          {count > 99 ? '99+' : count}
+          {count > 99 ? "99+" : count}
         </span>
       )}
     </div>
@@ -742,49 +1557,54 @@ export default function NotificationBadge() {
 Ubicación: src/components/NotificationToast.tsx (crear)
 
 Requisitos:
-1. Mostrar toast cuando llega nueva notificación:
+
+1. Mostrar toast cuando llega nueva notificación vía WebSocket:
+
    - Aparecer en esquina superior derecha
    - Mostrar: icono de app, remitente, monto
    - Auto-dismiss después de 5 segundos
    - Click en toast → navegar a detalle de notificación
    - Sonido opcional (configurable en settings)
 
-2. Implementación:
+2. Implementación con WebSockets:
+
 ```typescript
 // src/hooks/useNewNotifications.ts
-import { useQuery } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
-import { apiService } from '@/services/api';
+import { useEffect } from "react";
+import { echo } from "@/services/echo";
+import type { Notification } from "@/types";
 
-export function useNewNotifications(onNewNotification: (notification: Notification) => void) {
-  const previousIdsRef = useRef<Set<number>>(new Set());
-  
-  const { data } = useQuery({
-    queryKey: ['notifications', 'latest'],
-    queryFn: () => apiService.getNotifications({ per_page: 5, page: 1 }),
-    refetchInterval: 10000,
-  });
-  
+export function useNewNotifications(
+  onNewNotification: (notification: Notification) => void
+) {
+  const commerceId = useCommerceId();
+
   useEffect(() => {
-    if (!data?.data) return;
-    
-    const currentIds = new Set(data.data.map(n => n.id));
-    const newNotifications = data.data.filter(n => !previousIdsRef.current.has(n.id));
-    
-    newNotifications.forEach(notification => {
-      onNewNotification(notification);
+    if (!commerceId || !echo) return;
+
+    const channel = echo.private(`commerce.${commerceId}`);
+
+    // Escuchar evento de notificación creada
+    channel.listen(".notification.created", (data: Notification) => {
+      console.log("Nueva notificación recibida vía WebSocket:", data);
+      onNewNotification(data);
     });
-    
-    previousIdsRef.current = currentIds;
-  }, [data, onNewNotification]);
+
+    return () => {
+      channel.stopListening(".notification.created");
+    };
+  }, [commerceId, onNewNotification]);
 }
 ```
 
+**Ventaja:** Con WebSockets, el toast aparece instantáneamente cuando se crea la notificación, sin necesidad de polling.
+
 3. Componente Toast:
+
 ```typescript
 // src/components/NotificationToast.tsx
-import { X } from 'lucide-react';
-import { useEffect } from 'react';
+import { X } from "lucide-react";
+import { useEffect } from "react";
 
 interface NotificationToastProps {
   notification: Notification;
@@ -792,26 +1612,37 @@ interface NotificationToastProps {
   onClick: () => void;
 }
 
-export default function NotificationToast({ notification, onClose, onClick }: NotificationToastProps) {
+export default function NotificationToast({
+  notification,
+  onClose,
+  onClick,
+}: NotificationToastProps) {
   useEffect(() => {
     const timer = setTimeout(onClose, 5000);
     return () => clearTimeout(timer);
   }, [onClose]);
-  
+
   return (
-    <div 
+    <div
       className="bg-white shadow-lg rounded-lg p-4 mb-2 cursor-pointer hover:shadow-xl transition-shadow"
       onClick={onClick}
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="font-semibold">{notification.source_app}</div>
-          <div className="text-sm text-gray-600">{notification.sender_name}</div>
+          <div className="text-sm text-gray-600">
+            {notification.sender_name}
+          </div>
           <div className="text-lg font-bold text-green-600">
             {notification.currency} {notification.amount}
           </div>
         </div>
-        <button onClick={(e) => { e.stopPropagation(); onClose(); }}>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+        >
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -830,7 +1661,9 @@ export default function NotificationToast({ notification, onClose, onClick }: No
 Ubicación: src/pages/NotificationsPage.tsx (modificar)
 
 Requisitos:
+
 1. Filtros tipo chips más visibles:
+
    - Chips más grandes con mejor contraste
    - Chip activo: fondo púrpura, texto blanco
    - Chips inactivos: fondo gris claro, texto gris oscuro
@@ -838,27 +1671,29 @@ Requisitos:
    - Scroll horizontal si hay muchos filtros
 
 2. Implementación mejorada:
+
 ```typescript
 // Componente FilterChips
 const FilterChips = ({ filters, onFilterChange }) => {
   const filterOptions = [
-    { key: 'all', label: 'Todos', icon: Filter },
-    { key: 'today', label: 'Hoy', icon: Calendar },
+    { key: "all", label: "Todos", icon: Filter },
+    { key: "today", label: "Hoy", icon: Calendar },
     // ... más opciones
   ];
-  
+
   return (
     <div className="flex gap-2 overflow-x-auto pb-2">
-      {filterOptions.map(option => (
+      {filterOptions.map((option) => (
         <button
           key={option.key}
           onClick={() => onFilterChange(option.key)}
           className={`
             px-4 py-2 rounded-full flex items-center gap-2 whitespace-nowrap
             transition-colors
-            ${filters.active === option.key 
-              ? 'bg-purple-600 text-white' 
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            ${
+              filters.active === option.key
+                ? "bg-purple-600 text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }
           `}
         >
@@ -881,24 +1716,27 @@ const FilterChips = ({ filters, onFilterChange }) => {
 Ubicación: src/components/SearchBar.tsx (crear o modificar)
 
 Requisitos:
+
 1. Búsqueda mejorada:
+
    - Autocompletado mientras escribe
    - Sugerencias basadas en:
-     * Nombres de remitentes
-     * Montos
-     * Aliases de dispositivos
+     - Nombres de remitentes
+     - Montos
+     - Aliases de dispositivos
    - Debounce de 300ms para evitar demasiadas requests
    - Highlight de texto encontrado en resultados
 
 2. Implementación:
+
 ```typescript
 // src/hooks/useSearchSuggestions.ts
-import { useQuery } from '@tanstack/react-query';
-import { apiService } from '@/services/api';
+import { useQuery } from "@tanstack/react-query";
+import { apiService } from "@/services/api";
 
 export function useSearchSuggestions(query: string) {
   return useQuery({
-    queryKey: ['notifications', 'search-suggestions', query],
+    queryKey: ["notifications", "search-suggestions", query],
     queryFn: () => apiService.searchNotifications(query),
     enabled: query.length >= 2, // Solo buscar si hay al menos 2 caracteres
     staleTime: 5000,
@@ -907,17 +1745,18 @@ export function useSearchSuggestions(query: string) {
 ```
 
 3. Componente SearchBar:
+
 ```typescript
 // src/components/SearchBar.tsx
-import { Search, X } from 'lucide-react';
-import { useState } from 'react';
-import { useSearchSuggestions } from '@/hooks/useSearchSuggestions';
+import { Search, X } from "lucide-react";
+import { useState } from "react";
+import { useSearchSuggestions } from "@/hooks/useSearchSuggestions";
 
 export default function SearchBar({ onSearch }) {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const { data: suggestions } = useSearchSuggestions(query);
-  
+
   return (
     <div className="relative">
       <div className="relative">
@@ -936,8 +1775,8 @@ export default function SearchBar({ onSearch }) {
         {query && (
           <button
             onClick={() => {
-              setQuery('');
-              onSearch('');
+              setQuery("");
+              onSearch("");
               setShowSuggestions(false);
             }}
             className="absolute right-3 top-1/2 transform -translate-y-1/2"
@@ -946,20 +1785,21 @@ export default function SearchBar({ onSearch }) {
           </button>
         )}
       </div>
-      
+
       {showSuggestions && suggestions && suggestions.length > 0 && (
         <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg">
-          {suggestions.map(suggestion => (
+          {suggestions.map((suggestion) => (
             <div
               key={suggestion.id}
               onClick={() => {
-                setQuery(suggestion.sender_name || '');
-                onSearch(suggestion.sender_name || '');
+                setQuery(suggestion.sender_name || "");
+                onSearch(suggestion.sender_name || "");
                 setShowSuggestions(false);
               }}
               className="p-2 hover:bg-gray-100 cursor-pointer"
             >
-              {suggestion.sender_name} - {suggestion.currency} {suggestion.amount}
+              {suggestion.sender_name} - {suggestion.currency}{" "}
+              {suggestion.amount}
             </div>
           ))}
         </div>
@@ -974,16 +1814,19 @@ export default function SearchBar({ onSearch }) {
 Ubicación: src/components/EmptyState.tsx (crear)
 
 Requisitos:
+
 1. Componente de estado vacío:
+
    - Icono grande
    - Título descriptivo
    - Mensaje de ayuda
    - Acción sugerida (botón)
 
 2. Implementación:
+
 ```typescript
 // src/components/EmptyState.tsx
-import { Inbox } from 'lucide-react';
+import { Inbox } from "lucide-react";
 
 interface EmptyStateProps {
   icon?: React.ReactNode;
@@ -995,7 +1838,12 @@ interface EmptyStateProps {
   };
 }
 
-export default function EmptyState({ icon, title, message, action }: EmptyStateProps) {
+export default function EmptyState({
+  icon,
+  title,
+  message,
+  action,
+}: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-12 px-4">
       {icon || <Inbox className="w-16 h-16 text-gray-400 mb-4" />}
@@ -1024,46 +1872,50 @@ export default function EmptyState({ icon, title, message, action }: EmptyStateP
 Ubicación: Varios componentes (modificar)
 
 Requisitos:
+
 1. Navegación bottom tabs en móvil:
+
    - Crear componente MobileBottomNav
    - Mostrar solo en pantallas < 768px
    - Tabs: Notificaciones, Dispositivos, Configuración
 
 2. Responsive design:
+
    - Cards de notificaciones apiladas en móvil
    - Filtros en drawer en móvil
    - Búsqueda full-width en móvil
 
 3. Implementación:
+
 ```typescript
 // src/components/MobileBottomNav.tsx
-import { Bell, Smartphone, Settings } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Bell, Smartphone, Settings } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
 
 export default function MobileBottomNav() {
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   const tabs = [
-    { path: '/notifications', icon: Bell, label: 'Notificaciones' },
-    { path: '/devices', icon: Smartphone, label: 'Dispositivos' },
-    { path: '/settings', icon: Settings, label: 'Configuración' },
+    { path: "/notifications", icon: Bell, label: "Notificaciones" },
+    { path: "/devices", icon: Smartphone, label: "Dispositivos" },
+    { path: "/settings", icon: Settings, label: "Configuración" },
   ];
-  
+
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200">
       <div className="flex justify-around">
-        {tabs.map(tab => {
+        {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = location.pathname === tab.path;
-          
+
           return (
             <button
               key={tab.path}
               onClick={() => navigate(tab.path)}
               className={`
                 flex flex-col items-center py-2 px-4
-                ${isActive ? 'text-purple-600' : 'text-gray-400'}
+                ${isActive ? "text-purple-600" : "text-gray-400"}
               `}
             >
               <Icon className="w-6 h-6" />
@@ -1091,6 +1943,12 @@ Ver: apps/api/README.md para documentación completa
 
 ## DEPENDENCIAS NECESARIAS
 
+Instalar las siguientes dependencias:
+
+```bash
+npm install laravel-echo pusher-js
+```
+
 Ya deberían estar instaladas, pero verificar:
 
 ```json
@@ -1100,37 +1958,375 @@ Ya deberían estar instaladas, pero verificar:
   "react-router-dom": "^6.20.0",
   "tailwindcss": "^3.3.0",
   "lucide-react": "^0.300.0",
-  "date-fns": "^2.30.0"
+  "date-fns": "^2.30.0",
+  "laravel-echo": "^1.16.0",
+  "pusher-js": "^8.4.0"
 }
 ```
 
+## CONFIGURACIÓN DE WEBSOCKETS
+
+### Variables de Entorno Requeridas
+
+**CRÍTICO:** Variables se inyectan en **build time**, no runtime.
+
+**Para Desarrollo:**
+Crear archivo `.env` en `apps/web-dashboard/`:
+
+```env
+# API Backend
+VITE_API_URL=http://localhost:8000
+
+# Laravel Reverb WebSocket Server
+VITE_REVERB_APP_KEY=base64:7IFJN3FFdqSdv3nAdxoRmjMxzI5jqDIG33VJ7XC4LOk
+VITE_REVERB_HOST=localhost
+VITE_REVERB_PORT=8080
+VITE_REVERB_SCHEME=http
+```
+
+**Para Producción:**
+Configurar en Docker Compose o `.env.production`:
+
+```env
+# API Backend
+VITE_API_URL=https://api.notificaciones.space
+
+# Laravel Reverb WebSocket Server
+VITE_REVERB_APP_KEY=base64:7IFJN3FFdqSdv3nAdxoRmjMxzI5jqDIG33VJ7XC4LOk
+VITE_REVERB_HOST=api.notificaciones.space  # Dominio público, no localhost
+VITE_REVERB_PORT=8080
+VITE_REVERB_SCHEME=https  # HTTPS en producción
+
+# Error Tracking (Opcional)
+VITE_SENTRY_DSN=https://tu-dsn@sentry.io/proyecto-id
+```
+
+**⚠️ IMPORTANTE:**
+
+- `VITE_REVERB_HOST` en producción debe ser el dominio público (ej: `api.notificaciones.space`)
+- NO usar `localhost` o `0.0.0.0` en producción
+- `VITE_REVERB_SCHEME` debe ser `https` en producción
+- Variables se validan en build time, no runtime
+
+**Validación de Variables:**
+
+Crear `src/config/env.ts`:
+
+```typescript
+// src/config/env.ts
+const requiredEnvVars = [
+  "VITE_API_URL",
+  "VITE_REVERB_APP_KEY",
+  "VITE_REVERB_HOST",
+  "VITE_REVERB_PORT",
+] as const;
+
+export function validateEnvVars() {
+  const missing: string[] = [];
+
+  requiredEnvVars.forEach((varName) => {
+    if (!import.meta.env[varName]) {
+      missing.push(varName);
+    }
+  });
+
+  if (missing.length > 0) {
+    throw new Error(
+      `❌ Faltan variables de entorno requeridas: ${missing.join(", ")}\n` +
+        `Por favor, crea un archivo .env con estas variables.`
+    );
+  }
+
+  console.log("✅ Variables de entorno validadas correctamente");
+}
+
+// Validar al importar
+validateEnvVars();
+
+// Exportar variables tipadas
+export const env = {
+  API_URL: import.meta.env.VITE_API_URL!,
+  REVERB_APP_KEY: import.meta.env.VITE_REVERB_APP_KEY!,
+  REVERB_HOST: import.meta.env.VITE_REVERB_HOST!,
+  REVERB_PORT: parseInt(import.meta.env.VITE_REVERB_PORT || "8080"),
+  REVERB_SCHEME: import.meta.env.VITE_REVERB_SCHEME || "http",
+} as const;
+```
+
+**Importar en `src/services/echo.ts`:**
+
+```typescript
+import { env } from "@/config/env";
+
+export const echo = new Echo({
+  broadcaster: "reverb",
+  key: env.REVERB_APP_KEY,
+  wsHost: env.REVERB_HOST,
+  wsPort: env.REVERB_PORT,
+  // ... resto de configuración
+});
+```
+
+### Estado del Backend
+
+El backend YA tiene implementado:
+
+- ✅ **Event `NotificationCreated`** con broadcasting (`app/Events/NotificationCreated.php`)
+- ✅ **Laravel Reverb** configurado (`config/broadcasting.php`)
+- ✅ **Canales privados** configurados (`routes/channels.php`): `commerce.{commerceId}`
+- ✅ **Autenticación de canales** con Sanctum (verifica `user.commerce_id === commerceId`)
+- ✅ **Datos completos** en broadcast: id, user_id, commerce_id, device_id, source_app, package_name, app_instance_id, app_instance_label, device_alias, title, body, amount, currency, payer_name, posted_at, received_at, status, is_duplicate, created_at
+- ✅ **Evento nombre**: `notification.created` (broadcastAs)
+
+**Estructura del Evento Broadcast:**
+
+```typescript
+// El backend envía este objeto cuando se crea una notificación:
+{
+  notification: {
+    id: number;
+    user_id: number;
+    commerce_id: number;
+    device_id: number;
+    source_app: string;
+    package_name: string | null;
+    app_instance_id: number | null;
+    app_instance_label: string | null;
+    device_alias: string | null;
+    title: string;
+    body: string;
+    amount: number | null;
+    currency: string | null;
+    payer_name: string | null;
+    posted_at: string | null; // ISO8601
+    received_at: string; // ISO8601
+    status: "pending" | "validated" | "inconsistent";
+    is_duplicate: boolean;
+    created_at: string; // ISO8601
+  }
+}
+```
+
+**Solo necesitas conectarte desde el frontend usando Laravel Echo.**
+
+## CONSIDERACIONES DE CALIDAD Y DEVOPS
+
+### Tests Automatizados
+
+**Requisitos:**
+
+1. Tests unitarios con Jest:
+
+   - Crear: `src/__tests__/hooks/useNotifications.test.ts`
+   - Testear lógica de hooks, filtros, búsqueda
+   - Cobertura mínima: 70% de hooks y utils
+
+2. Tests de componentes con React Testing Library:
+
+   - Crear: `src/__tests__/components/NotificationBadge.test.tsx`
+   - Testear renderizado, interacciones, estados
+
+3. Tests E2E con Playwright (opcional pero recomendado):
+
+   - Testear flujos críticos completos
+   - Validar integración con API
+
+4. Configurar CI/CD:
+   - Crear: `.github/workflows/web-ci.yml`
+   - Ejecutar tests en cada PR
+   - Build automático en cada commit
+
+**Ejemplo de test:**
+
+```typescript
+// useNotifications.test.ts
+describe("useNotifications", () => {
+  it("should fetch notifications with filters", async () => {
+    const { result } = renderHook(() => useNotifications({ device_id: 1 }));
+    await waitFor(() => expect(result.current.data).toBeDefined());
+  });
+});
+```
+
+### Variables de Entorno
+
+**Requisitos:**
+
+1. NO hardcodear URLs o keys:
+
+   - Usar `import.meta.env.VITE_API_URL`
+   - Usar `import.meta.env.VITE_REVERB_APP_KEY`
+   - Crear `.env.example` con todas las variables
+
+2. Validar variables requeridas:
+
+   ```typescript
+   // src/config/env.ts
+   const requiredEnvVars = ["VITE_API_URL", "VITE_REVERB_APP_KEY"];
+   requiredEnvVars.forEach((varName) => {
+     if (!import.meta.env[varName]) {
+       throw new Error(`Missing required env var: ${varName}`);
+     }
+   });
+   ```
+
+3. Documentar en README:
+   - Lista completa de variables
+   - Valores de ejemplo
+   - Dónde obtener valores de producción
+
+### Error Tracking
+
+**Requisitos:**
+
+1. **Logger estructurado implementado** (✅ `src/services/logger.ts`):
+
+   - Logging con niveles (debug, info, warn, error)
+   - Automáticamente deshabilita logs en producción
+   - Preparado para integración con Sentry
+
+2. **Integrar Sentry (opcional):**
+
+   - Ver `ERROR_TRACKING.md` para guía completa
+   - Plan free: 5,000 eventos/mes
+   - Alternativa: GlitchTip self-hosted (gratis, ilimitado)
+   - Solo requiere agregar DSN: `VITE_SENTRY_DSN`
+
+3. **Capturar errores automáticamente:**
+   ```typescript
+   // Ya implementado en logger.ts
+   logger.error("Error de WebSocket", error, { context });
+   // Automáticamente envía a Sentry si está configurado
+   ```
+
+### Performance Monitoring
+
+**Requisitos:**
+
+1. Web Vitals:
+
+   - Integrar `web-vitals` library
+   - Enviar métricas a analytics
+   - Alertar si métricas degradan
+
+2. Code Splitting:
+   - Lazy load de rutas
+   - Lazy load de componentes pesados
+   - Optimizar bundle size
+
+### CI/CD Pipeline
+
+**Requisitos:**
+
+1. Crear `.github/workflows/web-ci.yml`:
+
+   ```yaml
+   name: Web Dashboard CI
+   on: [push, pull_request]
+   jobs:
+     test:
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v3
+         - uses: actions/setup-node@v3
+         - run: npm ci
+         - run: npm run test
+         - run: npm run build
+   ```
+
+2. Deployment automático:
+   - Deploy a staging en cada merge a `develop`
+   - Deploy a producción con approval manual
+   - Rollback automático si health check falla
+
+### Security
+
+**Requisitos:**
+
+1. Security headers:
+
+   - CSP (Content Security Policy)
+   - XSS protection
+   - HTTPS only cookies
+
+2. Validación de entrada:
+   - Sanitizar inputs de búsqueda
+   - Validar filtros antes de enviar a API
+   - Manejar XSS en datos del servidor
+
 ## CRITERIOS DE ACEPTACIÓN
 
-1. ✅ Feed se actualiza automáticamente cada 10 segundos cuando tab está visible
-2. ✅ No hace polling cuando tab está en background
-3. ✅ Badge muestra cantidad de no leídas correctamente
-4. ✅ Badge se actualiza automáticamente
-5. ✅ Toast aparece cuando llega nueva notificación
-6. ✅ Toast navega a detalle al hacer clic
-7. ✅ Filtros tipo chips son más visibles y funcionales
-8. ✅ Búsqueda tiene autocompletado
-9. ✅ Estados vacíos son informativos
-10. ✅ Diseño responsive funciona en móvil
-11. ✅ Navegación bottom tabs funciona en móvil
-12. ✅ No hay flickering al actualizar
-13. ✅ Manejo de errores si falla la conexión
+### Funcionalidad WebSockets:
+
+1. ✅ **WebSockets conectado y funcionando** (Laravel Echo + Reverb)
+2. ✅ **Feed se actualiza instantáneamente** (< 1 segundo) cuando llega nueva notificación
+3. ✅ **Reconexión automática** con backoff exponencial si se pierde conexión
+4. ✅ **Máximo 5 intentos de reconexión** antes de mostrar error
+5. ✅ **Actualización optimista** del cache (sin refetch innecesario)
+6. ✅ **Prevención de duplicados** verificando IDs de notificaciones
+7. ✅ **Indicador visual de estado** de conexión (conectado/desconectado/conectando/error)
+8. ✅ **Manejo robusto de errores** sin crashear la app
+9. ✅ **Limpieza adecuada** de suscripciones al desmontar componentes
+10. ✅ **Sincronización con React Query** para mantener consistencia
+
+### Funcionalidad UX:
+
+11. ✅ **Badge muestra cantidad de no leídas** correctamente
+12. ✅ **Badge se actualiza automáticamente** vía WebSocket
+13. ✅ **Toast aparece instantáneamente** cuando llega nueva notificación
+14. ✅ **Toast navega a detalle** al hacer clic
+15. ✅ **Filtros tipo chips** son más visibles y funcionales
+16. ✅ **Búsqueda tiene autocompletado** con debounce
+17. ✅ **Estados vacíos** son informativos y útiles
+18. ✅ **Diseño responsive** funciona en móvil
+19. ✅ **Navegación bottom tabs** funciona en móvil
+20. ✅ **No hay flickering** al actualizar notificaciones
+
+### Configuración y Validación:
+
+21. ✅ **Variables de entorno validadas** al iniciar la app
+22. ✅ **Mensajes de error claros** si faltan variables de entorno
+23. ✅ **Configuración tipada** con TypeScript
+24. ✅ **Documentación completa** de variables de entorno en README
+
+### Calidad y DevOps:
+
+25. ✅ **Tests unitarios** implementados (cobertura mínima 70%)
+26. ✅ **Tests de componentes** implementados (React Testing Library)
+27. ✅ **Tests de integración** para WebSockets (mock de Echo)
+28. ✅ **CI/CD pipeline** configurado y funcionando
+29. ✅ **Error tracking** preparado (logger estructurado, Sentry opcional - ver ERROR_TRACKING.md)
+30. ✅ **Performance monitoring** implementado (Web Vitals)
+31. ✅ **Security headers** configurados (CSP, XSS protection)
+32. ✅ **Code splitting** implementado para optimizar bundle size
+33. ✅ **Health check** implementado (`src/services/healthCheck.ts`)
+34. ✅ **Manejo de token expirado** en WebSocket
+35. ✅ **Logging estructurado** (`src/services/logger.ts`)
 
 ## NOTAS IMPORTANTES
 
-- Usar React Query para todas las queries (no fetch directo)
+- **CRÍTICO:** Usar WebSockets (Laravel Echo) para tiempo real, NO polling
+- El backend YA tiene WebSockets implementados, solo necesitas conectarte
+- Usar React Query para queries iniciales (carga de datos)
+- WebSockets actualiza el cache de React Query automáticamente
 - Implementar debounce para búsqueda (300ms)
-- Usar document.visibilityState para pausar polling
 - Considerar usar useMemo para optimizar renders
-- Agregar indicador visual de "sincronizando..."
-- Manejar estados de error apropiadamente
+- Agregar indicador visual de estado de conexión WebSocket
+- Manejar estados de error apropiadamente (desconexión, fallo de autenticación)
+- Implementar reconexión automática si se pierde conexión
 - Probar en diferentes tamaños de pantalla
 - Optimizar para performance (lazy loading, code splitting)
 - Seguir las convenciones de código existentes
+- **NUEVO:** Implementar tests automatizados antes de considerar completo
+- **NUEVO:** Configurar CI/CD para validación automática
+- **NUEVO:** Documentar y validar variables de entorno (VITE*REVERB*\*)
+- **NUEVO:** Error tracking preparado (ver ERROR_TRACKING.md para implementar Sentry)
+- **NUEVO:** Monitorear performance con Web Vitals
+- **NUEVO:** Health check implementado para diagnóstico
+- **NUEVO:** Manejo robusto de token expirado en WebSocket
+- **NUEVO:** Logging estructurado para producción
+- **NUEVO:** Ver GUIA_PRODUCCION.md para pasos de deployment
+
 ```
 
 ---
@@ -1138,6 +2334,7 @@ Ya deberían estar instaladas, pero verificar:
 ## PROMPT 3: API - WebSockets para Tiempo Real
 
 ```
+
 # PROMPT: Implementar WebSockets para Notificaciones en Tiempo Real - Yape Notifier API
 
 ## CONTEXTO DEL PROYECTO
@@ -1145,6 +2342,7 @@ Ya deberían estar instaladas, pero verificar:
 Eres un desarrollador trabajando en el backend Laravel de Yape Notifier. Necesitas implementar WebSockets para que el dashboard web reciba notificaciones en tiempo real sin necesidad de polling constante.
 
 Stack Tecnológico:
+
 - Laravel 11
 - PHP 8.2+
 - Laravel Reverb (WebSocket server nativo de Laravel) - RECOMENDADO
@@ -1154,6 +2352,7 @@ Stack Tecnológico:
 - Sanctum (autenticación ya implementada)
 
 Estado Actual:
+
 - ✅ API REST completa implementada
 - ✅ Modelo Notification implementado
 - ✅ NotificationService crea notificaciones correctamente
@@ -1163,6 +2362,7 @@ Estado Actual:
 - ❌ No hay WebSocket server configurado
 
 Estructura del Proyecto:
+
 - app/
   - Http/Controllers/NotificationController.php
   - Services/NotificationService.php
@@ -1175,13 +2375,16 @@ Estructura del Proyecto:
 ### 1. Instalar y Configurar Laravel Reverb
 
 Requisitos:
+
 1. Instalar Laravel Reverb:
+
 ```bash
 composer require laravel/reverb
 php artisan reverb:install
 ```
 
 2. Configurar en config/reverb.php:
+
 ```php
 return [
     'id' => env('REVERB_APP_ID', 'yape-notifier'),
@@ -1198,6 +2401,7 @@ return [
 ```
 
 3. Variables de entorno (.env):
+
 ```env
 REVERB_APP_ID=yape-notifier
 REVERB_APP_KEY=base64:tu-key-generada
@@ -1208,6 +2412,7 @@ REVERB_SCHEME=http
 ```
 
 4. Configurar broadcasting en config/broadcasting.php:
+
 ```php
 'connections' => [
     'reverb' => [
@@ -1227,6 +2432,7 @@ REVERB_SCHEME=http
 ```
 
 5. Configurar BROADCAST_DRIVER en .env:
+
 ```env
 BROADCAST_DRIVER=reverb
 ```
@@ -1236,7 +2442,9 @@ BROADCAST_DRIVER=reverb
 Ubicación: app/Events/NotificationCreated.php
 
 Requisitos:
+
 1. Crear Event que implemente ShouldBroadcast:
+
 ```php
 <?php
 
@@ -1312,18 +2520,21 @@ class NotificationCreated implements ShouldBroadcast
 Ubicación: app/Services/NotificationService.php (modificar método createNotification)
 
 Requisitos:
+
 1. Importar el Event:
+
 ```php
 use App\Events\NotificationCreated;
 ```
 
 2. Modificar método createNotification:
+
 ```php
 public function createNotification(array $data): Notification
 {
     // Validar datos (ya existe)
     $validated = $this->validateNotificationData($data);
-    
+
     // Crear notificación (lógica existente)
     $notification = Notification::create([
         'commerce_id' => $validated['commerce_id'],
@@ -1342,13 +2553,13 @@ public function createNotification(array $data): Notification
         'posted_at' => $validated['posted_at'] ?? now(),
         'received_at' => now(),
     ]);
-    
+
     // Cargar relaciones para el evento
     $notification->load(['appInstance', 'device']);
-    
+
     // Disparar evento de broadcasting
     broadcast(new NotificationCreated($notification))->toOthers();
-    
+
     return $notification;
 }
 ```
@@ -1360,7 +2571,9 @@ public function createNotification(array $data): Notification
 Ubicación: routes/channels.php
 
 Requisitos:
+
 1. Crear autorización para canal privado de commerce:
+
 ```php
 <?php
 
@@ -1377,7 +2590,9 @@ Broadcast::channel('commerce.{commerceId}', function ($user, $commerceId) {
 ### 5. Configurar Redis para Broadcasting (Opcional pero Recomendado)
 
 Requisitos:
+
 1. Si usas Redis para broadcasting (mejor performance):
+
 ```env
 BROADCAST_DRIVER=redis
 REDIS_HOST=127.0.0.1
@@ -1386,6 +2601,7 @@ REDIS_PORT=6379
 ```
 
 2. Instalar predis si no está:
+
 ```bash
 composer require predis/predis
 ```
@@ -1395,12 +2611,15 @@ composer require predis/predis
 ### 6. Iniciar Servidor Reverb
 
 Requisitos:
+
 1. Comando para desarrollo:
+
 ```bash
 php artisan reverb:start
 ```
 
 2. Para producción, usar supervisor o systemd:
+
 ```ini
 # /etc/supervisor/conf.d/reverb.conf
 [program:reverb]
@@ -1421,39 +2640,40 @@ El cliente necesita autenticarse antes de suscribirse a canales privados.
 Ubicación: Ya manejado por Laravel, pero verificar configuración
 
 Requisitos:
+
 1. El cliente debe enviar token de autenticación al conectarse
 2. Laravel valida el token usando Sanctum
 3. Si es válido, permite suscripción al canal
 
 Código del cliente (para referencia, no implementar en backend):
+
 ```javascript
 // El cliente debe conectarse así:
-import Echo from 'laravel-echo';
-import Pusher from 'pusher-js';
+import Echo from "laravel-echo";
+import Pusher from "pusher-js";
 
 window.Pusher = Pusher;
 
 window.Echo = new Echo({
-    broadcaster: 'reverb',
-    key: import.meta.env.VITE_REVERB_APP_KEY,
-    wsHost: import.meta.env.VITE_REVERB_HOST,
-    wsPort: import.meta.env.VITE_REVERB_PORT,
-    wssPort: import.meta.env.VITE_REVERB_PORT,
-    forceTLS: (import.meta.env.VITE_REVERB_SCHEME ?? 'https') === 'https',
-    enabledTransports: ['ws', 'wss'],
-    auth: {
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
+  broadcaster: "reverb",
+  key: import.meta.env.VITE_REVERB_APP_KEY,
+  wsHost: import.meta.env.VITE_REVERB_HOST,
+  wsPort: import.meta.env.VITE_REVERB_PORT,
+  wssPort: import.meta.env.VITE_REVERB_PORT,
+  forceTLS: (import.meta.env.VITE_REVERB_SCHEME ?? "https") === "https",
+  enabledTransports: ["ws", "wss"],
+  auth: {
+    headers: {
+      Authorization: `Bearer ${token}`,
     },
+  },
 });
 
 // Suscribirse al canal privado
-Echo.private(`commerce.${commerceId}`)
-    .listen('.notification.created', (e) => {
-        console.log('Nueva notificación:', e);
-        // Actualizar UI
-    });
+Echo.private(`commerce.${commerceId}`).listen(".notification.created", (e) => {
+  console.log("Nueva notificación:", e);
+  // Actualizar UI
+});
 ```
 
 ### 8. Eventos Adicionales (Opcional)
@@ -1463,23 +2683,24 @@ Crear eventos para otras acciones:
 Ubicación: app/Events/
 
 1. NotificationStatusUpdated.php:
+
 ```php
 class NotificationStatusUpdated implements ShouldBroadcast
 {
     public Notification $notification;
-    
+
     public function __construct(Notification $notification)
     {
         $this->notification = $notification;
     }
-    
+
     public function broadcastOn(): array
     {
         return [
             new PrivateChannel('commerce.' . $this->notification->commerce_id),
         ];
     }
-    
+
     public function broadcastAs(): string
     {
         return 'notification.status.updated';
@@ -1494,7 +2715,9 @@ class NotificationStatusUpdated implements ShouldBroadcast
 Ubicación: tests/Feature/NotificationBroadcastingTest.php
 
 Requisitos:
+
 1. Test básico:
+
 ```php
 <?php
 
@@ -1515,29 +2738,29 @@ class NotificationBroadcastingTest extends TestCase
     public function test_notification_created_event_is_broadcasted(): void
     {
         Event::fake();
-        
+
         $commerce = Commerce::factory()->create();
         $user = User::factory()->create(['commerce_id' => $commerce->id]);
-        
+
         $notification = Notification::factory()->create([
             'commerce_id' => $commerce->id,
         ]);
-        
+
         broadcast(new NotificationCreated($notification));
-        
+
         Event::assertDispatched(NotificationCreated::class);
     }
-    
+
     public function test_notification_is_broadcasted_to_correct_channel(): void
     {
         $commerce = Commerce::factory()->create();
         $notification = Notification::factory()->create([
             'commerce_id' => $commerce->id,
         ]);
-        
+
         $event = new NotificationCreated($notification);
         $channels = $event->broadcastOn();
-        
+
         $this->assertCount(1, $channels);
         $this->assertInstanceOf(PrivateChannel::class, $channels[0]);
         $this->assertEquals('commerce.' . $commerce->id, $channels[0]->name);
@@ -1564,7 +2787,156 @@ BROADCAST_DRIVER=reverb
 
 Para producción, cambiar REVERB_SCHEME a https y configurar SSL.
 
+## CONSIDERACIONES DE CALIDAD Y DEVOPS
+
+### Tests de Integración
+
+**Requisitos:**
+
+1. Tests para eventos de broadcasting:
+
+   - Crear: `tests/Feature/NotificationBroadcastingTest.php`
+   - Testear que eventos se disparan correctamente
+   - Testear que eventos llegan al canal correcto
+   - Testear autenticación de canales
+
+2. Tests para servidor Reverb:
+   - Testear conexión/desconexión
+   - Testear reconexión automática
+   - Testear manejo de errores
+
+**Ejemplo de test:**
+
+```php
+public function test_notification_broadcasts_to_correct_channel(): void
+{
+    Event::fake();
+
+    $notification = Notification::factory()->create();
+    broadcast(new NotificationCreated($notification));
+
+    Event::assertDispatched(NotificationCreated::class, function ($event) use ($notification) {
+        return $event->notification->id === $notification->id;
+    });
+}
+```
+
+### Rate Limiting
+
+**Requisitos:**
+
+1. Implementar rate limiting para eventos:
+
+   ```php
+   // app/Http/Middleware/ThrottleBroadcasting.php
+   public function handle($request, Closure $next)
+   {
+       $key = 'broadcast:' . $request->user()->id;
+       if (RateLimiter::tooManyAttempts($key, 100)) {
+           return response()->json(['error' => 'Too many requests'], 429);
+       }
+       RateLimiter::hit($key, 60); // 100 requests per minute
+       return $next($request);
+   }
+   ```
+
+2. Configurar límites por entorno:
+   - Desarrollo: límites altos
+   - Producción: límites estrictos
+
+### Monitoring y Métricas
+
+**Requisitos:**
+
+1. Métricas de conexiones:
+
+   - Conexiones activas
+   - Conexiones por commerce
+   - Tasa de desconexiones
+
+2. Métricas de eventos:
+
+   - Eventos broadcast por minuto
+   - Latencia de eventos
+   - Tasa de errores
+
+3. Health check endpoint:
+   ```php
+   // routes/api.php
+   Route::get('/health/reverb', function () {
+       return response()->json([
+           'status' => 'ok',
+           'connections' => Reverb::getConnectionCount(),
+       ]);
+   });
+   ```
+
+### Logging Estructurado
+
+**Requisitos:**
+
+1. Logging de eventos importantes:
+
+   ```php
+   Log::info('WebSocket connection established', [
+       'user_id' => $user->id,
+       'commerce_id' => $user->commerce_id,
+       'channel' => $channel,
+   ]);
+   ```
+
+2. Logging de errores con contexto:
+
+   ```php
+   Log::error('WebSocket connection failed', [
+       'user_id' => $user->id,
+       'error' => $exception->getMessage(),
+       'trace' => $exception->getTraceAsString(),
+   ]);
+   ```
+
+3. Integrar con sistema de logging centralizado (opcional):
+   - ELK Stack
+   - CloudWatch
+   - Datadog
+
+### CI/CD
+
+**Requisitos:**
+
+1. Tests automáticos:
+
+   - Ejecutar tests de broadcasting en CI
+   - Validar configuración de Reverb
+   - Verificar que eventos funcionan
+
+2. Deployment:
+   - Validar configuración antes de deploy
+   - Health check después de deploy
+   - Rollback automático si falla
+
+### Graceful Shutdown
+
+**Requisitos:**
+
+1. Manejar señales de terminación:
+
+   ```php
+   // En el proceso de Reverb
+   pcntl_signal(SIGTERM, function() {
+       // Cerrar conexiones gracefully
+       // Guardar estado
+       exit(0);
+   });
+   ```
+
+2. Notificar a clientes antes de cerrar:
+   - Enviar mensaje de "servidor reiniciando"
+   - Dar tiempo para reconexión
+
 ## CRITERIOS DE ACEPTACIÓN
+
+Funcionalidad:
 
 1. ✅ Laravel Reverb instalado y configurado correctamente
 2. ✅ Event NotificationCreated se dispara al crear notificación
@@ -1574,20 +2946,24 @@ Para producción, cambiar REVERB_SCHEME a https y configurar SSL.
 6. ✅ Servidor Reverb inicia sin errores
 7. ✅ Cliente puede conectarse y recibir eventos
 8. ✅ Manejo de reconexión automática (manejado por cliente)
-9. ✅ Tests pasan correctamente
-10. ✅ Documentación actualizada
+
+Calidad y DevOps: 9. ✅ Tests de integración implementados y pasando 10. ✅ Rate limiting implementado y configurado 11. ✅ Monitoring y métricas configurados 12. ✅ Health check endpoint implementado 13. ✅ Logging estructurado implementado 14. ✅ CI/CD pipeline configurado 15. ✅ Graceful shutdown implementado 16. ✅ Documentación actualizada
 
 ## NOTAS IMPORTANTES
 
 - Usar canales privados para seguridad multi-tenant
-- Implementar rate limiting para eventos si es necesario
+- **CRÍTICO:** Implementar rate limiting para prevenir abuso
 - Considerar usar Redis para mejor performance en producción
 - Configurar SSL/TLS para producción (wss://)
-- Monitorear conexiones WebSocket (logs, métricas)
+- **CRÍTICO:** Monitorear conexiones WebSocket (logs, métricas)
 - Documentar configuración en README.md
 - Probar con múltiples clientes conectados simultáneamente
 - Manejar desconexiones y reconexiones apropiadamente
 - Considerar usar queue para broadcasting si hay muchos eventos
+- **NUEVO:** Implementar tests de integración para WebSockets
+- **NUEVO:** Configurar monitoring y alertas
+- **NUEVO:** Implementar health checks para producción
+- **NUEVO:** Logging estructurado para debugging
 
 ## ALTERNATIVA: Pusher
 
@@ -1600,7 +2976,8 @@ Si prefieres usar Pusher en lugar de Reverb:
 5. El resto de la implementación es similar
 
 Reverb es recomendado porque es nativo de Laravel y no requiere servicio externo.
-```
+
+````
 
 ---
 
@@ -1608,7 +2985,7 @@ Reverb es recomendado porque es nativo de Laravel y no requiere servicio externo
 
 1. **Copiar el prompt completo**: Incluye desde el inicio del bloque de código (```) hasta el final (```)
 2. **Cada prompt es independiente**: Puedes usar uno sin los otros
-3. **Orden recomendado**: 
+3. **Orden recomendado**:
    - Primero: Android App (más crítico)
    - Segundo: Dashboard Web (mejoras UX)
    - Tercero: API WebSockets (opcional, mejora performance)
@@ -1619,3 +2996,4 @@ Reverb es recomendado porque es nativo de Laravel y no requiere servicio externo
 
 
 
+````
