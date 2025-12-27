@@ -157,6 +157,76 @@ export COMPOSE_DOCKER_CLI_BUILD=1
 docker compose --env-file .env build
 ```
 
+### ¿Qué es BuildKit y por qué se necesitan esas variables?
+
+**BuildKit** es el motor de construcción moderno de Docker que reemplaza al motor antiguo. Ofrece mejoras significativas de rendimiento y nuevas características como **cache mounts**.
+
+#### Variables de Entorno Requeridas
+
+| Variable | Propósito | ¿Qué pasa sin ella? |
+|----------|-----------|---------------------|
+| `DOCKER_BUILDKIT=1` | Habilita BuildKit para `docker build` | Docker usa el motor antiguo, no reconoce `--mount=type=cache` |
+| `COMPOSE_DOCKER_CLI_BUILD=1` | Hace que `docker compose build` use BuildKit | `docker compose build` puede no usar BuildKit aunque esté habilitado |
+
+#### ¿Por qué son obligatorias en este proyecto?
+
+Los Dockerfiles usan **cache mounts** que solo funcionan con BuildKit:
+
+```dockerfile
+# Ejemplo del Dockerfile.php-fpm (línea 28)
+RUN --mount=type=cache,target=/root/.composer/cache \
+    composer install --no-dev --optimize-autoloader ...
+```
+
+**Sin BuildKit:**
+- ❌ El build falla o ignora el cache mount
+- ❌ Composer descarga TODOS los paquetes en cada build (5-10 minutos)
+- ❌ No se aprovecha el cache entre builds
+- ❌ Mayor uso de ancho de banda
+
+**Con BuildKit:**
+- ✅ El cache mount funciona correctamente
+- ✅ Composer solo descarga paquetes nuevos o actualizados (30 seg - 2 min)
+- ✅ El cache persiste entre builds
+- ✅ Menor uso de ancho de banda
+
+#### Comparación de Tiempos
+
+**Sin BuildKit (motor antiguo):**
+```
+Build 1: [Descargar Composer packages] ████████████████████ 10 min
+Build 2: [Descargar Composer packages] ████████████████████ 10 min
+Build 3: [Descargar Composer packages] ████████████████████ 10 min
+```
+
+**Con BuildKit (cache mounts):**
+```
+Build 1: [Descargar Composer packages] ████████████████████ 10 min
+Build 2: [Usar cache]                   ██ 30 seg
+Build 3: [Usar cache]                   ██ 30 seg
+```
+
+#### Configuración Permanente (Opcional)
+
+Si prefieres no exportar las variables cada vez, puedes configurarlas permanentemente:
+
+**Para el usuario actual:**
+```bash
+# Agregar a ~/.bashrc o ~/.zshrc
+echo 'export DOCKER_BUILDKIT=1' >> ~/.bashrc
+echo 'export COMPOSE_DOCKER_CLI_BUILD=1' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Para todo el sistema:**
+```bash
+# Agregar a /etc/environment (requiere sudo)
+sudo sh -c 'echo "DOCKER_BUILDKIT=1" >> /etc/environment'
+sudo sh -c 'echo "COMPOSE_DOCKER_CLI_BUILD=1" >> /etc/environment'
+```
+
+**Nota:** Los scripts `deploy.sh` y `update.sh` ya exportan estas variables automáticamente, así que no es necesario configurarlas permanentemente a menos que hagas builds manuales frecuentes.
+
 ### Validación de composer.lock
 
 Los scripts de deploy validan automáticamente que `composer.lock` esté sincronizado con `composer.json` antes del build. Si está desactualizado, el deploy falla con instrucciones claras.
