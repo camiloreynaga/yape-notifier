@@ -4,6 +4,80 @@ Registro de cambios, mejoras y correcciones implementadas en el proyecto.
 
 ---
 
+## 2025-01-27
+
+### ✅ Mejoras Implementadas - App Android
+
+#### 1. Migración a Hilt (Dependency Injection)
+
+**Estado:** ✅ Completamente implementada
+
+**ViewModels Migrados:**
+- ✅ AdminLoginViewModel - Migrado y con tests
+- ✅ LoginViewModel - Migrado y con tests
+- ✅ RegisterViewModel - Migrado
+- ✅ LinkDeviceViewModel - Migrado
+- ✅ MainViewModel - Migrado
+- ✅ AppInstancesViewModel - Migrado
+- ✅ MonitoredAppsSelectionViewModel - Migrado
+- ✅ AdminPanelViewModel - Migrado
+
+**Tests Unitarios Creados:**
+- ✅ AdminLoginViewModelTest - 5 tests completos
+- ✅ LoginViewModelTest - 4 tests completos
+
+**Beneficios:**
+- ✅ Dependency Injection profesional con Hilt
+- ✅ Testing más fácil (mocks inyectables)
+- ✅ Singleton automático de ApiService
+- ✅ Bajo acoplamiento
+- ✅ Código más mantenible
+
+**Referencias:**
+- Ver `docs/03-architecture/ANDROID_HILT.md` para explicación técnica
+- Ver `docs/07-reference/CODE_QUALITY_ANDROID.md` para revisión completa
+
+#### 2. Sistema de Manejo de Errores Profesional
+
+**Archivos creados:**
+- `ApiResult.kt` - Sealed class para type-safe error handling
+- `ApiCallHandler.kt` - Handler centralizado para llamadas a API
+
+**Características:**
+- ✅ Type-safe error handling
+- ✅ Mensajes de error específicos por tipo
+- ✅ Detección automática de errores retryables
+- ✅ Mejor UX con mensajes claros
+
+#### 3. Validación de Conectividad y Retry Logic
+
+**Archivos creados:**
+- `NetworkUtils.kt` - Utilidades para verificación de red
+- `RetryInterceptor.kt` - Interceptor para retry automático
+
+**Características:**
+- ✅ Verificación de conectividad antes de requests
+- ✅ Retry automático con exponential backoff (1s, 2s, 4s)
+- ✅ Solo retry en errores retryables (5xx, timeouts)
+
+#### 4. Estandarización de Logging
+
+**Cambios:**
+- ✅ Todos los `Log` reemplazados por `Timber`
+- ✅ Logging consistente en toda la app
+- ✅ Logs automáticamente deshabilitados en release
+
+#### 5. Eliminación de Anti-patterns
+
+**Correcciones:**
+- ✅ Eliminado `runBlocking` en `RetrofitClient.authInterceptor`
+- ✅ Token cacheado en memoria con actualización asíncrona
+- ✅ Previene deadlocks y mejora performance
+
+**Score de Calidad Android: 9/10** (mejorado desde 7/10)
+
+---
+
 ## 2025-01-21
 
 ### ✅ Mejoras Implementadas

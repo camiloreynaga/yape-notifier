@@ -594,6 +594,7 @@ Para vincular un dispositivo correctamente:
 - **Android ViewModel:** `apps/android-client/app/src/main/java/com/yapenotifier/android/ui/viewmodel/LinkDeviceViewModel.kt`
 - **Modelo:** `apps/api/app/Models/DeviceLinkCode.php`
 - **Migración:** `apps/api/database/migrations/2025_01_20_000001_create_device_link_codes_table.php`
+- **Guía práctica:** Ver `docs/05-features/DEVICE_LINKING_GUIDE.md` para guía paso a paso detallada
 
 ---
 
