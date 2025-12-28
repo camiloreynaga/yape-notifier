@@ -27,6 +27,7 @@ AppInstance = (device_id + package_name + android_user_id)
 **Tabla:** `app_instances`
 
 **Campos:**
+
 - `id`
 - `commerce_id` (FK)
 - `device_id` (FK)
@@ -38,6 +39,7 @@ AppInstance = (device_id + package_name + android_user_id)
 **Constraint único:** `(device_id, package_name, android_user_id)`
 
 **Endpoints API:**
+
 - `GET /api/app-instances` - Listar instancias del comercio
 - `GET /api/devices/{id}/app-instances` - Instancias de un dispositivo
 - `PATCH /api/app-instances/{id}/label` - Actualizar nombre de instancia
@@ -45,11 +47,13 @@ AppInstance = (device_id + package_name + android_user_id)
 ### Android
 
 **Captura de datos:**
+
 - `packageName`: `sbn.packageName`
 - `androidUserId`: `sbn.userId` ✅ **CORRECTO**: Usa `userId` directamente (equivalente a `getIdentifier()` pero público)
 - `androidUid`: `sbn.uid` (opcional)
 
 **Implementación actual:**
+
 ```kotlin
 @Suppress("DEPRECATION")
 val androidUserId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -60,6 +64,7 @@ val androidUserId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
 ```
 
 **⚠️ IMPORTANTE - Opciones NO recomendadas:**
+
 - ❌ `sbn.user?.hashCode()` - NO es un identificador único confiable
 - ❌ `sbn.user?.getIdentifier()` - Puede ser API oculta (error de compilación)
 - ✅ `sbn.userId` - **Usar esta opción** (público, funcional, equivalente a `getIdentifier()`)
@@ -67,10 +72,12 @@ val androidUserId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
 **Ver análisis técnico completo:** `docs/03-architecture/ANDROID_USER_ID.md`
 
 **Almacenamiento local:**
+
 - `CapturedNotification` incluye todos los campos dual
 - Room Database con migración v1 → v2
 
 **Envío al backend:**
+
 - `SendNotificationWorker` envía todos los campos dual
 - Backend crea/busca AppInstance automáticamente
 
@@ -92,6 +99,7 @@ val androidUserId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
 ## Deduplicación
 
 Las notificaciones se consideran duplicadas si tienen:
+
 - Mismo `device_id`
 - Mismo `package_name`
 - Mismo `android_user_id`
@@ -105,6 +113,7 @@ Las notificaciones se consideran duplicadas si tienen:
 El código actual usa `sbn.userId` que es la solución correcta y funcional. Este valor es equivalente a `getIdentifier()` pero es público y accesible sin requerir APIs ocultas.
 
 **Historial:**
+
 - ❌ Versión inicial usaba `hashCode()` (incorrecto)
 - ✅ Corregido a `sbn.userId` (correcto y funcional)
 
@@ -116,4 +125,3 @@ Ver `docs/03-architecture/ANDROID_USER_ID.md` para análisis técnico detallado 
 - **Bugs conocidos**: Ver `docs/07-reference/KNOWN_ISSUES.md`
 - **Estado de implementación**: Ver `docs/07-reference/IMPLEMENTATION_STATUS.md`
 - **Roadmap**: Ver `docs/07-reference/ROADMAP.md`
-

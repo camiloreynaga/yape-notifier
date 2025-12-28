@@ -611,6 +611,66 @@ REVERB_SCHEME_PUBLIC=https                  # ✅ HTTPS externo
 
 ---
 
+## 🚀 Impacto del Deployment
+
+### Nuevos Componentes del Sistema
+
+#### Servicio Reverb (WebSocket Server)
+- **Qué es**: Servidor WebSocket nativo de Laravel que maneja conexiones en tiempo real
+- **Impacto**: Nuevo servicio que debe ejecutarse de forma continua
+- **Recursos**: Consume CPU y memoria para mantener conexiones WebSocket activas
+- **Puerto**: Requiere un puerto adicional (por defecto 8080) expuesto internamente
+
+#### Broadcasting de Eventos
+- **Qué es**: Sistema que transmite eventos de Laravel a clientes conectados vía WebSocket
+- **Impacto**: Cada notificación creada ahora dispara un evento broadcast
+- **Rendimiento**: Mínimo impacto en la creación de notificaciones (operación asíncrona)
+- **Escalabilidad**: Requiere considerar el número de conexiones simultáneas
+
+#### Autenticación de Canales Privados
+- **Qué es**: Sistema que valida que usuarios solo escuchen canales de su commerce
+- **Impacto**: Endpoint adicional `/api/broadcasting/auth` que valida tokens Sanctum
+- **Seguridad**: Asegura aislamiento multi-tenant a nivel de WebSocket
+
+### Cambios en la Infraestructura
+
+#### Antes (Sin WebSockets)
+```
+Cliente → Caddy → Nginx → PHP-FPM → PostgreSQL
+         (HTTPS)   (HTTP)   (FastCGI)
+```
+
+#### Después (Con WebSockets)
+```
+Cliente → Caddy → Nginx → PHP-FPM → PostgreSQL
+         (HTTPS)   (HTTP)   (FastCGI)
+         
+Cliente → Caddy → Reverb → PHP-FPM (para auth)
+         (WSS)     (WS)      (HTTP)
+```
+
+### Impacto en Recursos
+
+| Recurso | Impacto | Notas |
+|---------|---------|-------|
+| **CPU** | +5-10% | Reverb consume CPU para mantener conexiones |
+| **Memoria** | +50-100MB | Por cada conexión WebSocket activa (~1-2MB) |
+| **Red** | Variable | Depende del número de conexiones simultáneas |
+| **Puertos** | +1 puerto | Puerto 8080 (interno) para Reverb |
+| **Disco** | Mínimo | Logs adicionales de Reverb |
+
+### Archivos Modificados en el Deployment
+
+- ✅ `app/Events/NotificationCreated.php` - Evento de broadcasting
+- ✅ `app/Services/NotificationService.php` - Dispara evento al crear notificación
+- ✅ `routes/channels.php` - Autorización de canales privados
+- ✅ `config/reverb.php` - Configuración de Reverb (nuevo)
+- ✅ `config/broadcasting.php` - Ya tenía configuración de Reverb
+- ✅ `docker-compose.yml` - Servicio Reverb agregado
+- ✅ `Caddyfile` - Proxy WebSocket configurado
+
+---
+
 ## 📚 Referencias
 
 - [Laravel Reverb Documentation](https://laravel.com/docs/reverb)
@@ -620,6 +680,7 @@ REVERB_SCHEME_PUBLIC=https                  # ✅ HTTPS externo
 - **Estado de implementación**: Ver `docs/07-reference/IMPLEMENTATION_STATUS.md`
 - **Configuración de producción**: Ver `infra/docker/environments/production/REVERB_SETUP.md` para detalles específicos del entorno de producción
 - **Docker**: Ver `docs/02-deployment/DOCKER.md` para infraestructura Docker
+- **Deployment**: Ver `docs/02-deployment/DEPLOYMENT.md` para guía completa de deployment
 
 ---
 
