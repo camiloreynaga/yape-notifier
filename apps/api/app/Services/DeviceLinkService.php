@@ -140,15 +140,34 @@ class DeviceLinkService
                 'code' => $code,
             ]);
 
-            $device = Device::create([
-                'uuid' => $deviceUuid,
-                'user_id' => $user?->id, // Optional: associate with user if authenticated
-                'commerce_id' => $linkCode->commerce_id,
-                'name' => $deviceName ?? 'Android Device',
-                'platform' => 'android',
-                'is_active' => true,
-                'last_seen_at' => now(),
-            ]);
+            try {
+                $device = Device::create([
+                    'uuid' => $deviceUuid,
+                    'user_id' => $user?->id, // Optional: associate with user if authenticated (nullable)
+                    'commerce_id' => $linkCode->commerce_id,
+                    'name' => $deviceName ?? 'Android Device',
+                    'platform' => 'android',
+                    'is_active' => true,
+                    'last_seen_at' => now(),
+                ]);
+            } catch (\Illuminate\Database\QueryException $e) {
+                // Log the specific database error for debugging
+                Log::error('Failed to create device during link', [
+                    'device_uuid' => $deviceUuid,
+                    'user_id' => $user?->id,
+                    'commerce_id' => $linkCode->commerce_id,
+                    'error' => $e->getMessage(),
+                    'sql_state' => $e->getSqlState() ?? null,
+                    'error_code' => $e->getCode(),
+                ]);
+                
+                // Re-throw with a more user-friendly message
+                throw new \RuntimeException(
+                    'Error al crear el dispositivo. Verifica que la base de datos esté correctamente configurada.',
+                    $e->getCode(),
+                    $e
+                );
+            }
             
             $wasCreated = true;
 
