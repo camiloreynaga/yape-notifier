@@ -24,6 +24,7 @@ class LinkDeviceByCodeRequest extends FormRequest
         return [
             'code' => ['required', 'string', 'size:8', 'regex:/^[A-Z0-9]+$/'],
             'device_uuid' => ['required', 'string', 'uuid'],
+            'device_name' => ['nullable', 'string', 'max:255'], // Optional device name
         ];
     }
 

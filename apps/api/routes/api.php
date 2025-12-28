@@ -40,10 +40,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/devices/{id}/monitored-apps', [DeviceMonitoredAppController::class, 'index']);
     Route::post('/devices/{id}/monitored-apps', [DeviceMonitoredAppController::class, 'store']);
 
-    // Device Link routes (for QR/code linking)
+    // Device Link routes (for QR/code linking - admin only)
     Route::post('/devices/generate-link-code', [DeviceLinkController::class, 'generateLinkCode']);
-    Route::post('/devices/link-by-code', [DeviceLinkController::class, 'linkByCode']);
     Route::get('/devices/link-codes', [DeviceLinkController::class, 'getActiveCodes']);
+});
+
+// Public device linking endpoint (authentication optional)
+// Professional Architecture: The link code itself is the authorization mechanism
+// Devices can be linked without prior registration or authentication
+// If user is authenticated, device is associated with user for traceability
+Route::post('/devices/link-by-code', [DeviceLinkController::class, 'linkByCode']);
 
     // Notification routes
     Route::post('/notifications', [NotificationController::class, 'store']);

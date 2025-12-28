@@ -86,13 +86,20 @@ class DeviceLinkService
 
     /**
      * Link a device to a commerce using a link code.
+     * 
+     * Professional Architecture Approach:
+     * - The link code is the primary authorization mechanism (not user authentication)
+     * - Device can be linked without prior registration (flexible UX)
+     * - If user is authenticated, device is also associated with user (optional traceability)
+     * - If device doesn't exist, it's created automatically (find-or-create pattern)
      *
      * @param string $code
      * @param string $deviceUuid
-     * @param User $user
+     * @param User|null $user Optional authenticated user for traceability
+     * @param string|null $deviceName Optional device name from request
      * @return array{success: bool, device: Device|null, message: string}
      */
-    public function linkDevice(string $code, string $deviceUuid, User $user): array
+    public function linkDevice(string $code, string $deviceUuid, ?User $user = null, ?string $deviceName = null): array
     {
         // Validate code
         $validation = $this->validateCode($code);
@@ -117,41 +124,68 @@ class DeviceLinkService
             ];
         }
 
-        // Find device by UUID - device MUST exist before linking
-        // Professional approach: Separation of concerns
-        // - Device registration happens in login/register flow
-        // - Linking only associates existing device to commerce
-        $device = Device::where('uuid', $deviceUuid)
-            ->where('user_id', $user->id)
-            ->first();
+        // Find device by UUID (without user_id filter for flexibility)
+        // Professional approach: UUID is the primary identifier, user_id is optional
+        $device = Device::where('uuid', $deviceUuid)->first();
 
+        $wasCreated = false;
+        
         if (!$device) {
-            Log::warning('Attempt to link non-existent device', [
+            // Device doesn't exist - create it automatically
+            // This enables flexible UX: devices can be linked without prior registration
+            Log::info('Device not found, creating automatically during link', [
                 'device_uuid' => $deviceUuid,
-                'user_id' => $user->id,
+                'user_id' => $user?->id,
+                'commerce_id' => $linkCode->commerce_id,
                 'code' => $code,
             ]);
 
-            return [
-                'success' => false,
-                'device' => null,
-                'message' => 'Dispositivo no encontrado. Por favor, inicia sesión primero para registrar tu dispositivo.',
-            ];
-        }
+            $device = Device::create([
+                'uuid' => $deviceUuid,
+                'user_id' => $user?->id, // Optional: associate with user if authenticated
+                'commerce_id' => $linkCode->commerce_id,
+                'name' => $deviceName ?? 'Android Device',
+                'platform' => 'android',
+                'is_active' => true,
+                'last_seen_at' => now(),
+            ]);
+            
+            $wasCreated = true;
 
-        // Check if device already belongs to a different commerce
-        if ($device->commerce_id && $device->commerce_id !== $linkCode->commerce_id) {
-            return [
-                'success' => false,
-                'device' => null,
-                'message' => 'El dispositivo ya pertenece a otro negocio',
-            ];
-        }
+            Log::info('Device created automatically during link', [
+                'device_id' => $device->id,
+                'device_uuid' => $deviceUuid,
+                'commerce_id' => $linkCode->commerce_id,
+                'user_id' => $user?->id,
+            ]);
+        } else {
+            // Device exists - verify and update
+            // Check if device already belongs to a different commerce
+            if ($device->commerce_id && $device->commerce_id !== $linkCode->commerce_id) {
+                return [
+                    'success' => false,
+                    'device' => null,
+                    'message' => 'El dispositivo ya pertenece a otro negocio',
+                ];
+            }
 
-        // Update device with commerce_id
-        $device->update([
-            'commerce_id' => $linkCode->commerce_id,
-        ]);
+            // Update device with commerce_id and optionally user_id
+            $updateData = [
+                'commerce_id' => $linkCode->commerce_id,
+                'last_seen_at' => now(),
+            ];
+
+            // If user is authenticated and device doesn't have user_id, associate it
+            if ($user && !$device->user_id) {
+                $updateData['user_id'] = $user->id;
+                Log::info('Associating existing device with authenticated user', [
+                    'device_id' => $device->id,
+                    'user_id' => $user->id,
+                ]);
+            }
+
+            $device->update($updateData);
+        }
 
         // Mark code as used
         $linkCode->markAsUsed();
@@ -162,7 +196,8 @@ class DeviceLinkService
             'device_uuid' => $deviceUuid,
             'commerce_id' => $linkCode->commerce_id,
             'code' => $code,
-            'user_id' => $user->id,
+            'user_id' => $user?->id,
+            'was_created' => $wasCreated,
         ]);
 
         return [

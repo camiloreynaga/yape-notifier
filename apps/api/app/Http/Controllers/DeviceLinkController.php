@@ -109,18 +109,25 @@ class DeviceLinkController extends Controller
 
     /**
      * Link a device to a commerce using a link code.
-     * Requires authentication.
+     * 
+     * Professional Architecture Approach:
+     * - Authentication is OPTIONAL (flexible UX for capturer mode)
+     * - The link code itself is the authorization mechanism
+     * - If user is authenticated, device is associated with user (traceability)
+     * - If device doesn't exist, it's created automatically
      *
      * POST /api/devices/link-by-code
      */
     public function linkByCode(LinkDeviceByCodeRequest $request): JsonResponse
     {
         try {
-            $user = $request->user();
+            // Authentication is optional - link code is the authorization mechanism
+            $user = $request->user(); // Will be null if not authenticated
             $code = $request->input('code');
             $deviceUuid = $request->input('device_uuid');
+            $deviceName = $request->input('device_name'); // Optional device name
 
-            $result = $this->deviceLinkService->linkDevice($code, $deviceUuid, $user);
+            $result = $this->deviceLinkService->linkDevice($code, $deviceUuid, $user, $deviceName);
 
             if (!$result['success']) {
                 return response()->json([
@@ -134,7 +141,7 @@ class DeviceLinkController extends Controller
             ], 200);
         } catch (\Exception $e) {
             Log::error('Failed to link device by code', [
-                'user_id' => $request->user()->id,
+                'user_id' => $request->user()?->id,
                 'code' => $request->input('code'),
                 'device_uuid' => $request->input('device_uuid'),
                 'error' => $e->getMessage(),
