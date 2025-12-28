@@ -96,28 +96,49 @@ COPY --from=dependencies /var/www/composer.json /var/www/composer.lock* ./
 # Copy application files
 COPY . /var/www
 
+# Install Composer for running scripts (lightweight, only binary)
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
 # Create necessary directories with proper structure
+# IMPORTANTE: Crear directorios ANTES de ejecutar composer para evitar problemas de permisos
 RUN mkdir -p /var/www/storage/framework/sessions \
     && mkdir -p /var/www/storage/framework/views \
     && mkdir -p /var/www/storage/framework/cache/data \
     && mkdir -p /var/www/storage/logs \
     && mkdir -p /var/www/bootstrap/cache
 
+# Optimize autoloader for production
+# Ejecutar ANTES de cambiar permisos para que los archivos generados tengan permisos correctos
+# Usamos --no-scripts para evitar ejecutar scripts de Laravel que requieren variables de entorno
+# Los scripts se ejecutarán después cuando el contenedor esté corriendo con .env configurado
+RUN composer dump-autoload --optimize --classmap-authoritative --no-scripts
+
 # Set ownership and permissions for Laravel directories
 # www-data is the default user for PHP-FPM in Alpine
+# IMPORTANTE: Cambiar permisos DESPUÉS de composer dump-autoload para asegurar que todos los archivos
+# generados tengan el propietario correcto
 RUN chown -R www-data:www-data /var/www \
     && chmod -R 755 /var/www \
     && chmod -R 775 /var/www/storage \
     && chmod -R 775 /var/www/bootstrap/cache
 
-# Install Composer for running scripts (lightweight, only binary)
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-# Optimize autoloader for production
-# Usamos --no-scripts para evitar ejecutar scripts de Laravel que requieren variables de entorno
-# Los scripts se ejecutarán después cuando el contenedor esté corriendo con .env configurado
-RUN composer dump-autoload --optimize --classmap-authoritative --no-scripts
+# Create entrypoint script inline (verifica permisos al iniciar)
+# Útil para asegurar permisos correctos, especialmente si hay volúmenes montados
+RUN echo '#!/bin/sh' > /usr/local/bin/docker-entrypoint.sh \
+    && echo 'set -e' >> /usr/local/bin/docker-entrypoint.sh \
+    && echo 'echo "🔧 Verificando permisos de Laravel..."' >> /usr/local/bin/docker-entrypoint.sh \
+    && echo 'mkdir -p /var/www/storage/framework/{sessions,views,cache/data} /var/www/storage/logs /var/www/bootstrap/cache' >> /usr/local/bin/docker-entrypoint.sh \
+    && echo 'if [ "$(stat -c "%U" /var/www/storage 2>/dev/null || echo "www-data")" != "www-data" ]; then' >> /usr/local/bin/docker-entrypoint.sh \
+    && echo '  echo "📝 Ajustando permisos de storage y bootstrap/cache..."' >> /usr/local/bin/docker-entrypoint.sh \
+    && echo '  chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache 2>/dev/null || true' >> /usr/local/bin/docker-entrypoint.sh \
+    && echo '  chmod -R 775 /var/www/storage /var/www/bootstrap/cache 2>/dev/null || true' >> /usr/local/bin/docker-entrypoint.sh \
+    && echo 'fi' >> /usr/local/bin/docker-entrypoint.sh \
+    && echo 'echo "✅ Verificación de permisos completada"' >> /usr/local/bin/docker-entrypoint.sh \
+    && echo 'exec "$@"' >> /usr/local/bin/docker-entrypoint.sh \
+    && chmod +x /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 9000
 
+# Usar entrypoint para verificar permisos antes de iniciar PHP-FPM
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["php-fpm", "-F"]
