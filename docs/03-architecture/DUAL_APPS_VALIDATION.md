@@ -18,11 +18,13 @@ $table->unique(['device_id', 'package_name', 'android_user_id'], 'unique_app_ins
 ```
 
 **¿Qué asegura?**
+
 - ✅ **Integridad referencial**: Imposible tener dos instancias idénticas en la misma BD
 - ✅ **Prevención de duplicados**: La BD rechaza automáticamente intentos de crear instancias duplicadas
 - ✅ **Consistencia de datos**: Garantiza que cada combinación `(device_id, package_name, android_user_id)` es única
 
 **Validación:**
+
 ```sql
 -- Verificar que el constraint existe
 SHOW CREATE TABLE app_instances;
@@ -59,6 +61,7 @@ if (isset($data['package_name']) && isset($data['android_user_id']) && $commerce
 ```
 
 **¿Qué asegura?**
+
 - ✅ **Detección automática**: Cada notificación crea/busca su AppInstance automáticamente
 - ✅ **Sin intervención manual**: No requiere configuración previa
 - ✅ **Manejo de errores**: Logs detallados si falla la creación
@@ -74,6 +77,7 @@ if (isset($data['package_name']) && isset($data['android_user_id'])) {
 ```
 
 **¿Qué asegura?**
+
 - ✅ **Deduplicación precisa**: Distingue entre instancias duales del mismo package
 - ✅ **Prevención de falsos positivos**: No marca como duplicado una notificación de Yape 1 cuando viene de Yape 2
 
@@ -104,6 +108,7 @@ public static function findOrCreate(
 ```
 
 **¿Qué asegura?**
+
 - ✅ **Idempotencia**: Múltiples llamadas con los mismos parámetros retornan la misma instancia
 - ✅ **Thread-safe**: Laravel maneja la concurrencia correctamente
 - ✅ **Atomicidad**: Operación atómica (no puede quedar en estado inconsistente)
@@ -127,11 +132,13 @@ val postedAt = sbn.postTime
 ```
 
 **¿Qué asegura?**
+
 - ✅ **Identificador único**: `sbn.userId` es el identificador oficial de Android para perfiles duales
 - ✅ **Estabilidad**: El valor no cambia entre reinicios de la app
 - ✅ **Compatibilidad**: Funciona desde API 24 (Android 7.0) hasta la actualidad
 
-**⚠️ IMPORTANTE:** 
+**⚠️ IMPORTANTE:**
+
 - ❌ **NO usar** `sbn.user?.hashCode()` - No es confiable
 - ❌ **NO usar** `sbn.user?.getIdentifier()` - Puede ser API oculta
 - ✅ **USAR** `sbn.userId` - Solución correcta y documentada
@@ -143,6 +150,7 @@ val postedAt = sbn.postTime
 **Ubicación:** `apps/api/tests/Unit/NotificationServiceDualAppsTest.php`
 
 #### Test 1: Creación con identificadores duales
+
 ```php
 public function test_create_notification_with_dual_app_identifiers(): void
 {
@@ -153,21 +161,23 @@ public function test_create_notification_with_dual_app_identifiers(): void
 ```
 
 #### Test 2: Diferentes android_user_id crean diferentes instancias
+
 ```php
 public function test_different_android_user_ids_create_different_instances(): void
 {
     // Yape 1 (android_user_id = 10)
     $notification1 = $this->service->createNotification($data1, $device);
-    
+
     // Yape 2 (android_user_id = 11)
     $notification2 = $this->service->createNotification($data2, $device);
-    
+
     // Deben tener diferentes app_instance_id
     $this->assertNotEquals($notification1->app_instance_id, $notification2->app_instance_id);
 }
 ```
 
 **¿Qué asegura?**
+
 - ✅ **Validación automatizada**: Tests que se ejecutan en CI/CD
 - ✅ **Regresión**: Detecta si se rompe la funcionalidad en el futuro
 - ✅ **Documentación viva**: Los tests documentan el comportamiento esperado
@@ -182,7 +192,7 @@ public function test_different_android_user_ids_create_different_instances(): vo
 
 ```sql
 -- 1. Verificar que existen múltiples instancias del mismo package
-SELECT 
+SELECT
     device_id,
     package_name,
     android_user_id,
@@ -203,7 +213,7 @@ ORDER BY device_id, android_user_id;
 
 ```sql
 -- 2. Verificar constraint único
-SELECT 
+SELECT
     CONSTRAINT_NAME,
     CONSTRAINT_TYPE
 FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
@@ -215,7 +225,7 @@ AND CONSTRAINT_NAME = 'unique_app_instance';
 
 ```sql
 -- 3. Verificar que no hay duplicados (debe retornar 0 filas)
-SELECT 
+SELECT
     device_id,
     package_name,
     android_user_id,
@@ -243,6 +253,7 @@ adb logcat | grep "PaymentNotificationService" | grep "UserId"
 ```
 
 **Validación:**
+
 - ✅ Verificar que se capturan diferentes `UserId` para el mismo package
 - ✅ Verificar que el valor no cambia entre reinicios de la app
 - ✅ Verificar que se envía correctamente al backend
@@ -262,6 +273,7 @@ grep -i "android_user_id\|app_instance" storage/logs/laravel.log | grep -i error
 ```
 
 **Validación:**
+
 - ✅ No debe haber errores al crear AppInstances
 - ✅ Debe haber logs de creación para diferentes `android_user_id`
 
@@ -270,10 +282,12 @@ grep -i "android_user_id\|app_instance" storage/logs/laravel.log | grep -i error
 #### ✅ 4. Prueba en Dispositivo Real
 
 **Requisitos:**
+
 - Dispositivo con soporte de apps duales (MIUI, Samsung, etc.)
 - Dos instancias de Yape configuradas (Yape 1 y Yape 2)
 
 **Pasos:**
+
 1. Configurar dos instancias de Yape en el dispositivo
 2. Enviar un pago desde Yape 1
 3. Enviar un pago desde Yape 2
@@ -281,6 +295,7 @@ grep -i "android_user_id\|app_instance" storage/logs/laravel.log | grep -i error
 5. Verificar que las notificaciones se asignan correctamente a cada instancia
 
 **Resultado esperado:**
+
 - ✅ Dashboard muestra 2 instancias de `com.bcp.innovacxion.yapeapp`
 - ✅ Cada instancia tiene un `android_user_id` diferente (ej: 0 y 999)
 - ✅ Las notificaciones se filtran correctamente por instancia
@@ -304,6 +319,7 @@ php artisan test --filter=AppInstanceServiceTest
 **Pantalla:** `AppInstancesPage.tsx`
 
 **Validaciones:**
+
 1. ✅ Navegar a "Instancias de Apps" en el dashboard
 2. ✅ Verificar que se muestran múltiples instancias del mismo package
 3. ✅ Verificar que cada instancia muestra su `android_user_id`
@@ -344,18 +360,22 @@ php artisan test --filter=AppInstanceServiceTest
 ### 2. **Principios Aplicados**
 
 #### ✅ **Defensa en Profundidad (Defense in Depth)**
+
 - Múltiples capas de validación (Android → Backend → BD)
 - Si una capa falla, las otras previenen el error
 
 #### ✅ **Fail-Safe Defaults**
+
 - Si `android_user_id` es `null`, no se crea AppInstance (pero la notificación se guarda)
 - El sistema funciona incluso si falta el identificador dual
 
 #### ✅ **Principle of Least Surprise**
+
 - Comportamiento predecible: misma combinación = misma instancia
 - `findOrCreate` es idempotente
 
 #### ✅ **Observabilidad**
+
 - Logs detallados en cada capa
 - Métricas disponibles en el dashboard
 
@@ -372,7 +392,7 @@ FROM app_instances
 WHERE instance_label IS NULL;
 
 -- 2. Dispositivos con múltiples instancias del mismo package
-SELECT 
+SELECT
     device_id,
     package_name,
     COUNT(*) as instance_count
@@ -391,6 +411,7 @@ AND app_instance_id IS NULL;
 #### Alertas Recomendadas:
 
 1. **Alta prioridad:**
+
    - Notificaciones con `android_user_id` pero sin `app_instance_id` (indica fallo en creación)
    - Errores al crear AppInstance en logs
 
@@ -403,6 +424,7 @@ AND app_instance_id IS NULL;
 ### 4. **Workflow de Gestión**
 
 #### Flujo Normal (Automático):
+
 ```
 1. Android captura notificación → Captura android_user_id
 2. Android envía al backend → Incluye package_name + android_user_id
@@ -411,6 +433,7 @@ AND app_instance_id IS NULL;
 ```
 
 #### Flujo de Asignación Manual (Dashboard):
+
 ```
 1. Admin ve instancias "Sin asignar" en dashboard
 2. Admin hace clic en "Editar" en una instancia
@@ -424,17 +447,21 @@ AND app_instance_id IS NULL;
 ### 5. **Documentación y Mantenimiento**
 
 #### Documentación Existente:
+
 - ✅ `docs/03-architecture/DUAL_APPS.md` - Arquitectura general
 - ✅ `docs/03-architecture/ANDROID_USER_ID.md` - Análisis técnico de android_user_id
 - ✅ Este documento - Validación y revisión
 
 #### Mantenimiento Recomendado:
+
 1. **Revisión mensual:**
+
    - Ejecutar queries de validación
    - Revisar logs de errores
    - Verificar que no hay instancias huérfanas
 
 2. **Revisión trimestral:**
+
    - Actualizar tests si cambia el comportamiento
    - Revisar documentación
    - Validar en dispositivos nuevos con apps duales
@@ -454,7 +481,7 @@ AND app_instance_id IS NULL;
 ```sql
 -- Vista: Resumen de instancias por dispositivo
 CREATE OR REPLACE VIEW v_app_instances_summary AS
-SELECT 
+SELECT
     d.id as device_id,
     d.name as device_name,
     ai.package_name,
@@ -481,6 +508,7 @@ El sistema **asegura** el soporte de apps duales mediante:
 5. ✅ **Deduplicación mejorada** - Distingue entre instancias duales
 
 **Para revisar profesionalmente:**
+
 - Ejecutar queries de validación en BD
 - Revisar logs de Android y Backend
 - Probar en dispositivo real con apps duales
@@ -488,6 +516,7 @@ El sistema **asegura** el soporte de apps duales mediante:
 - Verificar en el Dashboard web
 
 **Mantenimiento:**
+
 - Monitoreo mensual de métricas
 - Revisión trimestral de documentación
 - Alertas para problemas críticos
@@ -495,4 +524,3 @@ El sistema **asegura** el soporte de apps duales mediante:
 ---
 
 _Última actualización: 2025-01-21_
-
