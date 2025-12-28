@@ -15,6 +15,7 @@ export interface Device {
   name: string;
   platform: string;
   is_active: boolean;
+  commerce_id: number | null;
   last_seen_at: string | null;
   battery_level: number | null;
   battery_optimization_disabled: boolean | null;

@@ -152,14 +152,14 @@ function EchoTokenUpdater() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
+    <AuthProvider>
         <WebSocketErrorHandler />
         <EchoTokenUpdater />
-        <Router>
-          <AppRoutes />
-          <NotificationToastContainer />
-        </Router>
-      </AuthProvider>
+      <Router>
+        <AppRoutes />
+        <NotificationToastContainer />
+      </Router>
+    </AuthProvider>
     </QueryClientProvider>
   );
 }
