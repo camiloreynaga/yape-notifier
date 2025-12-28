@@ -117,16 +117,25 @@ class DeviceLinkService
             ];
         }
 
-        // Find or create device
+        // Find device by UUID - device MUST exist before linking
+        // Professional approach: Separation of concerns
+        // - Device registration happens in login/register flow
+        // - Linking only associates existing device to commerce
         $device = Device::where('uuid', $deviceUuid)
             ->where('user_id', $user->id)
             ->first();
 
         if (!$device) {
+            Log::warning('Attempt to link non-existent device', [
+                'device_uuid' => $deviceUuid,
+                'user_id' => $user->id,
+                'code' => $code,
+            ]);
+
             return [
                 'success' => false,
                 'device' => null,
-                'message' => 'Dispositivo no encontrado',
+                'message' => 'Dispositivo no encontrado. Por favor, inicia sesión primero para registrar tu dispositivo.',
             ];
         }
 
