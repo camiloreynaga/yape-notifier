@@ -4,11 +4,28 @@
 
 Esta guía explica **cómo vincular adecuadamente** los dispositivos Android al sistema, asegurando que el proceso se complete correctamente y que los dispositivos queden correctamente asociados a sus comercios.
 
+**Última actualización:** 2025-12-28  
+**Versión:** 2.0 - Enfoque Flexible (Find-or-Create Pattern)
+
+**Referencias relacionadas:**
+- `docs/05-features/DEVICE_LINKING.md` - Documentación técnica general
+- `docs/03-architecture/DEVICE_LINKING_ARCHITECTURE.md` - Arquitectura y decisiones de diseño
+
+### 🏗️ Arquitectura del Sistema
+
+El sistema implementa un **enfoque flexible y profesional** donde:
+
+- ✅ **El código QR es el mecanismo de autorización principal** (no requiere autenticación previa)
+- ✅ **El dispositivo se crea automáticamente si no existe** (find-or-create pattern)
+- ✅ **La autenticación es opcional** (mejora UX para modo capturer)
+- ✅ **Si el usuario está autenticado, el dispositivo se asocia al usuario** (trazabilidad)
+
 ---
 
 ## 🎯 Objetivo del Proceso de Vinculación
 
 **Propósito:** Asociar un dispositivo Android a un `commerce_id` específico para que:
+
 - ✅ Las notificaciones se asocien al comercio correcto
 - ✅ El dispositivo aparezca en el dashboard del comercio
 - ✅ Las instancias de apps se vinculen al comercio correcto
@@ -23,6 +40,7 @@ Esta guía explica **cómo vincular adecuadamente** los dispositivos Android al 
 **Cuándo usar:** Usuario que se registra por primera vez e instala la app
 
 **Flujo:**
+
 ```
 1. Usuario se registra (POST /api/register)
    ↓
@@ -37,6 +55,7 @@ Esta guía explica **cómo vincular adecuadamente** los dispositivos Android al 
 ```
 
 **Validación:**
+
 ```sql
 -- Verificar que el dispositivo está vinculado
 SELECT id, uuid, name, user_id, commerce_id, created_at
@@ -49,7 +68,8 @@ AND commerce_id IS NOT NULL;
 
 ### Escenario 2: Dispositivo Existente Sin Commerce - Manual
 
-**Cuándo usar:** 
+**Cuándo usar:**
+
 - Dispositivo que ya existe pero `commerce_id = NULL`
 - Dispositivo que necesita cambiar de comercio
 - Dispositivo de un usuario "captador" que se une a un comercio existente
@@ -59,9 +79,10 @@ AND commerce_id IS NOT NULL;
 #### Paso 1: Verificar Estado del Dispositivo
 
 **En Base de Datos:**
+
 ```sql
 -- Verificar si el dispositivo existe y su estado
-SELECT 
+SELECT
     d.id,
     d.uuid,
     d.name,
@@ -69,7 +90,7 @@ SELECT
     d.commerce_id,
     u.email,
     u.commerce_id as user_commerce_id,
-    CASE 
+    CASE
         WHEN d.commerce_id IS NULL THEN 'Sin vincular'
         WHEN d.commerce_id != u.commerce_id THEN 'Commerce diferente'
         ELSE 'Vinculado correctamente'
@@ -80,11 +101,13 @@ WHERE d.uuid = '{device_uuid}';
 ```
 
 **En Dashboard Web:**
+
 - Ir a `/devices`
 - Buscar el dispositivo
 - Verificar columna "Comercio" (debe estar vacía o mostrar "Sin asignar")
 
 **En App Android:**
+
 - Si el dispositivo no está vinculado, la app mostrará automáticamente `LinkDeviceActivity`
 - Si no aparece, verificar logs: `adb logcat | grep "LinkDevice"`
 
@@ -95,9 +118,11 @@ WHERE d.uuid = '{device_uuid}';
 **Desde Dashboard Web (Recomendado):**
 
 1. **Navegar a la página:**
+
    - Ir a `/devices/add` o `/devices` → Botón "Agregar Dispositivo"
 
 2. **Generar código:**
+
    - Hacer clic en "Generar Código de Vinculación"
    - El sistema genera un código de 8 caracteres (ej: `ABC12345`)
    - El código expira en **24 horas**
@@ -130,9 +155,10 @@ Response:
 ```
 
 **Validación del código generado:**
+
 ```sql
 -- Verificar que el código se creó correctamente
-SELECT 
+SELECT
     id,
     commerce_id,
     code,
@@ -152,26 +178,36 @@ AND commerce_id = {commerce_id};
 **Proceso en la App:**
 
 1. **Abrir app Android:**
+
    - Si el dispositivo no está vinculado, la app mostrará automáticamente `LinkDeviceActivity`
    - Si no aparece, ir a Configuración → Vincular Dispositivo
 
 2. **Escanear QR o ingresar código:**
+
    - **Opción A:** Hacer clic en "Escanear QR" y apuntar a la pantalla del dashboard
    - **Opción B:** Ingresar código manualmente (8 caracteres, mayúsculas)
 
 3. **Validación automática:**
+
    - La app valida el código en tiempo real (`GET /api/devices/link-code/{code}`)
    - Muestra información del comercio si el código es válido
    - Muestra error si el código es inválido, expirado o ya usado
 
 4. **Confirmar vinculación:**
+
    - Diálogo muestra: "¿Deseas vincular este dispositivo al comercio: {nombre}?"
    - Hacer clic en "Vincular"
 
 5. **Proceso de vinculación:**
+
    - La app envía `POST /api/devices/link-by-code` con:
      - `code`: Código escaneado/ingresado
      - `device_uuid`: UUID del dispositivo (guardado en PreferencesManager)
+     - `device_name`: Nombre del dispositivo (opcional)
+   - **Backend automáticamente:**
+     - Si el dispositivo no existe → Lo crea automáticamente
+     - Si el dispositivo existe → Lo actualiza con el commerce_id
+     - Si el usuario está autenticado → Asocia el dispositivo al usuario (trazabilidad)
 
 6. **Resultado:**
    - ✅ Si exitoso: App muestra "Dispositivo vinculado exitosamente" y navega a `MainActivity`
@@ -182,9 +218,10 @@ AND commerce_id = {commerce_id};
 #### Paso 4: Verificar Vinculación Exitosa
 
 **En Base de Datos:**
+
 ```sql
 -- Verificar que el dispositivo quedó vinculado
-SELECT 
+SELECT
     d.id,
     d.uuid,
     d.name,
@@ -196,7 +233,7 @@ LEFT JOIN commerces c ON c.id = d.commerce_id
 WHERE d.uuid = '{device_uuid}';
 
 -- Verificar que el código se marcó como usado
-SELECT 
+SELECT
     id,
     code,
     commerce_id,
@@ -208,16 +245,19 @@ WHERE code = 'ABC12345';
 ```
 
 **En Dashboard Web:**
+
 - Ir a `/devices`
 - El dispositivo debe aparecer con el nombre del comercio en la columna "Comercio"
 - El estado debe ser "Activo"
 
 **En App Android:**
+
 - La app debe navegar automáticamente a `MainActivity`
 - No debe mostrar más la pantalla de vinculación
 - Las notificaciones deben funcionar normalmente
 
 **En Logs del Backend:**
+
 ```bash
 # Buscar logs de vinculación exitosa
 grep "Device linked to commerce" storage/logs/laravel.log | tail -5
@@ -232,10 +272,11 @@ grep "Device linked to commerce" storage/logs/laravel.log | tail -5
 
 ### Pre-requisitos
 
-- [ ] Usuario tiene cuenta creada y está autenticado
-- [ ] Usuario tiene `commerce_id` asignado (o se creará uno)
-- [ ] Dispositivo existe en la base de datos (creado con `POST /api/devices`)
-- [ ] Dispositivo tiene `user_id` correcto (pertenece al usuario autenticado)
+- [ ] Admin ha generado un código de vinculación válido
+- [ ] Código no ha expirado (válido por 24 horas)
+- [ ] Código no ha sido usado previamente
+- [ ] **Autenticación es OPCIONAL** (el código QR es el mecanismo de autorización)
+- [ ] Dispositivo tiene UUID único (generado automáticamente en la app)
 
 ### Generación de Código
 
@@ -252,7 +293,11 @@ grep "Device linked to commerce" storage/logs/laravel.log | tail -5
 - [ ] Validación muestra información correcta del comercio
 - [ ] Usuario confirma vinculación
 - [ ] App envía `POST /api/devices/link-by-code` con código y `device_uuid`
-- [ ] Backend actualiza `Device.commerce_id`
+- [ ] **Backend automáticamente:**
+  - [ ] Busca dispositivo por UUID
+  - [ ] Si no existe → Lo crea automáticamente con `commerce_id` del código
+  - [ ] Si existe → Actualiza `Device.commerce_id`
+  - [ ] Si usuario está autenticado → Asocia `Device.user_id` (trazabilidad)
 - [ ] Backend marca código como usado (`used_at = now()`)
 - [ ] Backend asigna `DeviceLinkCode.device_id`
 
@@ -274,7 +319,7 @@ grep "Device linked to commerce" storage/logs/laravel.log | tail -5
 
 ```sql
 -- Verificar estado completo del dispositivo
-SELECT 
+SELECT
     d.id,
     d.uuid,
     d.name,
@@ -282,7 +327,7 @@ SELECT
     d.commerce_id,
     u.email,
     u.commerce_id as user_commerce_id,
-    CASE 
+    CASE
         WHEN d.commerce_id IS NULL THEN '❌ Sin vincular'
         WHEN d.commerce_id != u.commerce_id THEN '⚠️ Commerce diferente al usuario'
         WHEN d.commerce_id = u.commerce_id THEN '✅ Vinculado correctamente'
@@ -295,6 +340,7 @@ WHERE d.uuid = '{device_uuid}';
 ```
 
 **Resultado esperado:**
+
 - `estado = '✅ Vinculado correctamente'`
 - `commerce_id` no es NULL
 - `commerce_id` coincide con `user_commerce_id` (o es intencional si es captador)
@@ -305,7 +351,7 @@ WHERE d.uuid = '{device_uuid}';
 
 ```sql
 -- Verificar estado del código
-SELECT 
+SELECT
     dlc.id,
     dlc.code,
     dlc.commerce_id,
@@ -314,7 +360,7 @@ SELECT
     d.name as device_name,
     dlc.expires_at,
     dlc.used_at,
-    CASE 
+    CASE
         WHEN dlc.used_at IS NOT NULL THEN '✅ Usado'
         WHEN dlc.expires_at < NOW() THEN '❌ Expirado'
         WHEN dlc.expires_at >= NOW() THEN '✅ Válido'
@@ -327,11 +373,13 @@ WHERE dlc.code = 'ABC12345';
 ```
 
 **Resultado esperado (antes de usar):**
+
 - `estado = '✅ Válido'`
 - `used_at` es NULL
 - `horas_restantes > 0`
 
 **Resultado esperado (después de usar):**
+
 - `estado = '✅ Usado'`
 - `used_at` no es NULL
 - `device_id` está asignado
@@ -361,6 +409,7 @@ WHERE user_id IS NULL;
 ```
 
 **Resultado esperado:**
+
 - `dispositivos_sin_commerce = 0` (o solo dispositivos recién creados)
 - `codigos_sin_usar_expirados = 0` (o se limpian automáticamente)
 - `dispositivos_sin_usuario = 0`
@@ -369,30 +418,35 @@ WHERE user_id IS NULL;
 
 ## 🚨 Problemas Comunes y Soluciones
 
-### Problema 1: "Dispositivo no encontrado"
+### Problema 1: "Dispositivo no encontrado" (RESUELTO)
 
 **Síntomas:**
-- App muestra: "Dispositivo no encontrado"
-- Backend retorna error 404
 
-**Causas posibles:**
-1. Dispositivo no existe en la base de datos
-2. UUID del dispositivo no coincide
-3. Dispositivo pertenece a otro usuario
+- ~~App muestra: "Dispositivo no encontrado"~~ ✅ **Ya no ocurre**
+- ~~Backend retorna error 404~~ ✅ **Backend crea dispositivo automáticamente**
 
-**Solución:**
+**Solución Implementada:**
+
+- ✅ **El backend ahora crea el dispositivo automáticamente** si no existe durante la vinculación
+- ✅ **No se requiere login previo** para vincular un dispositivo
+- ✅ **El código QR es el mecanismo de autorización principal**
+
+**Verificación:**
+
 ```sql
--- 1. Verificar si el dispositivo existe
-SELECT * FROM devices WHERE uuid = '{device_uuid}';
-
--- 2. Si no existe, crear dispositivo primero
--- Desde la app Android, el dispositivo se crea automáticamente al registrarse
--- O manualmente: POST /api/devices
-
--- 3. Verificar que el user_id coincide
-SELECT d.*, u.email 
+-- Verificar que el dispositivo fue creado automáticamente
+SELECT
+    d.id,
+    d.uuid,
+    d.name,
+    d.user_id,
+    d.commerce_id,
+    d.created_at,
+    CASE
+        WHEN d.user_id IS NULL THEN 'Sin usuario (vinculación directa)'
+        ELSE 'Con usuario asociado'
+    END as tipo_vinculacion
 FROM devices d
-JOIN users u ON u.id = d.user_id
 WHERE d.uuid = '{device_uuid}';
 ```
 
@@ -401,15 +455,18 @@ WHERE d.uuid = '{device_uuid}';
 ### Problema 2: "Código no encontrado" o "Código inválido"
 
 **Síntomas:**
+
 - App muestra: "Código no encontrado"
 - Validación falla
 
 **Causas posibles:**
+
 1. Código mal escrito (mayúsculas/minúsculas)
 2. Código expirado (24 horas)
 3. Código ya usado
 
 **Solución:**
+
 ```sql
 -- 1. Verificar estado del código
 SELECT * FROM device_link_codes WHERE code = 'ABC12345';
@@ -428,17 +485,20 @@ WHERE dlc.code = 'ABC12345';
 ### Problema 3: "El dispositivo ya pertenece a otro negocio"
 
 **Síntomas:**
+
 - Backend rechaza vinculación
 - Mensaje: "El dispositivo ya pertenece a otro negocio"
 
 **Causa:**
+
 - Dispositivo tiene `commerce_id` diferente al del código
 
 **Solución:**
+
 ```sql
 -- 1. Verificar commerce_id actual
-SELECT id, uuid, name, commerce_id 
-FROM devices 
+SELECT id, uuid, name, commerce_id
+FROM devices
 WHERE uuid = '{device_uuid}';
 
 -- 2. Si es intencional cambiar de comercio:
@@ -458,15 +518,18 @@ WHERE dlc.code = 'ABC12345';
 ### Problema 4: "App sigue mostrando pantalla de vinculación"
 
 **Síntomas:**
+
 - Dispositivo está vinculado en BD pero app sigue pidiendo código
 - App no navega a MainActivity
 
 **Causas posibles:**
+
 1. Cache de la app no actualizado
 2. DeviceId local no sincronizado
 3. App no verifica correctamente el estado
 
 **Solución:**
+
 ```kotlin
 // En Android, verificar que el dispositivo se actualizó correctamente
 // LinkDeviceActivity debe verificar en backend al iniciar:
@@ -493,6 +556,7 @@ if (linkedDevice != null) {
 ```
 
 **Solución rápida:**
+
 - Cerrar completamente la app
 - Abrir de nuevo
 - La app debe verificar estado en backend al iniciar
@@ -504,11 +568,13 @@ if (linkedDevice != null) {
 ### 1. **Generar Códigos con Tiempo Limitado**
 
 ✅ **Correcto:**
+
 - Generar código justo antes de vincular
 - Código expira en 24 horas
 - Limpiar códigos expirados automáticamente
 
 ❌ **Incorrecto:**
+
 - Generar códigos con mucha anticipación
 - Códigos que nunca expiran
 - Códigos que quedan huérfanos
@@ -518,6 +584,7 @@ if (linkedDevice != null) {
 ### 2. **Validar Antes de Vincular**
 
 ✅ **Correcto:**
+
 ```kotlin
 // Validar código antes de vincular
 fun validateCode(code: String) {
@@ -534,6 +601,7 @@ fun validateCode(code: String) {
 ```
 
 ❌ **Incorrecto:**
+
 - Vincular sin validar
 - No mostrar información del comercio
 - No permitir confirmación del usuario
@@ -543,6 +611,7 @@ fun validateCode(code: String) {
 ### 3. **Manejo de Errores**
 
 ✅ **Correcto:**
+
 ```kotlin
 try {
     val response = apiService.linkDeviceByCode(request)
@@ -568,6 +637,7 @@ try {
 ```
 
 ❌ **Incorrecto:**
+
 - No manejar errores
 - Asumir éxito sin verificar
 - No mostrar mensajes de error al usuario
@@ -577,6 +647,7 @@ try {
 ### 4. **Logging y Auditoría**
 
 ✅ **Correcto:**
+
 ```php
 // Backend: Log detallado
 Log::info('Device linked to commerce via code', [
@@ -590,6 +661,7 @@ Log::info('Device linked to commerce via code', [
 ```
 
 ❌ **Incorrecto:**
+
 - No registrar eventos de vinculación
 - No incluir información suficiente en logs
 - No auditar cambios de `commerce_id`
@@ -601,16 +673,19 @@ Log::info('Device linked to commerce via code', [
 ### Validaciones de Seguridad
 
 1. **Autenticación:**
+
    - ✅ Usuario debe estar autenticado para vincular
    - ✅ Solo puede vincular sus propios dispositivos
    - ✅ UUID debe pertenecer al usuario autenticado
 
 2. **Código:**
+
    - ✅ Código expira en 24 horas
    - ✅ Código solo se puede usar una vez
    - ✅ Código es case-insensitive pero se normaliza
 
 3. **Dispositivo:**
+
    - ✅ UUID debe tener formato válido
    - ✅ Dispositivo debe existir en BD
    - ✅ Dispositivo debe pertenecer al usuario
@@ -624,17 +699,20 @@ Log::info('Device linked to commerce via code', [
 ## 📝 Resumen de Endpoints
 
 ### Generar Código
+
 ```http
 POST /api/devices/generate-link-code
 Authorization: Bearer {token}
 ```
 
 ### Validar Código (Público)
+
 ```http
 GET /api/devices/link-code/{code}
 ```
 
 ### Vincular Dispositivo
+
 ```http
 POST /api/devices/link-by-code
 Authorization: Bearer {token}
@@ -662,6 +740,7 @@ Para vincular adecuadamente un dispositivo:
 8. ✅ **Registrar eventos** en logs
 
 **Resultado esperado:**
+
 - `Device.commerce_id` asignado correctamente
 - `DeviceLinkCode.used_at` marcado
 - App Android funciona normalmente
@@ -671,4 +750,3 @@ Para vincular adecuadamente un dispositivo:
 ---
 
 _Última actualización: 2025-01-21_
-

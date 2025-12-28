@@ -53,6 +53,7 @@ Guías para desarrolladores.
 - **[WORKFLOW.md](04-development/WORKFLOW.md)** - Flujo de trabajo de desarrollo
 - **[TESTING.md](04-development/TESTING.md)** - Guía completa de testing
 - **[ERROR_TRACKING.md](04-development/ERROR_TRACKING.md)** - Guía de implementación de error tracking
+- **[DEPENDENCIES.md](04-development/DEPENDENCIES.md)** - Gestión profesional de dependencias (composer)
 - **[PROMPTS_DESARROLLO.md](04-development/PROMPTS_DESARROLLO.md)** - Prompts listos para desarrollo con IA
 - **CONTRIBUTING.md** - Guía de contribución (pendiente)
 
@@ -66,7 +67,9 @@ Documentación de funcionalidades y features del sistema.
 - **[WEBSOCKETS.md](05-features/WEBSOCKETS.md)** - WebSockets para notificaciones en tiempo real (configuración disponible)
 - **[DEVICE_LINKING.md](05-features/DEVICE_LINKING.md)** - Vinculación de dispositivos mediante QR/código (implementado)
 - **[DEVICE_LINKING_GUIDE.md](05-features/DEVICE_LINKING_GUIDE.md)** - Guía profesional: Cómo vincular adecuadamente los dispositivos
+- **[DEVICE_LINKING_ARCHITECTURE.md](05-features/DEVICE_LINKING_ARCHITECTURE.md)** - Arquitectura profesional de vinculación de dispositivos
 - **[ANDROID_ADMIN_MODULE.md](05-features/ANDROID_ADMIN_MODULE.md)** - Módulo Admin móvil - App Android (implementado)
+- **[MONITOR_PACKAGES.md](05-features/MONITOR_PACKAGES.md)** - Sistema de gestión de paquetes monitoreados
 - **COMMERCE.md** - Sistema de comercios (pendiente)
 
 ---
@@ -126,6 +129,31 @@ Si eres nuevo en el proyecto:
 2. [IMPLEMENTATION_STATUS.md](07-reference/IMPLEMENTATION_STATUS.md)
 3. [KNOWN_ISSUES.md](07-reference/KNOWN_ISSUES.md)
 4. [ROADMAP.md](07-reference/ROADMAP.md)
+
+---
+
+## 🔍 Búsqueda Rápida
+
+- **¿Cómo inicio el proyecto?** → [QUICKSTART.md](01-getting-started/QUICKSTART.md)
+- **¿Cómo despliego en producción?** → [DEPLOYMENT.md](02-deployment/DEPLOYMENT.md)
+- **¿Qué está implementado?** → [IMPLEMENTATION_STATUS.md](07-reference/IMPLEMENTATION_STATUS.md)
+- **¿Hay bugs conocidos?** → [KNOWN_ISSUES.md](07-reference/KNOWN_ISSUES.md)
+- **¿Qué falta por hacer?** → [ROADMAP.md](07-reference/ROADMAP.md)
+- **¿Cómo trabajo con el código?** → [WORKFLOW.md](04-development/WORKFLOW.md)
+- **¿Cómo vincular dispositivos correctamente?** → [DEVICE_LINKING_GUIDE.md](05-features/DEVICE_LINKING_GUIDE.md)
+
+---
+
+## 📝 Notas
+
+- Los documentos marcados como "(pendiente)" están en proceso de creación o consolidación
+- Los documentos históricos se encuentran en `../ARCHIVE/`
+- Para reportar problemas o sugerir mejoras, consulta la guía de contribución (cuando esté disponible)
+
+---
+
+**Última actualización:** 2025-01-21
+
 
 ---
 

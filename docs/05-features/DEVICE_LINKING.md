@@ -8,23 +8,17 @@
 
 ## 📋 Resumen Ejecutivo
 
-El sistema tiene **DOS procesos diferentes** para dispositivos:
+El sistema implementa un **enfoque flexible y profesional** para la vinculación de dispositivos:
 
-1. **Registro Inicial de Dispositivo** (POST `/api/devices`): Crea el dispositivo en la base de datos
+1. **Registro Inicial de Dispositivo** (POST `/api/devices`): Crea el dispositivo en la base de datos (opcional, puede crearse automáticamente)
 2. **Vinculación a Comercio** (POST `/api/devices/link-by-code`): Asocia el dispositivo a un `commerce_id` usando un código QR/número
 
-**IMPORTANTE:** Un dispositivo puede existir en la base de datos pero **NO estar vinculado a ningún comercio** (`commerce_id = null`). En este caso, la app Android mostrará la pantalla de vinculación.
+**IMPORTANTE:** 
+- El sistema implementa un **patrón find-or-create**: si el dispositivo no existe, se crea automáticamente durante la vinculación
+- La autenticación es **opcional**: el código QR es el mecanismo de autorización principal
+- Un dispositivo puede existir en la base de datos pero **NO estar vinculado a ningún comercio** (`commerce_id = null`). En este caso, la app Android mostrará la pantalla de vinculación.
 
----
-
-## 📋 Resumen Ejecutivo
-
-El sistema tiene **DOS procesos diferentes** para dispositivos:
-
-1. **Registro Inicial de Dispositivo** (POST `/api/devices`): Crea el dispositivo en la base de datos
-2. **Vinculación a Comercio** (POST `/api/devices/link-by-code`): Asocia el dispositivo a un `commerce_id` usando un código QR/número
-
-**IMPORTANTE:** Un dispositivo puede existir en la base de datos pero **NO estar vinculado a ningún comercio** (`commerce_id = null`). En este caso, la app Android mostrará la pantalla de vinculación.
+**Para más detalles sobre la arquitectura, ver:** `docs/05-features/DEVICE_LINKING_ARCHITECTURE.md`
 
 ---
 
