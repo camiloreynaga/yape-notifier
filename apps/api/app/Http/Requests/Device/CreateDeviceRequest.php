@@ -16,13 +16,31 @@ class CreateDeviceRequest extends FormRequest
 
     /**
      * Get the validation rules that apply to the request.
+     * 
+     * UUID validation: Allow UUID if it belongs to the current user's device (find-or-create pattern)
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
         return [
-            'uuid' => ['nullable', 'string', 'uuid', 'unique:devices,uuid'],
+            'uuid' => [
+                'nullable',
+                'string',
+                'uuid',
+                function ($attribute, $value, $fail) {
+                    if ($value) {
+                        // Check if UUID exists for a different user
+                        $existingDevice = \App\Models\Device::where('uuid', $value)
+                            ->where('user_id', '!=', $this->user()->id)
+                            ->first();
+                        
+                        if ($existingDevice) {
+                            $fail('El UUID ya está en uso por otro usuario.');
+                        }
+                    }
+                },
+            ],
             'name' => ['required', 'string', 'max:255'],
             'platform' => ['nullable', 'string', 'in:android'],
             'is_active' => ['nullable', 'boolean'],

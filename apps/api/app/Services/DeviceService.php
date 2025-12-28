@@ -11,8 +11,13 @@ use Illuminate\Support\Str;
 class DeviceService
 {
     /**
-     * Create a new device for a user.
+     * Create a new device for a user, or return existing device if UUID already exists.
      * Automatically assigns commerce_id from user if available.
+     * 
+     * This implements "find or create" pattern based on UUID:
+     * - If device with UUID exists for this user, return existing device
+     * - If UUID doesn't exist, create new device
+     * - This ensures UUID uniqueness and prevents duplicate device creation
      */
     public function createDevice(User $user, array $data): Device
     {
@@ -20,6 +25,37 @@ class DeviceService
         $user->refresh();
         $commerceId = $user->commerce_id ?? $data['commerce_id'] ?? null;
 
+        // If UUID is provided, check if device already exists
+        if (isset($data['uuid']) && !empty($data['uuid'])) {
+            $existingDevice = Device::where('uuid', $data['uuid'])
+                ->where('user_id', $user->id)
+                ->first();
+
+            if ($existingDevice) {
+                // Device already exists with this UUID for this user
+                // Update commerce_id if user has one and device doesn't
+                if (!$existingDevice->commerce_id && $commerceId) {
+                    $existingDevice->update(['commerce_id' => $commerceId]);
+                    Log::info('Device commerce_id updated during find-or-create', [
+                        'device_id' => $existingDevice->id,
+                        'commerce_id' => $commerceId,
+                    ]);
+                }
+
+                // Update last_seen_at to indicate device is active
+                $existingDevice->update(['last_seen_at' => now()]);
+
+                Log::info('Device found by UUID (find-or-create)', [
+                    'device_id' => $existingDevice->id,
+                    'uuid' => $data['uuid'],
+                    'user_id' => $user->id,
+                ]);
+
+                return $existingDevice->fresh();
+            }
+        }
+
+        // Device doesn't exist, create new one
         if (!$commerceId) {
             Log::warning('Device created without commerce_id', [
                 'user_id' => $user->id,
@@ -37,8 +73,9 @@ class DeviceService
             'is_active' => $data['is_active'] ?? true,
         ]);
 
-        Log::info('Device created', [
+        Log::info('Device created (new)', [
             'device_id' => $device->id,
+            'uuid' => $device->uuid,
             'user_id' => $user->id,
             'commerce_id' => $commerceId,
         ]);
