@@ -144,13 +144,26 @@ class DeviceLinkController extends Controller
                 'user_id' => $request->user()?->id,
                 'code' => $request->input('code'),
                 'device_uuid' => $request->input('device_uuid'),
+                'device_name' => $request->input('device_name'),
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString(),
             ]);
 
+            // Professional approach: Always return error details in development, sanitized in production
+            $errorDetails = config('app.debug') ? [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'exception' => get_class($e),
+            ] : [
+                'message' => 'Error al vincular dispositivo. Por favor, contacta al soporte.',
+            ];
+
             return response()->json([
                 'message' => 'Error al vincular dispositivo',
-                'error' => config('app.debug') ? $e->getMessage() : null,
+                'error' => $errorDetails,
             ], 500);
         }
     }
