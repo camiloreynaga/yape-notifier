@@ -15,13 +15,32 @@ class DeviceHealthController extends Controller
 
     /**
      * Update device health information.
+     * 
+     * Professional Architecture Approach:
+     * - Authentication is OPTIONAL (devices can be linked without user)
+     * - If user is authenticated, verify device belongs to user (security)
+     * - If not authenticated, allow health updates for any device (devices can exist without user)
+     * 
      * POST /api/devices/{id}/health
      */
     public function update(UpdateDeviceHealthRequest $request, int $id): JsonResponse
     {
         try {
-            $user = $request->user();
-            $device = $user->devices()->findOrFail($id);
+            $user = $request->user(); // Can be null if not authenticated
+            
+            // Find device directly (not filtered by user)
+            $device = \App\Models\Device::findOrFail($id);
+            
+            // If user is authenticated, verify device belongs to user (security check)
+            if ($user) {
+                // Device must belong to the authenticated user OR have no user (linked without auth)
+                if ($device->user_id !== null && $device->user_id !== $user->id) {
+                    return response()->json([
+                        'message' => 'No tienes permisos para actualizar este dispositivo',
+                    ], 403);
+                }
+            }
+            // If not authenticated, allow update (device may have user_id = null)
 
             $device = $this->deviceService->updateHealth($device, $request->validated());
 
@@ -30,17 +49,37 @@ class DeviceHealthController extends Controller
                 'device' => $device,
                 'health' => $device->getHealthStatus(),
             ]);
-        } catch (\Exception $e) {
-            Log::error('Failed to update device health', [
-                'user_id' => $request->user()->id,
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            Log::warning('Device not found for health update', [
                 'device_id' => $id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'user_id' => $request->user()?->id,
             ]);
 
             return response()->json([
+                'message' => 'Dispositivo no encontrado',
+            ], 404);
+        } catch (\Exception $e) {
+            Log::error('Failed to update device health', [
+                'user_id' => $request->user()?->id,
+                'device_id' => $id,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            $errorDetails = config('app.debug') ? [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'exception' => get_class($e),
+            ] : [
+                'message' => 'Error al actualizar el estado del dispositivo. Por favor, contacta al soporte.',
+            ];
+
+            return response()->json([
                 'message' => 'Failed to update device health',
-                'error' => config('app.debug') ? $e->getMessage() : null,
+                'error' => $errorDetails,
             ], 500);
         }
     }

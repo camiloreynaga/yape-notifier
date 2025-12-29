@@ -36,7 +36,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // Device routes
     Route::apiResource('devices', DeviceController::class);
     Route::post('/devices/{id}/toggle-status', [DeviceController::class, 'toggleStatus']);
-    Route::post('/devices/{id}/health', [DeviceHealthController::class, 'update']);
     Route::get('/devices/{id}/monitored-apps', [DeviceMonitoredAppController::class, 'index']);
     Route::post('/devices/{id}/monitored-apps', [DeviceMonitoredAppController::class, 'store']);
 
@@ -72,3 +71,9 @@ Route::middleware('auth:sanctum')->group(function () {
 // Devices can be linked without prior registration or authentication
 // If user is authenticated, device is associated with user for traceability
 Route::post('/devices/link-by-code', [DeviceLinkController::class, 'linkByCode']);
+
+// Public device health endpoint (authentication optional)
+// Professional Architecture: Devices can report health without authentication
+// If user is authenticated, verify device belongs to user (security)
+// If not authenticated, allow health updates (devices can exist without user)
+Route::post('/devices/{id}/health', [DeviceHealthController::class, 'update']);
