@@ -70,6 +70,8 @@ Documentación de funcionalidades y features del sistema.
 - **[DEVICE_LINKING_ARCHITECTURE.md](05-features/DEVICE_LINKING_ARCHITECTURE.md)** - Arquitectura profesional de vinculación de dispositivos
 - **[ANDROID_ADMIN_MODULE.md](05-features/ANDROID_ADMIN_MODULE.md)** - Módulo Admin móvil - App Android (implementado)
 - **[MONITOR_PACKAGES.md](05-features/MONITOR_PACKAGES.md)** - Sistema de gestión de paquetes monitoreados
+- **[DEVICE_CONNECTION_STATUS_EXPLANATION.md](05-features/DEVICE_CONNECTION_STATUS_EXPLANATION.md)** - Explicación del estado de conexión de dispositivos
+- **[ADMIN_APP_FEATURE_GAP_ANALYSIS.md](05-features/ADMIN_APP_FEATURE_GAP_ANALYSIS.md)** - Análisis de brecha: App Android Admin vs Dashboard Web
 - **COMMERCE.md** - Sistema de comercios (pendiente)
 
 ---
