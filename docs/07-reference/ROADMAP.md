@@ -1,6 +1,6 @@
 # Roadmap
 
-> Última actualización: 2025-01-21
+> Última actualización: 2025-01-28
 
 Este documento lista las funcionalidades pendientes y mejoras planificadas, organizadas por prioridad.
 
@@ -153,20 +153,30 @@ _No hay pendientes críticos actualmente._
 
 ### Features Completadas
 
-1. **Validación de Notificaciones (Fase 2 - API)** ✅ (2025-01-21)
+1. **Filtrado de Notificaciones (Fase 1 - Android)** ✅ (2025-01-28)
+   - `PaymentNotificationFilter` implementado e integrado
+   - Filtrado de publicidad/promociones en cliente
+   - Tests unitarios completos
+   - Integrado en `PaymentNotificationParser`
+   - Ver `docs/05-features/NOTIFICATION_FILTERING.md` para detalles
+   - Ver `docs/07-reference/CHANGELOG.md` para changelog completo
+
+2. **Validación de Notificaciones (Fase 2 - API)** ✅ (2025-01-21)
    - `PaymentNotificationValidator` implementado
    - Filtrado de publicidad/promociones en servidor
    - Tests unitarios con cobertura > 80%
    - Ver `docs/05-features/NOTIFICATION_FILTERING.md` para detalles
    - Ver `docs/07-reference/CHANGELOG.md` para changelog completo
 
-2. **Mejoras en MonitorPackage** ✅ (2025-01-21)
+**Nota:** El filtrado híbrido (cliente + servidor) está completamente implementado y funcionando.
+
+3. **Mejoras en MonitorPackage** ✅ (2025-01-21)
    - Filtrado automático por `commerce_id`
    - Validación de pertenencia al commerce
    - Asignación automática de `commerce_id`
    - Ver `docs/07-reference/CHANGELOG.md` para detalles
 
-3. **Validación de Commerce Mejorada** ✅ (2025-01-21)
+4. **Validación de Commerce Mejorada** ✅ (2025-01-21)
    - Middleware `RequiresCommerce` creado
    - Validación temprana en operaciones críticas
    - Mensajes de error mejorados (403 en lugar de 500)

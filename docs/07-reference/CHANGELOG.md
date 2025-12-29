@@ -4,6 +4,37 @@ Registro de cambios, mejoras y correcciones implementadas en el proyecto.
 
 ---
 
+## 2025-01-28
+
+### ✅ Filtrado de Notificaciones - Fase 1 (Android) Implementada
+
+**Estado:** ✅ Completamente implementada
+
+**Archivos creados:**
+- `apps/android-client/app/src/main/java/com/yapenotifier/android/util/PaymentNotificationFilter.kt` - Filtro completo con validaciones
+- `apps/android-client/app/src/test/java/com/yapenotifier/android/util/PaymentNotificationFilterTest.kt` - Tests unitarios completos
+
+**Archivos modificados:**
+- `apps/android-client/app/src/main/java/com/yapenotifier/android/util/PaymentNotificationParser.kt` - Integrado con `PaymentNotificationFilter`
+
+**Características:**
+- ✅ Filtrado de publicidad, promociones y recordatorios
+- ✅ Validación de patrones de inclusión/exclusión
+- ✅ Validación de montos válidos (0.01 - 1,000,000)
+- ✅ Logging detallado con razón de exclusión
+- ✅ Tests unitarios completos
+
+**Impacto:**
+- ✅ Reduce tráfico de red (no envía notificaciones inválidas)
+- ✅ Ahorra batería (procesamiento local)
+- ✅ Mejora privacidad (no envía datos innecesarios)
+- ✅ Doble capa de seguridad (cliente + servidor)
+
+**Referencias:**
+- Ver `docs/05-features/NOTIFICATION_FILTERING.md` para documentación completa
+
+---
+
 ## 2025-01-27
 
 ### ✅ Mejoras Implementadas - App Android

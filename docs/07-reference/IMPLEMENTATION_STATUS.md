@@ -15,7 +15,7 @@ El proyecto tiene una **base sólida y funcional** con:
 - ✅ Sistema de vinculación QR funcionando
 - ✅ Dashboard web completo
 - ✅ Backend robusto con todos los endpoints
-- ✅ Filtrado de notificaciones implementado (Android + API)
+- ✅ Filtrado de notificaciones implementado completamente (Android + API) - Filtrado híbrido funcionando
 
 **Estado General:**
 
@@ -59,7 +59,7 @@ El proyecto tiene una **base sólida y funcional** con:
 | Vinculación por QR/código            | ✅ Implementado | `LinkDeviceActivity.kt`                                             |
 | Almacenamiento local                 | ✅ Implementado | Room Database                                                       |
 | Bug en androidUserId                 | ✅ CORREGIDO    | Ahora usa `sbn.userId` correctamente                                |
-| Filtrado de notificaciones (Fase 1)  | ✅ Implementado | `PaymentNotificationFilter` con exclusión de publicidad/promociones |
+| Filtrado de notificaciones (Fase 1)  | ✅ Implementado | `PaymentNotificationFilter` integrado en `PaymentNotificationParser`, tests unitarios completos (implementado 2025-01-28) |
 | UI para gestionar instancias         | ❌ Faltante     | Backend existe, falta UI Android                                    |
 | UI para seleccionar apps             | ⚠️ Parcial      | Backend existe, falta UI completa                                   |
 | Wizard completo de permisos          | ⚠️ Parcial      | Falta guías de batería y OEM específicas                            |
