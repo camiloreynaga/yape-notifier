@@ -37,6 +37,7 @@ export const API_ENDPOINTS = {
     delete: (id: number) => `/api/monitor-packages/${id}`,
     toggleStatus: (id: number) => `/api/monitor-packages/${id}/toggle-status`,
     bulkCreate: "/api/monitor-packages/bulk-create",
+    detected: "/api/monitor-packages/detected",
     // Public endpoint for clients
     getActive: "/api/settings/monitored-packages",
   },

@@ -8,6 +8,7 @@ import NotificationToast from "./NotificationToast";
 import type { Notification } from "@/types";
 import { echo } from "@/services/echo";
 import { useAuth } from "@/contexts/AuthContext";
+import { logger } from "@/services/logger";
 
 interface ToastNotification {
   notification: Notification;
@@ -55,8 +56,7 @@ export default function NotificationToastContainer({
     channel.listen(
       ".notification.created",
       (data: { notification: Notification }) => {
-        // eslint-disable-next-line no-console
-        console.log("🔔 Nueva notificación recibida vía WebSocket para toast:", data.notification);
+        logger.debug("Nueva notificación recibida para toast", { notificationId: data.notification.id });
         addToast(data.notification);
       }
     );

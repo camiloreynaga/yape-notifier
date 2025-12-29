@@ -2,14 +2,17 @@ import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '@/services/api';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useToast } from '@/hooks/useToast';
+import { logger } from '@/services/logger';
 import type { Notification, NotificationFilters, Device, AppInstance } from '@/types';
 import { format } from 'date-fns';
-import { Download, Filter, Eye, RefreshCw, Calendar, X, Inbox } from 'lucide-react';
+import { Download, Filter, Eye, RefreshCw, Calendar, X, Inbox, Search } from 'lucide-react';
 import WebSocketStatus from '@/components/WebSocketStatus';
 import EmptyState from '@/components/EmptyState';
 
 export default function NotificationsPage() {
   const navigate = useNavigate();
+  const toast = useToast();
   const [filters, setFilters] = useState<NotificationFilters>({
     per_page: 50,
     page: 1,
@@ -21,8 +24,7 @@ export default function NotificationsPage() {
 
   // Callback para manejar nuevas notificaciones (ya manejado por WebSocket)
   const handleNewNotification = useCallback((notification: Notification) => {
-    // eslint-disable-next-line no-console
-    console.log('Nueva notificación recibida:', notification);
+    logger.debug('Nueva notificación recibida en página', { notificationId: notification.id });
     // El toast se maneja automáticamente por NotificationToastContainer
   }, []);
 
@@ -41,25 +43,27 @@ export default function NotificationsPage() {
   useEffect(() => {
     loadDevices();
     loadAppInstances();
-  }, []);
+  }, [loadDevices, loadAppInstances]);
 
-  const loadDevices = async () => {
+  const loadDevices = useCallback(async () => {
     try {
       const deviceList = await apiService.getDevices();
       setDevices(deviceList);
     } catch (error) {
-      console.error('Error loading devices:', error);
+      logger.error('Error loading devices', error as Error, { source: 'NotificationsPage' });
+      toast.showError('Error al cargar dispositivos');
     }
-  };
+  }, [toast]);
 
-  const loadAppInstances = async () => {
+  const loadAppInstances = useCallback(async () => {
     try {
       const instances = await apiService.getAppInstances();
       setAppInstances(instances);
     } catch (error) {
-      console.error('Error loading app instances:', error);
+      logger.error('Error loading app instances', error as Error, { source: 'NotificationsPage' });
+      // No mostrar toast para errores silenciosos de carga inicial
     }
-  };
+  }, []);
 
   const handleFilterChange = (key: keyof NotificationFilters, value: string | number | boolean | undefined) => {
     setFilters({ ...filters, [key]: value, page: 1 });
@@ -74,15 +78,16 @@ export default function NotificationsPage() {
     try {
       await apiService.updateNotificationStatus(id, status);
       refetch();
+      toast.showSuccess('Estado actualizado correctamente');
     } catch (error: unknown) {
-      console.error('Error updating status:', error);
-      alert('Error al actualizar el estado');
+      logger.error('Error updating notification status', error as Error, { notificationId: id, status });
+      toast.showError('Error al actualizar el estado');
     }
   };
 
   const exportToCSV = () => {
     if (!notifications || notifications.data.length === 0) {
-      alert('No hay datos para exportar');
+      toast.showWarning('No hay datos para exportar');
       return;
     }
 
@@ -164,83 +169,86 @@ export default function NotificationsPage() {
     filters.status === 'pending' ? 'pending' : '';
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-4">
+      {/* Header compacto y responsive */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-3">
-          <h1 className="text-3xl font-bold text-gray-900">Notificaciones</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Notificaciones</h1>
           <WebSocketStatus />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <button
             onClick={() => refetch()}
-            className="btn btn-secondary flex items-center gap-2"
+            className="btn btn-secondary flex items-center gap-2 text-sm"
             title="Actualizar manualmente"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Actualizar
+            <span className="hidden sm:inline">Actualizar</span>
           </button>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="btn btn-secondary flex items-center gap-2"
+            className={`btn btn-secondary flex items-center gap-2 text-sm ${showFilters ? 'bg-primary-100 text-primary-700' : ''}`}
           >
             <Filter className="h-4 w-4" />
-            Filtros
+            <span className="hidden sm:inline">Filtros</span>
           </button>
           <button
             onClick={exportToCSV}
-            className="btn btn-primary flex items-center gap-2"
+            className="btn btn-primary flex items-center gap-2 text-sm"
           >
             <Download className="h-4 w-4" />
-            Exportar CSV
+            <span className="hidden sm:inline">Exportar</span>
           </button>
         </div>
       </div>
 
-      {/* Filtros rápidos tipo chips */}
-      <div className="flex gap-2 overflow-x-auto pb-2">
-        {quickFilters.map((filter) => (
-          <button
-            key={filter.key}
-            onClick={() => handleQuickFilter(filter.key)}
-            className={`
-              px-4 py-2 rounded-full flex items-center gap-2 whitespace-nowrap
-              transition-colors
-              ${
-                activeQuickFilter === filter.key
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }
-            `}
-          >
-            {filter.key === 'today' && <Calendar className="w-4 h-4" />}
-            {filter.label}
-          </button>
-        ))}
-      </div>
+      {/* Filtros rápidos y búsqueda en una sola fila */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        {/* Filtros rápidos tipo chips */}
+        <div className="flex gap-2 overflow-x-auto pb-2 flex-1">
+          {quickFilters.map((filter) => (
+            <button
+              key={filter.key}
+              onClick={() => handleQuickFilter(filter.key)}
+              className={`
+                px-3 sm:px-4 py-1.5 sm:py-2 rounded-full flex items-center gap-2 whitespace-nowrap text-sm
+                transition-colors flex-shrink-0
+                ${
+                  activeQuickFilter === filter.key
+                    ? 'bg-primary-600 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }
+              `}
+            >
+              {filter.key === 'today' && <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+              {filter.label}
+            </button>
+          ))}
+        </div>
 
-      {/* Búsqueda */}
-      <div className="relative">
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => {
-            setSearchQuery(e.target.value);
-            // Aquí podrías implementar búsqueda en tiempo real
-            // Por ahora solo actualizamos el estado
-          }}
-          placeholder="Buscar transacción, alias o monto..."
-          className="w-full pl-10 pr-10 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-        />
-        {searchQuery && (
-          <button
-            onClick={() => {
-              setSearchQuery('');
+        {/* Búsqueda compacta */}
+        <div className="relative flex-shrink-0 sm:w-64">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
             }}
-            className="absolute right-3 top-1/2 transform -translate-y-1/2"
-          >
-            <X className="w-5 h-5 text-gray-400" />
-          </button>
-        )}
+            placeholder="Buscar..."
+            className="w-full pl-9 pr-9 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          {searchQuery && (
+            <button
+              onClick={() => {
+                setSearchQuery('');
+              }}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -388,8 +396,8 @@ export default function NotificationsPage() {
         </div>
       )}
 
-      {/* Notifications Table */}
-      <div className="card">
+      {/* Notifications Table - Mejorado */}
+      <div className="card p-0 overflow-hidden">
         {loading && !notifications ? (
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
@@ -398,79 +406,105 @@ export default function NotificationsPage() {
           <>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Fecha
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Aplicación
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      App
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider hidden lg:table-cell">
                       Instancia
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider hidden md:table-cell">
                       Dispositivo
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Título
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Monto
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider hidden xl:table-cell">
                       Pagador
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Estado
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Acciones
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {notifications.data.map((notification: Notification) => (
-                    <tr key={notification.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {format(new Date(notification.received_at), 'dd/MM/yyyy HH:mm')}
+                    <tr 
+                      key={notification.id} 
+                      className="hover:bg-gray-50 transition-colors cursor-pointer"
+                      onClick={() => navigate(`/notifications/${notification.id}`)}
+                    >
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {format(new Date(notification.received_at), 'dd/MM/yyyy')}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {format(new Date(notification.received_at), 'HH:mm')}
+                        </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {notification.source_app || 'N/A'}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
+                            {notification.source_app || 'N/A'}
+                          </span>
+                        </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {notification.app_instance?.instance_label || 
-                         (notification.android_user_id ? `${notification.package_name} (User ${notification.android_user_id})` : 'N/A')}
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 hidden lg:table-cell">
+                        <div className="max-w-[150px] truncate" title={notification.app_instance?.instance_label || (notification.android_user_id ? `${notification.package_name} (User ${notification.android_user_id})` : 'N/A')}>
+                          {notification.app_instance?.instance_label || 
+                           (notification.android_user_id ? `User ${notification.android_user_id}` : 'N/A')}
+                        </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {notification.device?.name || 'N/A'}
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 hidden md:table-cell">
+                        <div className="max-w-[120px] truncate" title={notification.device?.name || 'N/A'}>
+                          {notification.device?.name || 'N/A'}
+                        </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
-                        {notification.title}
+                      <td className="px-4 py-3">
+                        <div className="text-sm font-medium text-gray-900 max-w-[200px] truncate" title={notification.title}>
+                          {notification.title}
+                        </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {notification.amount != null && !isNaN(Number(notification.amount))
-                          ? `${notification.currency || 'S/'} ${Number(notification.amount).toFixed(2)}`
-                          : 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {notification.payer_name || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(notification.status)}
-                        {notification.is_duplicate && (
-                          <span className="ml-2 badge badge-warning">Duplicado</span>
+                      <td className="px-4 py-3 whitespace-nowrap text-right">
+                        {notification.amount != null && !isNaN(Number(notification.amount)) ? (
+                          <div className="text-sm font-semibold text-gray-900">
+                            {notification.currency || 'S/'} {Number(notification.amount).toFixed(2)}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400">N/A</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex items-center gap-2">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 hidden xl:table-cell">
+                        <div className="max-w-[150px] truncate" title={notification.payer_name || 'N/A'}>
+                          {notification.payer_name || 'N/A'}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-center">
+                        <div className="flex flex-col items-center gap-1">
+                          {getStatusBadge(notification.status)}
+                          {notification.is_duplicate && (
+                            <span className="badge badge-warning text-xs">Duplicado</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-center" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-2">
                           <button
                             onClick={() => navigate(`/notifications/${notification.id}`)}
-                            className="btn btn-secondary btn-sm flex items-center gap-1"
+                            className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors"
                             title="Ver detalle"
                           >
-                            <Eye className="h-3 w-3" />
-                            Ver
+                            <Eye className="h-4 w-4" />
                           </button>
                           <select
                             value={notification.status}
@@ -480,7 +514,8 @@ export default function NotificationsPage() {
                                 e.target.value as 'pending' | 'validated' | 'inconsistent'
                               )
                             }
-                            className="text-xs border border-gray-300 rounded px-2 py-1"
+                            className="text-xs border border-gray-300 rounded-md px-2 py-1 bg-white hover:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             <option value="pending">Pendiente</option>
                             <option value="validated">Validado</option>
@@ -494,27 +529,30 @@ export default function NotificationsPage() {
               </table>
             </div>
 
-            {/* Pagination */}
+            {/* Pagination - Mejorado */}
             {notifications.last_page > 1 && (
-              <div className="mt-4 flex items-center justify-between">
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="text-sm text-gray-700">
-                  Mostrando {notifications.from} a {notifications.to} de {notifications.total} resultados
+                  Mostrando <span className="font-medium">{notifications.from}</span> a{' '}
+                  <span className="font-medium">{notifications.to}</span> de{' '}
+                  <span className="font-medium">{notifications.total}</span> resultados
                 </div>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleFilterChange('page', notifications.current_page - 1)}
                     disabled={notifications.current_page === 1}
-                    className="btn btn-secondary disabled:opacity-50"
+                    className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     Anterior
                   </button>
-                  <span className="flex items-center px-4">
-                    Página {notifications.current_page} de {notifications.last_page}
+                  <span className="px-4 py-1.5 text-sm text-gray-700">
+                    Página <span className="font-semibold">{notifications.current_page}</span> de{' '}
+                    <span className="font-semibold">{notifications.last_page}</span>
                   </span>
                   <button
                     onClick={() => handleFilterChange('page', notifications.current_page + 1)}
                     disabled={notifications.current_page === notifications.last_page}
-                    className="btn btn-secondary disabled:opacity-50"
+                    className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     Siguiente
                   </button>

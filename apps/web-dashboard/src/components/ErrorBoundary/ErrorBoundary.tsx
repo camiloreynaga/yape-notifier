@@ -33,20 +33,19 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log error to console in development
-    if (import.meta.env.DEV) {
-      console.error('ErrorBoundary caught an error:', error, errorInfo);
-    }
+    // Usar logger en lugar de console.error
+    // Import dinámico para evitar problemas de circular dependency
+    import('@/services/logger').then(({ logger }) => {
+      logger.error('ErrorBoundary caught an error', error, {
+        componentStack: errorInfo.componentStack,
+        errorBoundary: true,
+      });
+    });
 
     // Call optional error handler
     if (this.props.onError) {
       this.props.onError(error, errorInfo);
     }
-
-    // TODO: En producción, enviar a servicio de logging (Sentry, LogRocket, etc.)
-    // if (import.meta.env.PROD) {
-    //   logErrorToService(error, errorInfo);
-    // }
   }
 
   handleReset = () => {

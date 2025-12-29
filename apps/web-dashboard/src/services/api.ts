@@ -344,6 +344,27 @@ class ApiService {
       packages: response.data.packages,
     };
   }
+
+  /**
+   * Obtiene apps detectadas desde notificaciones y app instances
+   * que aún no están configuradas como MonitorPackages
+   */
+  async getDetectedPackages(): Promise<Array<{
+    package_name: string;
+    app_name: string;
+    detected_from: string;
+    notification_count: number;
+  }>> {
+    const response = await this.client.get<{
+      detected_packages: Array<{
+        package_name: string;
+        app_name: string;
+        detected_from: string;
+        notification_count: number;
+      }>;
+    }>(API_ENDPOINTS.monitorPackages.detected);
+    return response.data.detected_packages;
+  }
 }
 
 export const apiService = new ApiService();

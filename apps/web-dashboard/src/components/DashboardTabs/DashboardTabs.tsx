@@ -52,8 +52,8 @@ export default function DashboardTabs({ children, defaultTab = DEFAULT_TAB }: Da
         Saltar al contenido principal
       </a>
 
-      {/* Tabs Navigation */}
-      <div className="border-b border-gray-200" role="tablist" aria-label="Navegación del dashboard">
+      {/* Tabs Navigation - Sticky */}
+      <div className="sticky top-16 z-40 bg-white border-b border-gray-200 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 shadow-sm" role="tablist" aria-label="Navegación del dashboard">
         <nav
           className="-mb-px flex space-x-4 sm:space-x-8 overflow-x-auto scrollbar-hide"
           aria-label="Tabs"

@@ -11,6 +11,7 @@ import NotificationDetailPage from './pages/NotificationDetailPage';
 import CreateCommercePage from './pages/CreateCommercePage';
 import Layout from './components/Layout';
 import { NotificationToastContainer } from './components/NotificationToast';
+import ToastContainer from './components/Toast/ToastContainer';
 import { updateAuthToken } from './services/echo';
 import { logger } from './services/logger';
 
@@ -158,6 +159,7 @@ function App() {
       <Router>
         <AppRoutes />
         <NotificationToastContainer />
+        <ToastContainer />
       </Router>
     </AuthProvider>
     </QueryClientProvider>

@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { apiService } from "@/services/api";
 import { echo, getConnectionState } from "@/services/echo";
+import { logger } from "@/services/logger";
 import type {
   NotificationFilters,
   PaginatedResponse,
@@ -48,7 +49,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     // Verificar estado de conexión
     const connectionState = getConnectionState();
     if (connectionState !== "connected") {
-      console.warn("⚠️ WebSocket no está conectado, estado:", connectionState);
+      logger.warn("WebSocket no está conectado", { state: connectionState });
     }
 
     // Suscribirse al canal privado
@@ -61,11 +62,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       ".notification.created",
       (data: { notification: Notification }) => {
         const notification = data.notification;
-        // eslint-disable-next-line no-console
-        console.log(
-          "🔔 Nueva notificación recibida vía WebSocket:",
-          notification
-        );
+        logger.debug("Nueva notificación recibida vía WebSocket", { notificationId: notification.id });
 
         // Llamar callback si existe
         if (onNewNotificationRef.current) {
@@ -113,7 +110,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
 
     // Manejar errores de suscripción
     channelRef.current.error((error: Error) => {
-      console.error("❌ Error en canal WebSocket:", error);
+      logger.error("Error en canal WebSocket", error, { commerceId });
       
       // Si es error de autenticación, notificar
       const errorMessage = error?.message || String(error);
@@ -135,13 +132,12 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
   // Escuchar cambios en estado de conexión
   useEffect(() => {
     const handleConnected = () => {
-      // eslint-disable-next-line no-console
-      console.log("✅ WebSocket reconectado, refrescando notificaciones...");
+      logger.info("WebSocket reconectado, refrescando notificaciones");
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     };
 
     const handleDisconnected = () => {
-      console.warn("⚠️ WebSocket desconectado");
+      logger.warn("WebSocket desconectado");
     };
 
     window.addEventListener("echo:connected", handleConnected);

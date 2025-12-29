@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { apiService } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/useToast';
+import { logger } from '@/services/logger';
 import type { MonitorPackage } from '@/types';
 import {
   Package,
@@ -15,10 +17,13 @@ import {
   CheckCircle,
   Upload,
   FileText,
+  Sparkles,
+  Bell,
 } from 'lucide-react';
 
 export default function MonitoredAppsPage() {
   const { user } = useAuth();
+  const toast = useToast();
   const [packages, setPackages] = useState<MonitorPackage[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -37,6 +42,13 @@ export default function MonitoredAppsPage() {
   const [bulkPackages, setBulkPackages] = useState('');
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkError, setBulkError] = useState<string | null>(null);
+  const [detectedPackages, setDetectedPackages] = useState<Array<{
+    package_name: string;
+    app_name: string;
+    detected_from: string;
+    notification_count: number;
+  }>>([]);
+  const [loadingDetected, setLoadingDetected] = useState(false);
 
   const isAdmin = user?.role === 'admin';
 
@@ -46,15 +58,30 @@ export default function MonitoredAppsPage() {
       const packagesData = await apiService.getMonitorPackages(showActiveOnly);
       setPackages(packagesData);
     } catch (error) {
-      console.error('Error loading monitor packages:', error);
+      logger.error('Error loading monitor packages', error as Error, { source: 'MonitoredAppsPage' });
+      toast.showError('Error al cargar apps monitoreadas');
     } finally {
       setLoading(false);
     }
-  }, [showActiveOnly]);
+  }, [showActiveOnly, toast]);
+
+  const loadDetectedPackages = useCallback(async () => {
+    setLoadingDetected(true);
+    try {
+      const detected = await apiService.getDetectedPackages();
+      setDetectedPackages(detected);
+    } catch (error) {
+      logger.error('Error loading detected packages', error as Error, { source: 'MonitoredAppsPage' });
+      // Error silencioso, no mostrar toast
+    } finally {
+      setLoadingDetected(false);
+    }
+  }, []);
 
   useEffect(() => {
     loadPackages();
-  }, [loadPackages]);
+    loadDetectedPackages();
+  }, [loadPackages, loadDetectedPackages]);
 
   const handleCreate = () => {
     setEditingPackage(null);
@@ -93,12 +120,18 @@ export default function MonitoredAppsPage() {
       }
       setShowModal(false);
       loadPackages();
+      loadDetectedPackages(); // Recargar apps detectadas
+      toast.showSuccess(editingPackage ? 'Paquete actualizado correctamente' : 'Paquete creado correctamente');
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } };
       const errorMessage =
         error.response?.data?.message ||
         Object.values(error.response?.data?.errors || {}).flat().join(', ') ||
         'Error al guardar paquete';
+      logger.error('Error saving monitor package', err as Error, { 
+        isEdit: !!editingPackage,
+        formData 
+      });
       setFormError(errorMessage);
     } finally {
       setFormLoading(false);
@@ -106,15 +139,17 @@ export default function MonitoredAppsPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('¿Estás seguro de eliminar este paquete monitoreado?')) {
+    if (!window.confirm('¿Estás seguro de eliminar este paquete monitoreado?')) {
       return;
     }
     try {
       await apiService.deleteMonitorPackage(id);
       loadPackages();
+      toast.showSuccess('Paquete eliminado correctamente');
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
-      alert(err.response?.data?.message || 'Error al eliminar paquete');
+      logger.error('Error deleting monitor package', error as Error, { packageId: id });
+      toast.showError(err.response?.data?.message || 'Error al eliminar paquete');
     }
   };
 
@@ -122,9 +157,11 @@ export default function MonitoredAppsPage() {
     try {
       await apiService.toggleMonitorPackageStatus(pkg.id, !pkg.is_active);
       loadPackages();
+      toast.showSuccess(`Paquete ${!pkg.is_active ? 'activado' : 'desactivado'} correctamente`);
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
-      alert(err.response?.data?.message || 'Error al cambiar estado');
+      logger.error('Error toggling monitor package status', error as Error, { packageId: pkg.id });
+      toast.showError(err.response?.data?.message || 'Error al cambiar estado');
     }
   };
 
@@ -148,8 +185,9 @@ export default function MonitoredAppsPage() {
       const result = await apiService.bulkCreateMonitorPackages(packageNames);
       setShowBulkModal(false);
       setBulkPackages('');
-      alert(`Se crearon ${result.created_count} packages exitosamente`);
+      toast.showSuccess(`Se crearon ${result.created_count} packages exitosamente`);
       loadPackages();
+      loadDetectedPackages();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } };
       const errorMessage =
@@ -321,8 +359,91 @@ export default function MonitoredAppsPage() {
         </div>
       )}
 
+      {/* Apps Detectadas (no configuradas aún) */}
+      {detectedPackages.length > 0 && !searchTerm && (
+        <div className="card border-2 border-blue-200 bg-blue-50">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-blue-600" />
+              <h2 className="text-xl font-semibold text-gray-900">
+                Apps Detectadas ({detectedPackages.length})
+              </h2>
+            </div>
+            {isAdmin && (
+              <button
+                onClick={async () => {
+                  try {
+                    const packageNames = detectedPackages.map(p => p.package_name);
+                    await apiService.bulkCreateMonitorPackages(packageNames);
+                    loadPackages();
+                    loadDetectedPackages();
+                  } catch (error) {
+                    logger.error('Error adding detected packages', error as Error, { source: 'MonitoredAppsPage' });
+                    toast.showError('Error al agregar apps detectadas');
+                  }
+                }}
+                className="btn btn-primary text-sm"
+              >
+                Agregar todas
+              </button>
+            )}
+          </div>
+          <p className="text-sm text-gray-600 mb-4">
+            Estas apps han enviado notificaciones pero aún no están configuradas para monitoreo.
+            Agrégalas para comenzar a monitorearlas automáticamente.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {detectedPackages.map((detected) => (
+              <div
+                key={detected.package_name}
+                className="bg-white rounded-lg p-4 border border-blue-200"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-900 truncate">
+                      {detected.app_name}
+                    </p>
+                    <p className="text-xs text-gray-500 font-mono truncate mt-1">
+                      {detected.package_name}
+                    </p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Bell className="h-3 w-3 text-gray-400" />
+                      <span className="text-xs text-gray-500">
+                        {detected.notification_count} notificación{detected.notification_count !== 1 ? 'es' : ''}
+                      </span>
+                    </div>
+                  </div>
+                  {isAdmin && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          await apiService.createMonitorPackage({
+                            package_name: detected.package_name,
+                            app_name: detected.app_name,
+                            priority: 0,
+                          });
+                          loadPackages();
+                          loadDetectedPackages();
+                        } catch (error) {
+                          logger.error('Error adding detected app', error as Error, { packageName: detected.package_name });
+                          toast.showError('Error al agregar app');
+                        }
+                      }}
+                      className="ml-2 btn btn-sm btn-primary flex-shrink-0"
+                      title="Agregar a apps monitoreadas"
+                    >
+                      <Plus className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Estado vacío */}
-      {filteredPackages.length === 0 && (
+      {filteredPackages.length === 0 && detectedPackages.length === 0 && (
         <div className="card text-center py-12">
           <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-500 mb-4">
