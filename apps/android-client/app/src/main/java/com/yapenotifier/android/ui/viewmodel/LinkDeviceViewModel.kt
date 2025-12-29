@@ -1,21 +1,28 @@
 package com.yapenotifier.android.ui.viewmodel
 
 import android.app.Application
-import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
-import com.yapenotifier.android.data.api.RetrofitClient
+import com.yapenotifier.android.data.api.ApiCallHandler
+import com.yapenotifier.android.data.api.ApiService
 import com.yapenotifier.android.data.local.PreferencesManager
+import com.yapenotifier.android.data.model.ApiResult
 import com.yapenotifier.android.data.model.CommerceInfo
 import com.yapenotifier.android.data.model.LinkDeviceRequest
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import timber.log.Timber
+import javax.inject.Inject
 
-class LinkDeviceViewModel(application: Application) : AndroidViewModel(application) {
-    private val apiService = RetrofitClient.createApiService(application)
-    private val preferencesManager = PreferencesManager(application)
+@HiltViewModel
+class LinkDeviceViewModel @Inject constructor(
+    application: Application,
+    private val apiService: ApiService,
+    private val preferencesManager: PreferencesManager
+) : AndroidViewModel(application) {
 
     sealed class ValidationState {
         object Idle : ValidationState()
@@ -45,86 +52,143 @@ class LinkDeviceViewModel(application: Application) : AndroidViewModel(applicati
 
         _validationState.value = ValidationState.Validating
         viewModelScope.launch {
-            try {
+            // Professional approach: Use ApiCallHandler
+            val result = ApiCallHandler.safeApiCall(getApplication()) {
                 val normalizedCode = code.trim().uppercase()
-                val response = apiService.validateLinkCode(normalizedCode)
-
-                if (response.isSuccessful) {
-                    val body = response.body()
-                    if (body != null && body.valid && body.commerce != null) {
+                apiService.validateLinkCode(normalizedCode)
+            }
+            
+            when (result) {
+                is ApiResult.Success -> {
+                    val body = result.data
+                    if (body.valid && body.commerce != null) {
                         _validationState.postValue(ValidationState.Valid(body.commerce))
                     } else {
                         _validationState.postValue(
-                            ValidationState.Invalid(body?.message ?: "Código inválido")
+                            ValidationState.Invalid(body.message ?: "Código inválido")
                         )
                     }
-                } else {
-                    val errorBody = response.errorBody()?.string()
-                    val errorMessage = try {
-                        // Try to parse error response
-                        val errorResponse = com.google.gson.Gson().fromJson(
-                            errorBody,
-                            com.yapenotifier.android.data.model.LinkCodeValidationResponse::class.java
-                        )
-                        errorResponse.message
-                    } catch (e: Exception) {
-                        "Error al validar código: ${response.code()}"
-                    }
-                    _validationState.postValue(ValidationState.Invalid(errorMessage))
                 }
-            } catch (e: Exception) {
-                Log.e("LinkDeviceViewModel", "Error validating code", e)
-                _validationState.postValue(ValidationState.Invalid("Error de conexión: ${e.message}"))
+                is ApiResult.NetworkError -> {
+                    Timber.e(result.throwable, "Error validating code")
+                    _validationState.postValue(
+                        ValidationState.Invalid(
+                            result.getErrorMessage(getApplication()) ?: "Error de conexión"
+                        )
+                    )
+                }
+                is ApiResult.HttpError -> {
+                    _validationState.postValue(
+                        ValidationState.Invalid(
+                            result.getErrorMessage(getApplication()) ?: "Error al validar código"
+                        )
+                    )
+                }
+                is ApiResult.UnknownError -> {
+                    Timber.e(result.throwable, "Error validating code")
+                    _validationState.postValue(
+                        ValidationState.Invalid(
+                            result.getErrorMessage(getApplication()) ?: "Error desconocido"
+                        )
+                    )
+                }
+                is ApiResult.Loading -> {
+                    // Ya está en Validating
+                }
             }
         }
     }
 
+    /**
+     * Link device to commerce using a link code.
+     * 
+     * Professional Architecture Approach:
+     * - Authentication is optional (flexible UX for capturer mode)
+     * - Backend automatically creates device if it doesn't exist
+     * - Link code is the primary authorization mechanism
+     * - If user is authenticated, device is associated with user (traceability)
+     */
     fun linkDevice(code: String) {
         _linkState.value = LinkState.Linking
         viewModelScope.launch {
             try {
-                val deviceUuid = preferencesManager.deviceUuid.first()
-                    ?: throw IllegalStateException("Device UUID no encontrado")
+                // Ensure device UUID exists (generated in Application.onCreate)
+                val deviceUuid = preferencesManager.deviceUuid.first() ?: run {
+                    val uuid = java.util.UUID.randomUUID().toString()
+                    preferencesManager.saveDeviceUuid(uuid)
+                    Timber.d("LinkDeviceViewModel: Generado nuevo device UUID: $uuid")
+                    uuid
+                }
+                
+                if (deviceUuid.isBlank()) {
+                    throw IllegalStateException("No se pudo generar Device UUID")
+                }
+
+                // Check if user is authenticated (optional - for traceability)
+                val authToken = preferencesManager.authToken.first()
+                val isAuthenticated = !authToken.isNullOrBlank()
+                
+                Timber.d("LinkDeviceViewModel: Intentando vincular dispositivo. UUID: $deviceUuid, Autenticado: $isAuthenticated")
 
                 val normalizedCode = code.trim().uppercase()
-                val request = LinkDeviceRequest(
-                    code = normalizedCode,
-                    deviceUuid = deviceUuid
-                )
+                val deviceName = android.os.Build.MODEL ?: "Android Device"
+                
+                // Professional approach: Use ApiCallHandler for type-safe error handling
+                val result = ApiCallHandler.safeApiCall(getApplication()) {
+                    // Note: Backend will automatically create device if it doesn't exist
+                    val request = LinkDeviceRequest(
+                        code = normalizedCode,
+                        deviceUuid = deviceUuid,
+                        deviceName = deviceName
+                    )
+                    apiService.linkDeviceByCode(request)
+                }
 
-                val response = apiService.linkDeviceByCode(request)
-
-                if (response.isSuccessful) {
-                    val body = response.body()
-                    if (body != null) {
-                        // Save commerce_id if available in device response
-                        body.device?.let { device ->
-                            device.commerceId?.let { commerceId ->
-                                preferencesManager.saveCommerceId(commerceId.toString())
-                                Log.d("LinkDeviceViewModel", "Device linked successfully: ${device.id}, Commerce ID: $commerceId")
+                when (result) {
+                    is ApiResult.Success -> {
+                        val body = result.data
+                        if (body != null) {
+                            // Save device_id and commerce_id if available in device response
+                            body.device?.let { device ->
+                                // CRITICAL: Save device ID first
+                                preferencesManager.saveDeviceId(device.id.toString())
+                                Timber.d("LinkDeviceViewModel: Device ID saved: ${device.id}")
+                                
+                                device.commerceId?.let { commerceId ->
+                                    preferencesManager.saveCommerceId(commerceId.toString())
+                                    Timber.d("LinkDeviceViewModel: Device linked successfully: ${device.id}, Commerce ID: $commerceId")
+                                } ?: run {
+                                    Timber.w("LinkDeviceViewModel: Device linked but no commerce_id")
+                                }
                             } ?: run {
-                                Log.d("LinkDeviceViewModel", "Device linked successfully: ${device.id}, but no commerce_id")
+                                Timber.w("LinkDeviceViewModel: Device linked but no device object in response")
                             }
+                            _linkState.postValue(LinkState.Success(body.message))
+                        } else {
+                            _linkState.postValue(LinkState.Error("Respuesta vacía del servidor"))
                         }
-                        _linkState.postValue(LinkState.Success(body.message))
-                    } else {
-                        _linkState.postValue(LinkState.Error("Respuesta vacía del servidor"))
                     }
-                } else {
-                    val errorBody = response.errorBody()?.string()
-                    val errorMessage = try {
-                        val errorResponse = com.google.gson.Gson().fromJson(
-                            errorBody,
-                            com.yapenotifier.android.data.model.LinkDeviceResponse::class.java
-                        )
-                        errorResponse.message
-                    } catch (e: Exception) {
-                        "Error al vincular dispositivo: ${response.code()}"
+                    is ApiResult.HttpError -> {
+                        val errorMessage = result.getErrorMessage(getApplication()) ?: "Error al vincular dispositivo"
+                        Timber.e("LinkDeviceViewModel: Error linking device: code=${result.code}, message=$errorMessage")
+                        _linkState.postValue(LinkState.Error(errorMessage))
                     }
-                    _linkState.postValue(LinkState.Error(errorMessage))
+                    is ApiResult.NetworkError -> {
+                        val errorMessage = result.getErrorMessage(getApplication()) ?: "Error de conexión"
+                        Timber.e(result.throwable, "LinkDeviceViewModel: Network error linking device")
+                        _linkState.postValue(LinkState.Error(errorMessage))
+                    }
+                    is ApiResult.UnknownError -> {
+                        val errorMessage = result.getErrorMessage(getApplication()) ?: "Error desconocido"
+                        Timber.e(result.throwable, "LinkDeviceViewModel: Unknown error linking device")
+                        _linkState.postValue(LinkState.Error(errorMessage))
+                    }
+                    is ApiResult.Loading -> {
+                        // Already in Linking state
+                    }
                 }
             } catch (e: Exception) {
-                Log.e("LinkDeviceViewModel", "Error linking device", e)
+                Timber.e(e, "LinkDeviceViewModel: Exception linking device")
                 _linkState.postValue(LinkState.Error("Error de conexión: ${e.message}"))
             }
         }
@@ -138,4 +202,3 @@ class LinkDeviceViewModel(application: Application) : AndroidViewModel(applicati
         _linkState.value = LinkState.Idle
     }
 }
-

@@ -1,12 +1,12 @@
 package com.yapenotifier.android.util
 
 import android.content.Context
-import android.util.Log
 import androidx.work.Constraints
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.yapenotifier.android.worker.DeviceHealthWorker
+import timber.log.Timber
 import java.util.concurrent.TimeUnit
 
 object DeviceHealthWorkerHelper {
@@ -16,6 +16,9 @@ object DeviceHealthWorkerHelper {
     /**
      * Schedules a periodic work request for device health reporting.
      * The worker will run every 15 minutes (or the configured interval) when network is available.
+     * 
+     * Professional approach: Uses enqueueUniquePeriodicWork to prevent duplicate workers
+     * and ensures only one periodic worker is active at a time.
      */
     fun scheduleDeviceHealthWorker(context: Context) {
         try {
@@ -32,11 +35,41 @@ object DeviceHealthWorkerHelper {
                 .build()
 
             val workManager = WorkManager.getInstance(context)
-            workManager.enqueue(periodicWorkRequest)
+            // Use enqueueUniquePeriodicWork to prevent duplicate workers
+            // KEEP policy: if worker already exists, keep the existing one
+            workManager.enqueueUniquePeriodicWork(
+                DeviceHealthWorker.WORK_NAME,
+                androidx.work.ExistingPeriodicWorkPolicy.KEEP,
+                periodicWorkRequest
+            )
 
-            Log.i(TAG, "Device health worker scheduled to run every $REPEAT_INTERVAL_MINUTES minutes")
+            Timber.tag(TAG).i("Device health worker scheduled to run every $REPEAT_INTERVAL_MINUTES minutes")
         } catch (e: Exception) {
-            Log.e(TAG, "Error scheduling device health worker", e)
+            Timber.tag(TAG).e(e, "Error scheduling device health worker")
+        }
+    }
+    
+    /**
+     * Sends an immediate health check (one-time work) in addition to the periodic worker.
+     * This is useful after device linking to immediately update connection status.
+     */
+    fun sendImmediateHealthCheck(context: Context) {
+        try {
+            val constraints = Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build()
+
+            val oneTimeWorkRequest = androidx.work.OneTimeWorkRequestBuilder<DeviceHealthWorker>()
+                .setConstraints(constraints)
+                .addTag(DeviceHealthWorker.WORK_NAME)
+                .build()
+
+            val workManager = WorkManager.getInstance(context)
+            workManager.enqueue(oneTimeWorkRequest)
+
+            Timber.tag(TAG).i("Immediate device health check scheduled")
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "Error scheduling immediate health check")
         }
     }
 
@@ -47,9 +80,9 @@ object DeviceHealthWorkerHelper {
         try {
             val workManager = WorkManager.getInstance(context)
             workManager.cancelAllWorkByTag(DeviceHealthWorker.WORK_NAME)
-            Log.i(TAG, "Device health worker cancelled")
+            Timber.tag(TAG).i("Device health worker cancelled")
         } catch (e: Exception) {
-            Log.e(TAG, "Error cancelling device health worker", e)
+            Timber.tag(TAG).e(e, "Error cancelling device health worker")
         }
     }
 }

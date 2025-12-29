@@ -1,16 +1,20 @@
 package com.yapenotifier.android.ui.viewmodel
 
 import android.app.Application
-import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
-import com.yapenotifier.android.data.api.RetrofitClient
+import com.yapenotifier.android.data.api.ApiCallHandler
+import com.yapenotifier.android.data.api.ApiService
 import com.yapenotifier.android.data.local.PreferencesManager
+import com.yapenotifier.android.data.model.ApiResult
 import com.yapenotifier.android.data.model.MonitorPackage
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import timber.log.Timber
+import javax.inject.Inject
 
 data class MonitoredAppsUiState(
     val packages: List<MonitorPackage> = emptyList(),
@@ -29,9 +33,12 @@ enum class FilterType {
     ALL, MONITORED, NOT_MONITORED
 }
 
-class MonitoredAppsSelectionViewModel(application: Application) : AndroidViewModel(application) {
-    private val apiService = RetrofitClient.createApiService(application)
-    private val preferencesManager = PreferencesManager(application)
+@HiltViewModel
+class MonitoredAppsSelectionViewModel @Inject constructor(
+    application: Application,
+    private val apiService: ApiService,
+    private val preferencesManager: PreferencesManager
+) : AndroidViewModel(application) {
 
     private val _uiState = MutableLiveData<MonitoredAppsUiState>(MonitoredAppsUiState())
     val uiState: LiveData<MonitoredAppsUiState> = _uiState
@@ -66,7 +73,7 @@ class MonitoredAppsSelectionViewModel(application: Application) : AndroidViewMod
                     )
                 }
             } catch (e: Exception) {
-                Log.e("MonitoredAppsViewModel", "Error loading monitor packages", e)
+                Timber.tag("MonitoredAppsViewModel").e(e, "Error loading monitor packages")
                 _uiState.value = _uiState.value?.copy(
                     loading = false,
                     error = "Error de conexión: ${e.message}"
@@ -162,7 +169,7 @@ class MonitoredAppsSelectionViewModel(application: Application) : AndroidViewMod
                     )
                 }
             } catch (e: Exception) {
-                Log.e("MonitoredAppsViewModel", "Error toggling package status", e)
+                Timber.tag("MonitoredAppsViewModel").e(e, "Error toggling package status")
                 _uiState.value = currentState.copy(
                     saving = false,
                     saveError = "Error de conexión: ${e.message}"

@@ -3,42 +3,58 @@ package com.yapenotifier.android.ui.admin
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.ViewModelProvider
 import com.yapenotifier.android.databinding.ActivityAdminLoginBinding
 import com.yapenotifier.android.ui.admin.viewmodel.AdminLoginViewModel
 import com.yapenotifier.android.ui.CreateCommerceActivity
 import com.yapenotifier.android.ui.RegisterActivity
+import dagger.hilt.android.AndroidEntryPoint
+import timber.log.Timber
 
+@AndroidEntryPoint
 class AdminLoginActivity : AppCompatActivity() {
     private lateinit var binding: ActivityAdminLoginBinding
-    private lateinit var viewModel: AdminLoginViewModel
+    private val viewModel: AdminLoginViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityAdminLoginBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+        Timber.d("AdminLoginActivity: onCreate iniciado")
+        try {
+            binding = ActivityAdminLoginBinding.inflate(layoutInflater)
+            setContentView(binding.root)
 
-        viewModel = ViewModelProvider(
-            this,
-            ViewModelProvider.AndroidViewModelFactory.getInstance(application)
-        )[AdminLoginViewModel::class.java]
-
-        setupObservers()
-        setupClickListeners()
+            Timber.d("AdminLoginActivity: ViewModel creado")
+            setupObservers()
+            setupClickListeners()
+            Timber.d("AdminLoginActivity: Setup completo")
+        } catch (e: Exception) {
+            Timber.e(e, "AdminLoginActivity: Error crítico en onCreate")
+            Toast.makeText(this, "Error al iniciar: ${e.message}", Toast.LENGTH_LONG).show()
+            finish()
+        }
     }
 
     private fun setupObservers() {
         viewModel.loginResult.observe(this) { result ->
             result?.let {
                 if (it.success) {
+                    Timber.d("Login exitoso, needsCommerceCreation: ${it.needsCommerceCreation}")
                     Toast.makeText(this, "Login exitoso", Toast.LENGTH_SHORT).show()
-                    if (it.needsCommerceCreation) {
-                        navigateToCreateCommerce()
-                    } else {
-                        navigateToAdminPanel()
+                    try {
+                        if (it.needsCommerceCreation) {
+                            Timber.d("Navegando a CreateCommerceActivity")
+                            navigateToCreateCommerce()
+                        } else {
+                            Timber.d("Navegando a AdminPanelActivity")
+                            navigateToAdminPanel()
+                        }
+                    } catch (e: Exception) {
+                        Timber.e(e, "Error al navegar después del login")
+                        Toast.makeText(this, "Error al navegar: ${e.message}", Toast.LENGTH_LONG).show()
                     }
                 } else {
+                    Timber.w("Login fallido: ${it.message}")
                     Toast.makeText(this, it.message ?: "Error al iniciar sesión", Toast.LENGTH_LONG).show()
                 }
             }
@@ -62,11 +78,6 @@ class AdminLoginActivity : AppCompatActivity() {
 
         binding.tvForgotPassword.setOnClickListener {
             // TODO: Implement forgot password flow
-            Toast.makeText(this, "Funcionalidad próximamente disponible", Toast.LENGTH_SHORT).show()
-        }
-
-        binding.btnFaceId.setOnClickListener {
-            // TODO: Implement Face ID login
             Toast.makeText(this, "Funcionalidad próximamente disponible", Toast.LENGTH_SHORT).show()
         }
 

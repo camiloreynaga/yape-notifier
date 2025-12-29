@@ -30,6 +30,7 @@ import com.yapenotifier.android.data.model.MonitorPackagesResponse
 import com.yapenotifier.android.data.model.User
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
@@ -136,6 +137,15 @@ interface ApiService {
 
     @GET("api/devices/{id}")
     suspend fun getDevice(@Path("id") id: Long): Response<DeviceResponse>
+
+    @DELETE("api/devices/{id}")
+    suspend fun deleteDevice(@Path("id") id: Long): Response<Unit>
+
+    @PATCH("api/devices/{id}")
+    suspend fun updateDevice(
+        @Path("id") id: Long,
+        @Body request: Map<String, String>
+    ): Response<DeviceResponse>
 
     // --- Admin: Link Codes ---
     @POST("api/devices/generate-link-code")

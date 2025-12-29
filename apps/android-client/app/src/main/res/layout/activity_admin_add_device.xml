@@ -28,7 +28,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Connect Device"
+                    android:text="@string/connect_device_title"
                     android:textSize="20sp"
                     android:textStyle="bold"
                     android:textColor="@android:color/black" />
@@ -36,7 +36,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Step 2 of 3: Pairing"
+                    android:text="@string/connect_device_subtitle"
                     android:textSize="14sp"
                     android:textColor="#757575" />
             </LinearLayout>
@@ -58,7 +58,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Device Alias"
+                android:text="@string/device_alias_label"
                 android:textSize="14sp"
                 android:textStyle="bold"
                 android:textColor="@android:color/black" />
@@ -69,7 +69,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:hint="Yape Cashier 1"
+                android:hint="@string/device_alias_hint"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 app:startIconDrawable="@drawable/ic_edit_pencil"
                 app:boxBackgroundMode="filled"
@@ -79,7 +79,7 @@
                     android:id="@+id/etDeviceAlias"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Yape Cashier 1"
+                    android:text="@string/device_alias_hint"
                     android:inputType="text" />
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -87,7 +87,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="This name will appear on your dashboard notifications."
+                android:text="@string/device_alias_description"
                 android:textSize="12sp"
                 android:textColor="#757575" />
 
@@ -96,7 +96,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="32dp"
-                android:text="Pairing Code"
+                android:text="@string/pairing_code_label"
                 android:textSize="18sp"
                 android:textStyle="bold"
                 android:textColor="@android:color/black" />
@@ -105,7 +105,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="Scan or enter this code on the capturer device."
+                android:text="@string/pairing_code_description"
                 android:textSize="14sp"
                 android:textColor="#757575" />
 
@@ -164,7 +164,7 @@
                     android:layout_marginStart="8dp"
                     android:src="@drawable/ic_copy"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Copiar código" />
+                    android:contentDescription="@string/copy_code" />
             </LinearLayout>
 
         <!-- Status -->
@@ -186,10 +186,10 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Waiting for device connection..."
+                android:text="@string/waiting_for_connection"
                 android:textSize="14sp"
                 android:textColor="#757575"
-                tools:text="Waiting for device connection..." />
+                tools:text="@string/waiting_for_connection" />
         </LinearLayout>
 
             <!-- Instructions Section -->
@@ -197,7 +197,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="32dp"
-                android:text="HOW TO CONNECT"
+                android:text="@string/how_to_connect"
                 android:textSize="16sp"
                 android:textStyle="bold"
                 android:textColor="@android:color/black" />
@@ -228,7 +228,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Open the Capturer App"
+                        android:text="@string/step_1_title"
                         android:textSize="14sp"
                         android:textStyle="bold"
                         android:textColor="#424242" />
@@ -237,7 +237,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:text="On the phone that receives the notifications."
+                        android:text="@string/step_1_description"
                         android:textSize="14sp"
                         android:textColor="#757575" />
                 </LinearLayout>
@@ -269,7 +269,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Select 'Link as Source'"
+                        android:text="@string/step_2_title"
                         android:textSize="14sp"
                         android:textStyle="bold"
                         android:textColor="#424242" />
@@ -278,7 +278,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:text="Tap the + button on the main screen."
+                        android:text="@string/step_2_description"
                         android:textSize="14sp"
                         android:textColor="#757575" />
                 </LinearLayout>
@@ -310,7 +310,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Scan QR or Enter Code"
+                        android:text="@string/step_3_title"
                         android:textSize="14sp"
                         android:textStyle="bold"
                         android:textColor="#424242" />
@@ -319,7 +319,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:text="Use the code displayed above to complete pairing."
+                        android:text="@string/step_3_description"
                         android:textSize="14sp"
                         android:textColor="#757575" />
                 </LinearLayout>
@@ -331,7 +331,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="32dp"
-                android:text="Cancel"
+                android:text="@string/cancel"
                 android:textSize="16sp"
                 app:strokeColor="#E0E0E0"
                 app:strokeWidth="1dp"

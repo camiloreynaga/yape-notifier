@@ -1,17 +1,21 @@
 package com.yapenotifier.android.ui.viewmodel
 
 import android.app.Application
-import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
-import com.yapenotifier.android.data.api.RetrofitClient
+import com.yapenotifier.android.data.api.ApiCallHandler
+import com.yapenotifier.android.data.api.ApiService
 import com.yapenotifier.android.data.local.PreferencesManager
+import com.yapenotifier.android.data.model.ApiResult
 import com.yapenotifier.android.data.model.AppInstance
 import com.yapenotifier.android.data.model.UpdateAppInstanceLabelRequest
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import timber.log.Timber
+import javax.inject.Inject
 
 data class AppInstancesUiState(
     val instances: List<AppInstance> = emptyList(),
@@ -24,9 +28,12 @@ data class AppInstancesUiState(
     val saveError: String? = null
 )
 
-class AppInstancesViewModel(application: Application) : AndroidViewModel(application) {
-    private val apiService = RetrofitClient.createApiService(application)
-    private val preferencesManager = PreferencesManager(application)
+@HiltViewModel
+class AppInstancesViewModel @Inject constructor(
+    application: Application,
+    private val apiService: ApiService,
+    private val preferencesManager: PreferencesManager
+) : AndroidViewModel(application) {
 
     private val _uiState = MutableLiveData<AppInstancesUiState>(AppInstancesUiState())
     val uiState: LiveData<AppInstancesUiState> = _uiState
@@ -70,7 +77,7 @@ class AppInstancesViewModel(application: Application) : AndroidViewModel(applica
                     )
                 }
             } catch (e: Exception) {
-                Log.e("AppInstancesViewModel", "Error loading app instances", e)
+                Timber.tag("AppInstancesViewModel").e(e, "Error loading app instances")
                 _uiState.value = _uiState.value?.copy(
                     loading = false,
                     error = "Error de conexión: ${e.message}"
@@ -117,7 +124,7 @@ class AppInstancesViewModel(application: Application) : AndroidViewModel(applica
                     )
                 }
             } catch (e: Exception) {
-                Log.e("AppInstancesViewModel", "Error updating instance label", e)
+                Timber.tag("AppInstancesViewModel").e(e, "Error updating instance label")
                 _uiState.value = _uiState.value?.copy(
                     saving = false,
                     saveError = "Error de conexión: ${e.message}"
@@ -152,7 +159,7 @@ class AppInstancesViewModel(application: Application) : AndroidViewModel(applica
                     )
                 }
             } catch (e: Exception) {
-                Log.e("AppInstancesViewModel", "Error saving all labels", e)
+                Timber.tag("AppInstancesViewModel").e(e, "Error saving all labels")
                 _uiState.value = _uiState.value?.copy(
                     saving = false,
                     saveError = "Error de conexión: ${e.message}"
@@ -185,7 +192,7 @@ class AppInstancesViewModel(application: Application) : AndroidViewModel(applica
                 false
             }
         } catch (e: Exception) {
-            Log.e("AppInstancesViewModel", "Error checking unnamed instances", e)
+            Timber.tag("AppInstancesViewModel").e(e, "Error checking unnamed instances")
             false
         }
     }

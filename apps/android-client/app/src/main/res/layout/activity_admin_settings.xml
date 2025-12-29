@@ -1,24 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/white"
+    android:orientation="vertical"
+    android:padding="16dp"
     tools:context=".ui.admin.AdminSettingsActivity">
 
-    <LinearLayout
+    <TextView
+        android:id="@+id/tvUserName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/tvUserEmail"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp" />
+
+    <Button
+        android:id="@+id/btnMonitoredApps"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="24dp">
+        android:text="Seleccionar aplicaciones monitoreadas" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Configuración"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:textColor="@android:color/black" />
-    </LinearLayout>
-</ScrollView>
+    <Button
+        android:id="@+id/btnLogout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Cerrar Sesión" />
 
+    <TextView
+        android:id="@+id/tvAppVersion"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="24dp" />
+
+</LinearLayout>

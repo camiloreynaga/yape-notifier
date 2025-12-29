@@ -5,15 +5,17 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
-import com.yapenotifier.android.data.api.RetrofitClient
 import com.yapenotifier.android.data.model.Commerce
 import com.yapenotifier.android.data.repository.CommerceRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class CreateCommerceViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val apiService = RetrofitClient.createApiService(application)
-    private val commerceRepository = CommerceRepository(apiService)
+@HiltViewModel
+class CreateCommerceViewModel @Inject constructor(
+    application: Application,
+    private val commerceRepository: CommerceRepository
+) : AndroidViewModel(application) {
 
     sealed class CreateCommerceState {
         object Idle : CreateCommerceState()

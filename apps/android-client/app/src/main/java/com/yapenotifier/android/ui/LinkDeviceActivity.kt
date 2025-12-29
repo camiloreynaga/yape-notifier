@@ -9,24 +9,33 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.ViewModelProvider
+import androidx.activity.viewModels
 import androidx.lifecycle.lifecycleScope
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
-import com.yapenotifier.android.data.api.RetrofitClient
+import com.yapenotifier.android.R
+import com.yapenotifier.android.data.api.ApiService
 import com.yapenotifier.android.data.local.PreferencesManager
 import com.yapenotifier.android.databinding.ActivityLinkDeviceBinding
 import com.yapenotifier.android.ui.viewmodel.LinkDeviceViewModel
 import com.yapenotifier.android.util.DeviceHealthWorkerHelper
 import com.yapenotifier.android.util.WizardHelper
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import timber.log.Timber
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class LinkDeviceActivity : AppCompatActivity() {
     private lateinit var binding: ActivityLinkDeviceBinding
-    private lateinit var viewModel: LinkDeviceViewModel
-    private lateinit var preferencesManager: PreferencesManager
-    private val apiService = RetrofitClient.createApiService(this)
+    private val viewModel: LinkDeviceViewModel by viewModels()
+
+    @Inject
+    lateinit var preferencesManager: PreferencesManager
+
+    @Inject
+    lateinit var apiService: ApiService
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -36,7 +45,7 @@ class LinkDeviceActivity : AppCompatActivity() {
         } else {
             Toast.makeText(
                 this,
-                "Se necesita permiso de cámara para escanear el código QR",
+                R.string.camera_permission_needed,
                 Toast.LENGTH_LONG
             ).show()
         }
@@ -48,7 +57,7 @@ class LinkDeviceActivity : AppCompatActivity() {
             binding.etCode.setText(scannedCode)
             validateCode(scannedCode)
         } else {
-            Toast.makeText(this, "No se pudo escanear el código", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, R.string.could_not_scan_code, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -57,14 +66,100 @@ class LinkDeviceActivity : AppCompatActivity() {
         binding = ActivityLinkDeviceBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        preferencesManager = PreferencesManager(this)
-        viewModel = ViewModelProvider(
-            this,
-            ViewModelProvider.AndroidViewModelFactory.getInstance(application)
-        )[LinkDeviceViewModel::class.java]
+        // Asegurar que existe un deviceUuid antes de verificar vinculación
+        ensureDeviceUuid()
+
+        // Verificar si el dispositivo ya está vinculado
+        checkIfAlreadyLinked()
 
         setupObservers()
         setupClickListeners()
+    }
+
+    private fun ensureDeviceUuid() {
+        lifecycleScope.launch {
+            try {
+                val deviceUuid = preferencesManager.deviceUuid.first()
+                if (deviceUuid.isNullOrBlank()) {
+                    // Si no existe UUID, es un error porque debería generarse en Application.onCreate
+                    Timber.e("LinkDeviceActivity: Device UUID no encontrado. Debería generarse al iniciar la app.")
+                    Toast.makeText(
+                        this@LinkDeviceActivity,
+                        R.string.error_uuid_not_found,
+                        Toast.LENGTH_LONG
+                    ).show()
+                } else {
+                    Timber.d("LinkDeviceActivity: Device UUID verificado: $deviceUuid")
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "LinkDeviceActivity: Error al verificar device UUID")
+            }
+        }
+    }
+
+    private fun checkIfAlreadyLinked() {
+        lifecycleScope.launch {
+            try {
+                // Primero verificar localmente
+                val deviceId = preferencesManager.deviceId.first()
+                if (!deviceId.isNullOrBlank()) {
+                    Timber.d("LinkDeviceActivity: DeviceId local encontrado ($deviceId), verificando en backend...")
+                    // Verificar en backend que el dispositivo existe y está vinculado
+                    try {
+                        val deviceIdLong = deviceId.toLongOrNull()
+                        if (deviceIdLong != null) {
+                            val response = apiService.getDevice(deviceIdLong)
+                            if (response.isSuccessful && response.body()?.device?.commerceId != null) {
+                                Timber.d("LinkDeviceActivity: Dispositivo ya vinculado en backend, navegando a MainActivity")
+                                Toast.makeText(this@LinkDeviceActivity, R.string.device_already_linked, Toast.LENGTH_SHORT).show()
+                                navigateToMain()
+                                return@launch
+                            } else {
+                                Timber.w("LinkDeviceActivity: DeviceId local existe pero no está vinculado en backend, limpiando...")
+                                // Limpiar deviceId local si no está vinculado en backend
+                                preferencesManager.saveDeviceId("")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Timber.e(e, "LinkDeviceActivity: Error al verificar dispositivo en backend")
+                        // Si hay error de red, asumir que está vinculado y continuar
+                        navigateToMain()
+                        return@launch
+                    }
+                }
+
+                // Si no hay deviceId local, verificar por UUID en backend
+                val deviceUuid = preferencesManager.deviceUuid.first()
+                if (!deviceUuid.isNullOrBlank()) {
+                    Timber.d("LinkDeviceActivity: Verificando dispositivo por UUID en backend...")
+                    // Buscar en la lista de dispositivos del usuario
+                    try {
+                        val devicesResponse = apiService.getDevices(activeOnly = false)
+                        if (devicesResponse.isSuccessful) {
+                            val devices = devicesResponse.body()?.devices ?: emptyList()
+                            val currentDevice = devices.find { it.uuid == deviceUuid }
+                            if (currentDevice?.commerceId != null) {
+                                // Dispositivo encontrado y vinculado, guardar deviceId
+                                Timber.d("LinkDeviceActivity: Dispositivo encontrado en backend (id=${currentDevice.id}), guardando...")
+                                preferencesManager.saveDeviceId(currentDevice.id.toString())
+                                currentDevice.commerceId.let {
+                                    preferencesManager.saveCommerceId(it.toString())
+                                }
+                                Toast.makeText(this@LinkDeviceActivity, R.string.device_already_linked, Toast.LENGTH_SHORT).show()
+                                navigateToMain()
+                                return@launch
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Timber.e(e, "LinkDeviceActivity: Error al buscar dispositivo por UUID")
+                    }
+                }
+
+                Timber.d("LinkDeviceActivity: Dispositivo no vinculado, mostrando pantalla de vinculación")
+            } catch (e: Exception) {
+                Timber.e(e, "LinkDeviceActivity: Error al verificar si está vinculado")
+            }
+        }
     }
 
     private fun setupObservers() {
@@ -84,7 +179,7 @@ class LinkDeviceActivity : AppCompatActivity() {
                 }
                 is LinkDeviceViewModel.ValidationState.Valid -> {
                     binding.progressBar.visibility = android.view.View.GONE
-                    binding.tvCommerceInfo.text = "Comercio: ${state.commerce.name}"
+                    binding.tvCommerceInfo.text = getString(R.string.commerce_info, state.commerce.name)
                     binding.tvCommerceInfo.visibility = android.view.View.VISIBLE
                     binding.btnLink.isEnabled = true
                     binding.tvError.visibility = android.view.View.GONE
@@ -153,7 +248,7 @@ class LinkDeviceActivity : AppCompatActivity() {
             if (code.isNotEmpty()) {
                 showConfirmDialog(code)
             } else {
-                Toast.makeText(this, "Por favor ingresa un código", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, R.string.enter_code_prompt, Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -175,7 +270,7 @@ class LinkDeviceActivity : AppCompatActivity() {
     private fun startQRScanner() {
         val options = ScanOptions()
         options.setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-        options.setPrompt("Escanea el código QR de vinculación")
+        options.setPrompt(getString(R.string.scan_qr_code_prompt))
         options.setCameraId(0)
         options.setBeepEnabled(false)
         options.setBarcodeImageEnabled(false)
@@ -193,24 +288,24 @@ class LinkDeviceActivity : AppCompatActivity() {
     private fun showConfirmDialog(code: String) {
         val commerceInfo = when (val state = viewModel.validationState.value) {
             is LinkDeviceViewModel.ValidationState.Valid -> state.commerce.name
-            else -> "el comercio"
+            else -> getString(R.string.default_commerce_name)
         }
 
         AlertDialog.Builder(this)
-            .setTitle("Confirmar Vinculación")
-            .setMessage("¿Deseas vincular este dispositivo al comercio: $commerceInfo?")
-            .setPositiveButton("Vincular") { _, _ ->
+            .setTitle(R.string.confirm_linking_title)
+            .setMessage(getString(R.string.confirm_linking_message, commerceInfo))
+            .setPositiveButton(R.string.link_button) { _, _ ->
                 viewModel.linkDevice(code)
             }
-            .setNegativeButton("Cancelar", null)
+            .setNegativeButton(R.string.cancel, null)
             .show()
     }
 
     private fun showSuccessDialog(message: String) {
         AlertDialog.Builder(this)
-            .setTitle("Dispositivo Vinculado")
+            .setTitle(R.string.device_linked_title)
             .setMessage(message)
-            .setPositiveButton("Continuar") { _, _ ->
+            .setPositiveButton(R.string.continue_button) { _, _ ->
                 checkAppInstancesAndNavigate()
             }
             .setCancelable(false)
@@ -222,44 +317,60 @@ class LinkDeviceActivity : AppCompatActivity() {
             try {
                 val deviceId = preferencesManager.deviceId.first()?.toLongOrNull()
                 if (deviceId == null) {
+                    Timber.w("Device ID es null después de vincular, navegando a MainActivity")
                     navigateToMain() // Navigates and finishes
                     return@launch
                 }
 
+                Timber.d("Verificando instancias para deviceId: $deviceId")
                 val response = apiService.getDeviceAppInstances(deviceId)
                 if (response.isSuccessful) {
                     val instances = response.body()?.instances ?: emptyList()
-                    val hasUnnamedInstances = instances.any {
-                        val label = it.label
-                        label.isNullOrBlank()
-                    }
+                    Timber.d("Instancias encontradas: ${instances.size}")
+                    val hasUnnamedInstances = instances.any { it.label.isNullOrBlank() }
 
                     if (hasUnnamedInstances) {
+                        Timber.d("Hay instancias sin nombre, navegando a AppInstancesActivity")
                         val intent = Intent(this@LinkDeviceActivity, AppInstancesActivity::class.java)
                         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                         startActivity(intent)
                         finish()
                     } else {
+                        Timber.d("Todas las instancias tienen nombre, navegando a siguiente pantalla")
                         // Start device health worker after device linking
                         DeviceHealthWorkerHelper.scheduleDeviceHealthWorker(this@LinkDeviceActivity)
+                        // Send immediate health check to update connection status
+                        DeviceHealthWorkerHelper.sendImmediateHealthCheck(this@LinkDeviceActivity)
                         navigateToNextScreen()
                     }
                 } else {
+                    Timber.w("Error al obtener instancias (${response.code()}), navegando a MainActivity")
                     navigateToMain()
                 }
             } catch (e: Exception) {
+                Timber.e(e, "Excepción al verificar instancias, navegando a MainActivity")
                 navigateToMain()
             }
         }
     }
 
     private fun navigateToMain() {
-        // Start device health worker after device linking
-        DeviceHealthWorkerHelper.scheduleDeviceHealthWorker(this)
-        val intent = Intent(this, MainActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
-        finish()
+        try {
+            Timber.d("Navegando a MainActivity después de vincular dispositivo")
+            // Start device health worker after device linking
+            DeviceHealthWorkerHelper.scheduleDeviceHealthWorker(this)
+            // Send immediate health check to update connection status
+            DeviceHealthWorkerHelper.sendImmediateHealthCheck(this)
+            val intent = Intent(this, MainActivity::class.java)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            startActivity(intent)
+            finish()
+        } catch (e: Exception) {
+            Timber.e(e, "Error crítico al navegar a MainActivity")
+            // Si MainActivity no existe o hay error, al menos no crashear
+            Toast.makeText(this, R.string.device_already_linked, Toast.LENGTH_LONG).show()
+            finish()
+        }
     }
 
     private fun navigateToNextScreen() {

@@ -1,16 +1,21 @@
 package com.yapenotifier.android.ui.viewmodel
 
-import android.util.Log
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.yapenotifier.android.data.api.RetrofitClient
+import com.yapenotifier.android.data.api.ApiCallHandler
+import com.yapenotifier.android.data.api.ApiService
 import com.yapenotifier.android.data.local.PreferencesManager
+import com.yapenotifier.android.data.model.ApiResult
 import com.yapenotifier.android.data.model.RegisterRequest
 import com.yapenotifier.android.data.repository.CommerceRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import timber.log.Timber
+import javax.inject.Inject
 
 data class RegisterResult(
     val success: Boolean,
@@ -18,10 +23,13 @@ data class RegisterResult(
     val needsCommerceCreation: Boolean = false
 )
 
-class RegisterViewModel(application: android.app.Application) : androidx.lifecycle.AndroidViewModel(application) {
-    private val apiService = RetrofitClient.createApiService(application)
-    private val preferencesManager = PreferencesManager(application)
-    private val commerceRepository = CommerceRepository(apiService)
+@HiltViewModel
+class RegisterViewModel @Inject constructor(
+    application: Application,
+    private val apiService: ApiService,
+    private val preferencesManager: PreferencesManager,
+    private val commerceRepository: CommerceRepository
+) : AndroidViewModel(application) {
 
     private val _registerResult = MutableLiveData<RegisterResult?>()
     val registerResult: LiveData<RegisterResult?> = _registerResult
@@ -32,53 +40,83 @@ class RegisterViewModel(application: android.app.Application) : androidx.lifecyc
     fun register(name: String, email: String, password: String, passwordConfirmation: String) {
         viewModelScope.launch {
             _isLoading.value = true
-            try {
+            
+            // Professional approach: Use ApiCallHandler for type-safe error handling
+            val registerResult = ApiCallHandler.safeApiCall(getApplication()) {
                 val request = RegisterRequest(name, email, password, passwordConfirmation)
-                val response = apiService.register(request)
+                apiService.register(request)
+            }
+            
+            when (registerResult) {
+                is ApiResult.Success -> {
+                    val authResponse = registerResult.data
+                    preferencesManager.saveAuthToken(authResponse.token)
+                    preferencesManager.saveUserEmail(authResponse.user.email)
 
-                if (response.isSuccessful) {
-                    val authResponse = response.body()
-                    if (authResponse != null) {
-                        preferencesManager.saveAuthToken(authResponse.token)
-                        preferencesManager.saveUserEmail(authResponse.user.email)
-
-                        val deviceRegistered = registerDevice()
-                        if (deviceRegistered) {
-                            val commerceCheckResponse = commerceRepository.checkCommerce()
-                            if(commerceCheckResponse.isSuccessful) {
-                                val needsCreation = commerceCheckResponse.body()?.exists == false
-                                _registerResult.value = RegisterResult(true, "Registro exitoso y dispositivo registrado.", needsCreation)
-                            } else {
-                                _registerResult.value = RegisterResult(false, "Error al verificar el comercio.")
+                    val deviceRegistered = registerDevice()
+                    if (deviceRegistered) {
+                        val commerceResult = ApiCallHandler.safeApiCall(getApplication()) {
+                            apiService.checkCommerce()
+                        }
+                        
+                        when (commerceResult) {
+                            is ApiResult.Success -> {
+                                val needsCreation = !commerceResult.data.hasCommerce
+                                _registerResult.value = RegisterResult(
+                                    true,
+                                    "Registro exitoso y dispositivo registrado.",
+                                    needsCreation
+                                )
                             }
-                        } else {
-                            _registerResult.value = RegisterResult(false, "Error al registrar el dispositivo. Por favor, intente de nuevo.")
+                            else -> {
+                                _registerResult.value = RegisterResult(
+                                    false,
+                                    commerceResult.getErrorMessage(getApplication()) ?: "Error al verificar el comercio."
+                                )
+                            }
                         }
                     } else {
-                        _registerResult.value = RegisterResult(false, "Respuesta de registro inválida del servidor")
+                        _registerResult.value = RegisterResult(
+                            false,
+                            "Error al registrar el dispositivo. Por favor, intente de nuevo."
+                        )
                     }
-                } else {
-                    val errorBody = response.errorBody()?.string()
-                    _registerResult.value = RegisterResult(false, "Error de registro: ${response.code()} - $errorBody")
                 }
-            } catch (e: Exception) {
-                _registerResult.value = RegisterResult(false, "Error de conexión: ${e.message}")
-            } finally {
-                _isLoading.value = false
+                is ApiResult.NetworkError -> {
+                    _registerResult.value = RegisterResult(
+                        false,
+                        registerResult.getErrorMessage(getApplication()) ?: "Error de conexión"
+                    )
+                }
+                is ApiResult.HttpError -> {
+                    _registerResult.value = RegisterResult(
+                        false,
+                        registerResult.getErrorMessage(getApplication()) ?: "Error de registro"
+                    )
+                }
+                is ApiResult.UnknownError -> {
+                    _registerResult.value = RegisterResult(
+                        false,
+                        registerResult.getErrorMessage(getApplication()) ?: "Error desconocido"
+                    )
+                }
+                is ApiResult.Loading -> {
+                    // No debería llegar aquí
+                }
             }
+            
+            _isLoading.value = false
         }
     }
 
     private suspend fun registerDevice(): Boolean {
         try {
-            val deviceUuid = preferencesManager.deviceUuid.first() ?: run {
-                val uuid = java.util.UUID.randomUUID().toString()
-                preferencesManager.saveDeviceUuid(uuid)
-                Log.d("RegisterViewModel", "Generated new device UUID: $uuid")
-                uuid
-            }
+            // El UUID debería existir (generado en Application.onCreate)
+            // Si no existe, es un error crítico
+            val deviceUuid = preferencesManager.deviceUuid.first()
+                ?: throw IllegalStateException("Device UUID no encontrado. La app debe reiniciarse.")
 
-            Log.d("RegisterViewModel", "Attempting to register device with UUID: $deviceUuid")
+            Timber.tag("RegisterViewModel").d("Attempting to register device with UUID: $deviceUuid")
 
             val deviceName = android.os.Build.MODEL ?: "Android Device"
             val createDeviceRequest = com.yapenotifier.android.data.model.CreateDeviceRequest(
@@ -91,23 +129,23 @@ class RegisterViewModel(application: android.app.Application) : androidx.lifecyc
             
             if (deviceResponse.isSuccessful) {
                 val responseBody = deviceResponse.body()
-                Log.d("RegisterViewModel", "Device registration response body: $responseBody")
+                Timber.tag("RegisterViewModel").d("Device registration response body: $responseBody")
 
                 responseBody?.device?.let {
                     preferencesManager.saveDeviceId(it.id.toString())
-                    Log.i("RegisterViewModel", "Device successfully registered with server. Saved remote ID: ${it.id}")
+                    Timber.tag("RegisterViewModel").i("Device successfully registered with server. Saved remote ID: ${it.id}")
                     return true
                 } ?: run {
-                    Log.e("RegisterViewModel", "Could not find 'device' object in the response body.")
+                    Timber.tag("RegisterViewModel").e("Could not find 'device' object in the response body.")
                     return false
                 }
             } else {
                 val errorBody = deviceResponse.errorBody()?.string()
-                Log.e("RegisterViewModel", "Device registration API call failed. Code: ${deviceResponse.code()}, Body: $errorBody")
+                Timber.tag("RegisterViewModel").e("Device registration API call failed. Code: ${deviceResponse.code()}, Body: $errorBody")
                 return false
             }
         } catch (e: Exception) {
-            Log.e("RegisterViewModel", "Exception during device registration", e)
+            Timber.tag("RegisterViewModel").e(e, "Exception during device registration")
             return false
         }
     }

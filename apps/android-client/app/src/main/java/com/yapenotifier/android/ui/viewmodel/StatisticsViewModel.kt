@@ -5,12 +5,14 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.yapenotifier.android.data.local.db.AppDatabase
 import com.yapenotifier.android.data.local.db.CapturedNotification
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.util.Calendar
+import javax.inject.Inject
 
 data class StatisticsState(
     val lastSentNotification: CapturedNotification? = null,
@@ -19,7 +21,10 @@ data class StatisticsState(
     val failedCount: Int = 0
 )
 
-class StatisticsViewModel(application: Application) : AndroidViewModel(application) {
+@HiltViewModel
+class StatisticsViewModel @Inject constructor(
+    application: Application
+) : AndroidViewModel(application) {
     private val dao = AppDatabase.getDatabase(application).capturedNotificationDao()
 
     private val _statisticsState = MutableStateFlow(StatisticsState())

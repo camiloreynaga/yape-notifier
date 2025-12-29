@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Permitir cleartext solo para desarrollo local (emulador y localhost) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- IP del host desde el emulador Android -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <!-- Localhost -->
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+    </domain-config>
+    
+    <!-- Configuración para producción: solo HTTPS -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- Confiar en certificados del sistema (Let's Encrypt, etc.) -->
+            <certificates src="system" />
+            <!-- También confiar en certificados de usuario (útil para desarrollo con certificados propios) -->
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+    
+    <!-- Configuración específica para el dominio de producción -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">api.notificaciones.space</domain>
+        <domain includeSubdomains="true">notificaciones.space</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>
+

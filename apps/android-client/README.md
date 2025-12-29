@@ -60,18 +60,55 @@ app/src/main/java/com/yapenotifier/android/
 
 ### URL de la API
 
-Editar `app/src/main/java/com/yapenotifier/android/data/api/RetrofitClient.kt`:
+La URL de la API se configura automáticamente según el tipo de build:
+
+**Debug (Desarrollo Local):**
+
+- URL: `http://10.0.2.2:8000/` (emulador Android)
+- Configurado en: `app/build.gradle.kts` → `buildTypes.debug`
+
+**Release (Producción):**
+
+- URL: `https://api.notificaciones.space/`
+- Configurado en: `app/build.gradle.kts` → `buildTypes.release`
+
+#### Para cambiar la URL manualmente:
+
+1. **Editar `app/build.gradle.kts`:**
 
 ```kotlin
-// Emulador
-private const val BASE_URL = "http://10.0.2.2:8000/"
-
-// Dispositivo físico
-private const val BASE_URL = "http://192.168.1.XXX:8000/"
-
-// Producción
-private const val BASE_URL = "https://api.notificaciones.space/"
+buildTypes {
+    debug {
+        // Para probar con producción en debug, cambia esta línea:
+        buildConfigField("String", "API_BASE_URL", "\"https://api.notificaciones.space/\"")
+    }
+    release {
+        buildConfigField("String", "API_BASE_URL", "\"https://api.notificaciones.space/\"")
+    }
+}
 ```
+
+2. **Para dispositivo físico en desarrollo local:**
+   - Cambiar `10.0.2.2` por la IP local de tu máquina (ej: `192.168.1.100`)
+
+#### Verificar la URL configurada:
+
+La app muestra la URL en los logs al iniciar:
+
+```
+RetrofitClient: Creating API service with base URL: https://api.notificaciones.space/
+RetrofitClient: Build type: RELEASE
+```
+
+### Network Security Config
+
+La app está configurada para:
+
+- ✅ Permitir HTTP solo para `localhost` y `10.0.2.2` (desarrollo)
+- ✅ Requerir HTTPS para todas las demás conexiones (producción)
+- ✅ Confiar en certificados del sistema (Let's Encrypt, etc.)
+
+Configuración en: `app/src/main/res/xml/network_security_config.xml`
 
 ## 🔐 Permisos Requeridos
 

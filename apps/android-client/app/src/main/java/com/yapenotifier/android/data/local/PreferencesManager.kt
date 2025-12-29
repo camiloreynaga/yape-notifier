@@ -94,6 +94,18 @@ class PreferencesManager(private val context: Context) {
         }
     }
 
+    suspend fun clearAuthToken() {
+        context.dataStore.edit { preferences ->
+            preferences.remove(AUTH_TOKEN_KEY)
+        }
+    }
+
+    suspend fun clearUserEmail() {
+        context.dataStore.edit { preferences ->
+            preferences.remove(USER_EMAIL_KEY)
+        }
+    }
+
     suspend fun clearAll() {
         context.dataStore.edit { preferences ->
             preferences.clear()

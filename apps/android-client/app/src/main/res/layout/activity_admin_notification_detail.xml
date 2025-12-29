@@ -12,14 +12,116 @@
         android:orientation="vertical"
         android:padding="24dp">
 
-        <!-- TODO: Add notification detail fields -->
-        <TextView
+        <ProgressBar
+            android:id="@+id/progressBar"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Detalle de Notificación"
+            android:layout_gravity="center"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/tvAppName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:textSize="20sp"
             android:textStyle="bold"
             android:textColor="@android:color/black" />
+
+        <TextView
+            android:id="@+id/tvTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="16sp"
+            android:textColor="#333333" />
+
+        <TextView
+            android:id="@+id/tvPayerName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textSize="16sp"
+            android:textColor="#555555" />
+
+        <TextView
+            android:id="@+id/tvAmount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@android:color/black" />
+
+        <TextView
+            android:id="@+id/tvDate"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textSize="14sp"
+            android:textColor="#757575" />
+
+        <TextView
+            android:id="@+id/tvPackageName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textSize="14sp"
+            android:textColor="#757575" />
+
+        <TextView
+            android:id="@+id/tvInstanceLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="14sp"
+            android:textColor="#757575" />
+
+        <TextView
+            android:id="@+id/tvDeviceName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="14sp"
+            android:textColor="#757575" />
+
+        <TextView
+            android:id="@+id/tvAndroidUserId"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="14sp"
+            android:textColor="#757575" />
+
+        <TextView
+            android:id="@+id/tvFullText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="#f5f5f5"
+            android:padding="12dp"
+            android:textColor="#333333" />
+
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnMarkValidated"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Marcar como Validado" />
+
+        <Button
+            android:id="@+id/btnMarkInconsistent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Marcar como Inconsistente" />
+
     </LinearLayout>
 </ScrollView>
-

@@ -16,7 +16,9 @@ data class CommerceInfo(
 data class LinkDeviceRequest(
     val code: String,
     @SerializedName("device_uuid")
-    val deviceUuid: String
+    val deviceUuid: String,
+    @SerializedName("device_name")
+    val deviceName: String? = null
 )
 
 data class LinkDeviceResponse(

@@ -37,7 +37,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
-                android:text="Admin Portal"
+                android:text="@string/admin_portal_title"
                 android:textSize="28sp"
                 android:textStyle="bold"
                 android:textColor="@android:color/black"
@@ -51,7 +51,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="Centralized Payment Hub"
+                android:text="@string/admin_panel_subtitle"
                 android:textSize="16sp"
                 android:textColor="#757575"
                 app:layout_constraintEnd_toEndOf="parent"
@@ -81,7 +81,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="EMAIL OR PHONE"
+                        android:text="@string/email_or_phone_label"
                         android:textSize="12sp"
                         android:textColor="#757575"
                         android:textStyle="bold"
@@ -93,7 +93,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:hint="admin@company.com"
+                        android:hint="@string/email_or_phone_hint"
                         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                         app:startIconDrawable="@drawable/ic_person"
                         app:boxBackgroundMode="filled"
@@ -112,7 +112,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="16dp"
-                        android:text="PASSWORD"
+                        android:text="@string/password_label"
                         android:textSize="12sp"
                         android:textColor="#757575"
                         android:textStyle="bold"
@@ -124,7 +124,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:hint="Password"
+                        android:hint="@string/password_hint"
                         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                         app:passwordToggleEnabled="true"
                         app:startIconDrawable="@drawable/ic_lock"
@@ -146,7 +146,7 @@
                         android:layout_height="wrap_content"
                         android:layout_gravity="end"
                         android:layout_marginTop="8dp"
-                        android:text="Forgot Password?"
+                        android:text="@string/forgot_password"
                         android:textSize="14sp"
                         android:textColor="#6200EE"
                         android:clickable="true"
@@ -159,7 +159,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="24dp"
-                        android:text="Sign In"
+                        android:text="@string/sign_in"
                         android:textSize="16sp"
                         android:textStyle="bold"
                         android:padding="16dp"
@@ -167,33 +167,6 @@
                         app:iconGravity="end"
                         app:backgroundTint="#6200EE"
                         app:cornerRadius="12dp" />
-
-                    <!-- Biometrics Info -->
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="center"
-                        android:layout_marginTop="16dp"
-                        android:text="Secured by Biometrics"
-                        android:textSize="12sp"
-                        android:textColor="#757575" />
-
-                    <!-- Face ID Button -->
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnFaceId"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="16dp"
-                        android:text="Login with Face ID"
-                        android:textSize="16sp"
-                        android:textColor="#6200EE"
-                        android:padding="16dp"
-                        app:icon="@drawable/ic_face_id"
-                        app:iconGravity="start"
-                        app:iconTint="#6200EE"
-                        app:strokeColor="#E0E0E0"
-                        app:strokeWidth="1dp"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -203,7 +176,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
-                android:text="Don't have an account? Sign Up"
+                android:text="@string/dont_have_account"
                 android:textSize="14sp"
                 android:textColor="#757575"
                 app:layout_constraintEnd_toEndOf="parent"
@@ -217,7 +190,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="32dp"
                 android:layout_marginBottom="24dp"
-                android:text="Need help accessing your dashboard?\nContact Support"
+                android:text="@string/need_help"
                 android:textSize="14sp"
                 android:textColor="#757575"
                 android:gravity="center"

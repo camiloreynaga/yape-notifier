@@ -2,16 +2,18 @@ package com.yapenotifier.android.ui
 
 import android.os.Bundle
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.ViewModelProvider
 import com.yapenotifier.android.databinding.ActivityCapturedNotificationsBinding
 import com.yapenotifier.android.ui.adapter.CapturedNotificationsAdapter
 import com.yapenotifier.android.ui.viewmodel.CapturedNotificationsViewModel
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class CapturedNotificationsActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityCapturedNotificationsBinding
-    private lateinit var viewModel: CapturedNotificationsViewModel
+    private val viewModel: CapturedNotificationsViewModel by viewModels()
     private val adapter = CapturedNotificationsAdapter()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -19,8 +21,7 @@ class CapturedNotificationsActivity : AppCompatActivity() {
         binding = ActivityCapturedNotificationsBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        viewModel = ViewModelProvider(this, ViewModelProvider.AndroidViewModelFactory.getInstance(application))
-            .get(CapturedNotificationsViewModel::class.java)
+        // ViewModel inyectado automáticamente por Hilt
 
         setupRecyclerView()
         setupClickListeners()

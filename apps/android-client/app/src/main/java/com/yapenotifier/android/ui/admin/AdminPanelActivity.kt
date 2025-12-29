@@ -6,10 +6,10 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import android.text.TextWatcher
 import androidx.appcompat.widget.SearchView
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -18,33 +18,42 @@ import com.yapenotifier.android.R
 import com.yapenotifier.android.databinding.ActivityAdminPanelBinding
 import com.yapenotifier.android.ui.admin.adapter.NotificationAdapter
 import com.yapenotifier.android.ui.admin.viewmodel.AdminPanelViewModel
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
+@AndroidEntryPoint
 class AdminPanelActivity : AppCompatActivity() {
     private lateinit var binding: ActivityAdminPanelBinding
-    private lateinit var viewModel: AdminPanelViewModel
+    private val viewModel: AdminPanelViewModel by viewModels()
     private lateinit var adapter: NotificationAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityAdminPanelBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+        try {
+            Timber.d("AdminPanelActivity onCreate - iniciando")
+            binding = ActivityAdminPanelBinding.inflate(layoutInflater)
+            setContentView(binding.root)
 
-        viewModel = ViewModelProvider(
-            this,
-            ViewModelProvider.AndroidViewModelFactory.getInstance(application)
-        )[AdminPanelViewModel::class.java]
+            // ViewModel inyectado automáticamente por Hilt
 
-        setupToolbar()
-        setupRecyclerView()
-        setupSwipeRefresh()
-        setupBottomNavigation()
-        setupSearch()
-        setupClickListeners()
-        setupObservers()
-        setupFilters()
+            Timber.d("AdminPanelActivity ViewModel creado")
+            setupToolbar()
+            setupRecyclerView()
+            setupSwipeRefresh()
+            setupBottomNavigation()
+            setupSearch()
+            setupClickListeners()
+            setupObservers()
+            setupFilters()
+            Timber.d("AdminPanelActivity setup completo")
+        } catch (e: Exception) {
+            Timber.e(e, "AdminPanelActivity: Error crítico en onCreate")
+            Toast.makeText(this, "Error al iniciar el panel: ${e.message}", Toast.LENGTH_LONG).show()
+            finish()
+        }
     }
 
     private fun setupToolbar() {
@@ -110,6 +119,7 @@ class AdminPanelActivity : AppCompatActivity() {
 
     private fun setupObservers() {
         viewModel.uiState.observe(this) { state ->
+            Timber.d("AdminPanelActivity UI State actualizado: loading=${state.loading}, notifications=${state.notifications.size}, error=${state.error}, total=${state.total}")
             binding.swipeRefresh.isRefreshing = state.loading
 
             if (state.loading && state.notifications.isEmpty()) {
@@ -123,14 +133,20 @@ class AdminPanelActivity : AppCompatActivity() {
             if (state.notifications.isEmpty() && !state.loading) {
                 binding.tvEmpty.visibility = View.VISIBLE
                 binding.rvNotifications.visibility = View.GONE
+                Timber.d("AdminPanelActivity: Mostrando mensaje vacío")
             } else {
                 binding.tvEmpty.visibility = View.GONE
                 binding.rvNotifications.visibility = View.VISIBLE
             }
 
             state.error?.let { error ->
+                Timber.e("AdminPanelActivity Error: $error")
                 Toast.makeText(this, error, Toast.LENGTH_LONG).show()
             }
+        }
+        
+        viewModel.pollingState.observe(this) { state ->
+            Timber.d("AdminPanelActivity Polling State: $state")
         }
     }
 
@@ -180,10 +196,14 @@ class AdminPanelActivity : AppCompatActivity() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: android.text.Editable?) {
+                val query = s?.toString() ?: ""
+                // Pausar polling cuando usuario está escribiendo
+                viewModel.setUserTyping(query.isNotEmpty())
+                
                 searchJob?.cancel()
                 searchJob = lifecycleScope.launch {
                     delay(500)
-                    viewModel.setSearchQuery(s?.toString() ?: "")
+                    viewModel.setSearchQuery(query)
                 }
             }
         })
@@ -213,6 +233,29 @@ class AdminPanelActivity : AppCompatActivity() {
                 true
             }
             else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Timber.d("AdminPanelActivity onResume - iniciando polling")
+        viewModel.startPolling() // Iniciar polling cuando Activity está visible
+    }
+
+    override fun onPause() {
+        super.onPause()
+        Timber.d("AdminPanelActivity onPause - deteniendo polling")
+        viewModel.stopPolling() // Detener polling cuando Activity está en background
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        Timber.d("AdminPanelActivity onDestroy - deteniendo polling")
+        // Safe access: viewModel is initialized by Hilt when first accessed
+        try {
+            viewModel.stopPolling() // Asegurar que se detiene al destruir
+        } catch (e: Exception) {
+            Timber.e(e, "Error stopping polling in onDestroy")
         }
     }
 }

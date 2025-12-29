@@ -4,12 +4,19 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.viewModelScope
 import com.yapenotifier.android.data.api.ApiService
 import com.yapenotifier.android.data.api.RetrofitClient
 import com.yapenotifier.android.data.model.Notification
 import com.yapenotifier.android.data.model.PaginatedResponse
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -22,8 +29,18 @@ data class AdminPanelUiState(
     val total: Int = 0
 )
 
-class AdminPanelViewModel(application: Application) : AndroidViewModel(application) {
-    private val apiService: ApiService = RetrofitClient.createApiService(application)
+sealed class PollingState {
+    object Idle : PollingState()
+    object Active : PollingState()
+    object Paused : PollingState()
+    data class Error(val message: String) : PollingState()
+}
+
+@HiltViewModel
+class AdminPanelViewModel @Inject constructor(
+    application: Application,
+    private val apiService: ApiService
+) : AndroidViewModel(application) {
 
     private val _uiState = MutableLiveData<AdminPanelUiState>(AdminPanelUiState())
     val uiState: LiveData<AdminPanelUiState> = _uiState
@@ -31,63 +48,99 @@ class AdminPanelViewModel(application: Application) : AndroidViewModel(applicati
     private val _searchQuery = MutableLiveData<String>("")
     val searchQuery: LiveData<String> = _searchQuery
 
+    private val _pollingState = MutableLiveData<PollingState>(PollingState.Idle)
+    val pollingState: LiveData<PollingState> = _pollingState
+
     private var currentFilters = mutableMapOf<String, Any?>()
 
+    // Estados de polling
+    private var pollingJob: Job? = null
+    private var isPollingActive = false
+    private var isUserTyping = false
+    private var consecutiveErrors = 0
+    private val maxConsecutiveErrors = 3
+
     init {
+        Timber.d("AdminPanelViewModel init - cargando notificaciones iniciales")
         loadNotifications()
     }
 
     fun loadNotifications(refresh: Boolean = false) {
-        if (_uiState.value?.loading == true) return
-
         viewModelScope.launch {
-            try {
-                val currentState = _uiState.value ?: AdminPanelUiState()
-                val page = if (refresh) 1 else currentState.currentPage
+            loadNotificationsInternal(refresh, silent = false)
+        }
+    }
 
+    /**
+     * Carga notificaciones con opción de modo silencioso (sin mostrar loading)
+     */
+    private suspend fun loadNotificationsInternal(refresh: Boolean = false, silent: Boolean = false): Boolean {
+        if (_uiState.value?.loading == true && !silent) return false
+
+        return try {
+            val currentState = _uiState.value ?: AdminPanelUiState()
+            val page = if (refresh) 1 else currentState.currentPage
+
+            if (!silent) {
                 _uiState.value = currentState.copy(loading = true, error = null)
+            }
 
-                val response = apiService.getNotifications(
-                    deviceId = currentFilters["device_id"] as? Long,
-                    sourceApp = currentFilters["source_app"] as? String,
-                    packageName = currentFilters["package_name"] as? String,
-                    appInstanceId = currentFilters["app_instance_id"] as? Long,
-                    startDate = currentFilters["start_date"] as? String,
-                    endDate = currentFilters["end_date"] as? String,
-                    status = currentFilters["status"] as? String,
-                    excludeDuplicates = currentFilters["exclude_duplicates"] as? Boolean,
-                    perPage = 50,
-                    page = page
-                )
+            Timber.d("AdminPanelViewModel: Cargando notificaciones - page=$page, filters=$currentFilters")
+            val response = apiService.getNotifications(
+                deviceId = currentFilters["device_id"] as? Long,
+                sourceApp = currentFilters["source_app"] as? String,
+                packageName = currentFilters["package_name"] as? String,
+                appInstanceId = currentFilters["app_instance_id"] as? Long,
+                startDate = currentFilters["start_date"] as? String,
+                endDate = currentFilters["end_date"] as? String,
+                status = currentFilters["status"] as? String,
+                excludeDuplicates = currentFilters["exclude_duplicates"] as? Boolean,
+                perPage = 50,
+                page = page
+            )
 
-                if (response.isSuccessful) {
-                    val paginatedResponse = response.body()
-                    if (paginatedResponse != null) {
-                        val newNotifications = if (refresh) {
-                            paginatedResponse.data
-                        } else {
-                            currentState.notifications + paginatedResponse.data
-                        }
-
-                        _uiState.value = AdminPanelUiState(
-                            notifications = newNotifications,
-                            loading = false,
-                            hasMore = paginatedResponse.currentPage < paginatedResponse.lastPage,
-                            currentPage = paginatedResponse.currentPage,
-                            total = paginatedResponse.total
-                        )
+            Timber.d("AdminPanelViewModel: Respuesta recibida - isSuccessful=${response.isSuccessful}, code=${response.code()}")
+            if (response.isSuccessful) {
+                val paginatedResponse = response.body()
+                Timber.d("AdminPanelViewModel: paginatedResponse=${paginatedResponse != null}, data count=${paginatedResponse?.data?.size ?: 0}, total=${paginatedResponse?.total ?: 0}")
+                if (paginatedResponse != null) {
+                    val newNotifications = if (refresh) {
+                        paginatedResponse.data
                     } else {
+                        currentState.notifications + paginatedResponse.data
+                    }
+
+                    _uiState.value = AdminPanelUiState(
+                        notifications = newNotifications,
+                        loading = false,
+                        hasMore = paginatedResponse.currentPage < paginatedResponse.lastPage,
+                        currentPage = paginatedResponse.currentPage,
+                        total = paginatedResponse.total
+                    )
+                    true
+                } else {
+                    if (!silent) {
                         _uiState.value = currentState.copy(loading = false, error = "No se pudieron cargar las notificaciones")
                     }
-                } else {
-                    _uiState.value = currentState.copy(loading = false, error = "Error ${response.code()}")
+                    false
                 }
-            } catch (e: Exception) {
+            } else {
+                val errorBody = response.errorBody()?.string()
+                Timber.e("AdminPanelViewModel: Error en respuesta - code=${response.code()}, errorBody=$errorBody")
+                if (!silent) {
+                    _uiState.value = currentState.copy(loading = false, error = "Error ${response.code()}: ${errorBody ?: "Sin detalles"}")
+                }
+                false
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "AdminPanelViewModel: Excepción al cargar notificaciones")
+            if (!silent) {
                 _uiState.value = _uiState.value?.copy(
                     loading = false,
                     error = e.message ?: "Error de conexión"
                 )
             }
+            false
         }
     }
 
@@ -117,6 +170,18 @@ class AdminPanelViewModel(application: Application) : AndroidViewModel(applicati
         _searchQuery.value = query
         // Filter locally for now, can be improved with backend search
         filterBySearchQuery(query)
+    }
+
+    /**
+     * Marca que el usuario está escribiendo (pausa polling)
+     */
+    fun setUserTyping(typing: Boolean) {
+        isUserTyping = typing
+        if (typing) {
+            pausePolling()
+        } else {
+            resumePolling()
+        }
     }
 
     private fun filterBySearchQuery(query: String) {
@@ -194,6 +259,121 @@ class AdminPanelViewModel(application: Application) : AndroidViewModel(applicati
     fun getTodayDateFilter(): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         return sdf.format(Date())
+    }
+
+    /**
+     * Inicia polling inteligente con manejo de errores y optimización de batería
+     */
+    fun startPolling() {
+        if (isPollingActive) return
+
+        isPollingActive = true
+        consecutiveErrors = 0
+        _pollingState.value = PollingState.Active
+
+        pollingJob?.cancel()
+        pollingJob = viewModelScope.launch {
+            var pollInterval = 15000L // 15 segundos por defecto
+
+            while (isActive && isPollingActive) {
+                try {
+                    // Verificar condiciones antes de hacer polling
+                    if (!shouldPoll()) {
+                        delay(5000) // Esperar 5 segundos antes de verificar de nuevo
+                        continue
+                    }
+
+                    // Hacer polling
+                    val success = loadNotificationsInternal(refresh = true, silent = true)
+
+                    if (success) {
+                        consecutiveErrors = 0
+                        pollInterval = 15000L // Resetear intervalo a 15s si fue exitoso
+                    } else {
+                        consecutiveErrors++
+                        // Aumentar intervalo exponencialmente en caso de errores
+                        pollInterval = minOf(pollInterval * 2, 120000L) // Máximo 2 minutos
+
+                        if (consecutiveErrors >= maxConsecutiveErrors) {
+                            _pollingState.value = PollingState.Error("Error de conexión. Reintentando...")
+                            // Esperar más tiempo antes de reintentar
+                            delay(30000)
+                            consecutiveErrors = 0 // Resetear después de esperar
+                        }
+                    }
+
+                    delay(pollInterval)
+                } catch (e: Exception) {
+                    Timber.e(e, "Error en polling")
+                    consecutiveErrors++
+                    pollInterval = minOf(pollInterval * 2, 120000L)
+                    delay(pollInterval)
+                }
+            }
+        }
+    }
+
+    /**
+     * Detiene el polling
+     */
+    fun stopPolling() {
+        isPollingActive = false
+        pollingJob?.cancel()
+        pollingJob = null
+        _pollingState.value = PollingState.Idle
+    }
+
+    /**
+     * Pausa temporalmente el polling (ej: cuando usuario está escribiendo)
+     */
+    fun pausePolling() {
+        if (isPollingActive) {
+            _pollingState.value = PollingState.Paused
+        }
+    }
+
+    /**
+     * Reanuda el polling después de una pausa
+     */
+    fun resumePolling() {
+        if (isPollingActive && _pollingState.value is PollingState.Paused) {
+            _pollingState.value = PollingState.Active
+        }
+    }
+
+    /**
+     * Verifica si se debe hacer polling
+     */
+    private fun shouldPoll(): Boolean {
+        // No hacer polling si:
+        // 1. App no está en foreground
+        if (!isAppInForeground()) return false
+
+        // 2. Usuario está escribiendo (evitar interrupciones)
+        if (isUserTyping) return false
+
+        // 3. Ya hay una carga en progreso
+        if (_uiState.value?.loading == true) return false
+
+        return true
+    }
+
+    /**
+     * Verifica si la app está en foreground
+     */
+    private fun isAppInForeground(): Boolean {
+        return ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(
+            androidx.lifecycle.Lifecycle.State.STARTED
+        )
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopPolling()
+    }
+
+    companion object {
+        private const val TAG = "AdminPanelViewModel"
     }
 }
 

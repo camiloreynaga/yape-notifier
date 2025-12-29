@@ -6,18 +6,20 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.ViewModelProvider
+import androidx.fragment.app.viewModels
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.yapenotifier.android.databinding.FragmentMonitoredAppsBinding
 import com.yapenotifier.android.ui.MonitoredAppsAdapter
 import com.yapenotifier.android.ui.viewmodel.MonitoredAppsViewModel
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MonitoredAppsFragment : Fragment() {
 
     private var _binding: FragmentMonitoredAppsBinding? = null
     private val binding get() = _binding!!
 
-    private lateinit var viewModel: MonitoredAppsViewModel
+    private val viewModel: MonitoredAppsViewModel by viewModels()
     private lateinit var adapter: MonitoredAppsAdapter
 
     override fun onCreateView(
@@ -31,7 +33,7 @@ class MonitoredAppsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        viewModel = ViewModelProvider(this).get(MonitoredAppsViewModel::class.java)
+        // ViewModel inyectado automáticamente por Hilt
 
         setupRecyclerView()
         setupObservers()

@@ -1,8 +1,8 @@
 plugins {
-    id("com.android.application") version "8.2.0"
-    id("org.jetbrains.kotlin.android") version "1.9.22"
-    id("org.jetbrains.kotlin.kapt") version "1.9.22"
-    id("org.jetbrains.kotlin.plugin.parcelize") version "1.9.22"
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("com.google.dagger.hilt.android")
+    id("org.jetbrains.kotlin.kapt")
 }
 
 android {
@@ -20,8 +20,16 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Desarrollo local - Emulador Android
+            // buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8000/\"")
+            // Para probar con producción en debug, descomenta la línea siguiente:
+            buildConfigField("String", "API_BASE_URL", "\"https://api.notificaciones.space/\"")
+        }
         release {
-            isMinifyEnabled = false
+            // Producción - Servidor real
+            isMinifyEnabled = true
+            buildConfigField("String", "API_BASE_URL", "\"https://api.notificaciones.space/\"")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -37,10 +45,16 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+    
+    // Hilt: Allow references to generated code
+    kapt {
+        correctErrorTypes = true
+    }
 
     buildFeatures {
         viewBinding = true
         dataBinding = true
+        buildConfig = true
     }
 }
 
@@ -98,8 +112,26 @@ dependencies {
     // Fragment
     implementation("androidx.fragment:fragment-ktx:1.6.2")
 
+    // Timber for logging
+    implementation("com.jakewharton.timber:timber:5.0.1")
+
+    // Hilt for Dependency Injection
+    implementation("com.google.dagger:hilt-android:2.51.1")
+    kapt("com.google.dagger:hilt-android-compiler:2.51.1")
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.mockito:mockito-core:5.1.1")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:5.0.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    testImplementation("org.robolectric:robolectric:4.11.1")
+    testImplementation("androidx.test:core:1.5.0")
+    testImplementation("androidx.arch.core:core-testing:2.2.0")
+    testImplementation("com.google.dagger:hilt-android-testing:2.51.1")
+    kaptTest("com.google.dagger:hilt-android-compiler:2.51.1")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+    androidTestImplementation("com.google.dagger:hilt-android-testing:2.51.1")
+    kaptAndroidTest("com.google.dagger:hilt-android-compiler:2.51.1")
 }

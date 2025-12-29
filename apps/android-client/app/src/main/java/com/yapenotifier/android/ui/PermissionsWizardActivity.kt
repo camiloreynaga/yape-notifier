@@ -15,19 +15,24 @@ import com.yapenotifier.android.ui.fragment.MonitoredAppsFragment
 import com.yapenotifier.android.ui.fragment.NotificationPermissionFragment
 import com.yapenotifier.android.util.DeviceHealthWorkerHelper
 import com.yapenotifier.android.util.WizardHelper
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class PermissionsWizardActivity : AppCompatActivity() {
     private lateinit var binding: ActivityPermissionsWizardBinding
     private lateinit var adapter: PermissionsWizardAdapter
-    private lateinit var preferencesManager: PreferencesManager
+    
+    @Inject
+    lateinit var preferencesManager: PreferencesManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityPermissionsWizardBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        preferencesManager = PreferencesManager(this)
+        // Dependencias inyectadas automáticamente por Hilt
         
         setupViewPager()
         setupClickListeners()

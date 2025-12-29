@@ -10,9 +10,14 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.yapenotifier.android.data.local.db.AppDatabase
 import com.yapenotifier.android.worker.SendNotificationWorker
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class CapturedNotificationsViewModel(application: Application) : AndroidViewModel(application) {
+@HiltViewModel
+class CapturedNotificationsViewModel @Inject constructor(
+    application: Application
+) : AndroidViewModel(application) {
 
     private val capturedNotificationDao = AppDatabase.getDatabase(application).capturedNotificationDao()
     private val workManager = WorkManager.getInstance(application)

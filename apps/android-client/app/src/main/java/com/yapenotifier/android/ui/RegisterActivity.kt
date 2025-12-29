@@ -3,21 +3,23 @@ package com.yapenotifier.android.ui
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.ViewModelProvider
 import com.yapenotifier.android.databinding.ActivityRegisterBinding
 import com.yapenotifier.android.ui.viewmodel.RegisterViewModel
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class RegisterActivity : AppCompatActivity() {
     private lateinit var binding: ActivityRegisterBinding
-    private lateinit var viewModel: RegisterViewModel
+    private val viewModel: RegisterViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityRegisterBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        viewModel = ViewModelProvider(this, ViewModelProvider.AndroidViewModelFactory.getInstance(application))[RegisterViewModel::class.java]
+        // ViewModel inyectado automáticamente por Hilt
 
         setupObservers()
         setupClickListeners()

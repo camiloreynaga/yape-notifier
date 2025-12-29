@@ -4,24 +4,30 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.ViewModelProvider
+import androidx.core.graphics.toColorInt
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.yapenotifier.android.databinding.ActivityAppInstancesBinding
+import com.yapenotifier.android.R
 import com.yapenotifier.android.data.local.PreferencesManager
+import com.yapenotifier.android.databinding.ActivityAppInstancesBinding
 import com.yapenotifier.android.ui.adapter.AppInstanceAdapter
 import com.yapenotifier.android.ui.viewmodel.AppInstancesViewModel
 import com.yapenotifier.android.util.DeviceHealthWorkerHelper
-import com.yapenotifier.android.util.WizardHelper
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class AppInstancesActivity : AppCompatActivity() {
     private lateinit var binding: ActivityAppInstancesBinding
-    private lateinit var viewModel: AppInstancesViewModel
-    private lateinit var preferencesManager: PreferencesManager
+    private val viewModel: AppInstancesViewModel by viewModels()
+
+    @Inject
+    lateinit var preferencesManager: PreferencesManager
+
     private lateinit var adapter: AppInstanceAdapter
 
     private val labelChanges = mutableMapOf<Long, String>()
@@ -32,11 +38,7 @@ class AppInstancesActivity : AppCompatActivity() {
         binding = ActivityAppInstancesBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        preferencesManager = PreferencesManager(this)
-        viewModel = ViewModelProvider(
-            this,
-            ViewModelProvider.AndroidViewModelFactory.getInstance(application)
-        )[AppInstancesViewModel::class.java]
+        // ViewModel y dependencias inyectados automáticamente por Hilt
 
         setupToolbar()
         setupRecyclerView()
@@ -82,8 +84,8 @@ class AppInstancesActivity : AppCompatActivity() {
                 // Show alert card or banner
                 android.widget.TextView(this).apply {
                     text = state.multipleInstancesMessage
-                    setBackgroundColor(android.graphics.Color.parseColor("#FFF3CD"))
-                    setTextColor(android.graphics.Color.parseColor("#856404"))
+                    setBackgroundColor("#FFF3CD".toColorInt())
+                    setTextColor("#856404".toColorInt())
                     setPadding(16, 12, 16, 12)
                 }
                 // You can add this to a card or alert in the layout
@@ -120,12 +122,12 @@ class AppInstancesActivity : AppCompatActivity() {
     }
 
     private fun loadAppInstances() {
-        runBlocking {
+        lifecycleScope.launch {
             val deviceId = preferencesManager.deviceId.first()?.toLongOrNull()
             if (deviceId != null) {
                 viewModel.loadAppInstances(deviceId)
             } else {
-                binding.tvError.text = "No se pudo obtener el ID del dispositivo"
+                binding.tvError.text = getString(R.string.error_getting_device_id)
                 binding.tvError.visibility = View.VISIBLE
             }
         }
@@ -144,9 +146,9 @@ class AppInstancesActivity : AppCompatActivity() {
         isSaving = true
         val changesToSave = labelChanges.mapKeys { it.key.toString() }
         labelChanges.clear()
-        
+
         viewModel.saveAllLabels(changesToSave)
-        
+
         // Observe save completion
         viewModel.uiState.observe(this) { state ->
             if (isSaving && !state.saving) {
@@ -188,7 +190,7 @@ class AppInstancesActivity : AppCompatActivity() {
                     // No device ID, navigate to MainActivity anyway
                     navigateToMain()
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // On error, navigate to MainActivity
                 navigateToMain()
             }
@@ -200,11 +202,5 @@ class AppInstancesActivity : AppCompatActivity() {
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
         finish()
-    }
-
-    companion object {
-        fun shouldShowAppInstances(hasUnnamedInstances: Boolean): Boolean {
-            return hasUnnamedInstances
-        }
     }
 }

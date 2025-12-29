@@ -5,12 +5,19 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
-import com.yapenotifier.android.data.api.RetrofitClient
+import com.yapenotifier.android.data.api.ApiService
 import com.yapenotifier.android.data.local.PreferencesManager
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
+import timber.log.Timber
+import javax.inject.Inject
 
-class MainViewModel(application: Application) : AndroidViewModel(application) {
-    private val preferencesManager = PreferencesManager(application)
+@HiltViewModel
+class MainViewModel @Inject constructor(
+    application: Application,
+    private val apiService: ApiService,
+    private val preferencesManager: PreferencesManager
+) : AndroidViewModel(application) {
 
     private val _statusMessage = MutableLiveData<String?>()
     val statusMessage: LiveData<String?> = _statusMessage
@@ -26,15 +33,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun logout() {
         viewModelScope.launch {
             try {
-                val apiService = RetrofitClient.createApiService(getApplication())
                 apiService.logout()
             } catch (e: Exception) {
                 // Log error but don't block logout
-                android.util.Log.e("MainViewModel", "Error calling logout API", e)
+                Timber.tag("MainViewModel").e(e, "Error calling logout API")
             }
 
             // Always clear local data regardless of API call success
             preferencesManager.clearAll()
+            
+            // Clear token cache in RetrofitClient
+            com.yapenotifier.android.data.api.RetrofitClient.clearTokenCache()
             
             // Notify the UI that logout is complete
             _logoutComplete.value = true

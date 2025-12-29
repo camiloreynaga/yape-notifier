@@ -12,28 +12,41 @@ import com.google.zxing.WriterException
 import com.google.zxing.qrcode.QRCodeWriter
 import com.yapenotifier.android.databinding.ActivityAdminAddDeviceBinding
 import com.yapenotifier.android.data.api.ApiService
-import com.yapenotifier.android.data.api.RetrofitClient
 import com.yapenotifier.android.data.model.LinkCodeGenerateRequest
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.util.*
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class AdminAddDeviceActivity : AppCompatActivity() {
     private lateinit var binding: ActivityAdminAddDeviceBinding
-    private val apiService: ApiService = RetrofitClient.createApiService(this)
+    
+    @Inject
+    lateinit var apiService: ApiService
     private var pollingHandler: Handler? = null
     private var linkCode: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityAdminAddDeviceBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+        Timber.d("AdminAddDeviceActivity: onCreate iniciado")
+        try {
+            binding = ActivityAdminAddDeviceBinding.inflate(layoutInflater)
+            setContentView(binding.root)
 
-        setupToolbar()
-        setupClickListeners()
-        generateLinkCode()
+            setupToolbar()
+            setupClickListeners()
+            generateLinkCode()
+            Timber.d("AdminAddDeviceActivity: setup completo")
+        } catch (e: Exception) {
+            Timber.e(e, "AdminAddDeviceActivity: Error crítico en onCreate")
+            Toast.makeText(this, "Error al iniciar: ${e.message}", Toast.LENGTH_LONG).show()
+            finish()
+        }
     }
 
     private fun setupToolbar() {
@@ -61,6 +74,7 @@ class AdminAddDeviceActivity : AppCompatActivity() {
         val deviceAlias = binding.etDeviceAlias.text.toString().takeIf { it.isNotBlank() }
             ?: "Yape Cashier 1"
 
+        Timber.d("AdminAddDeviceActivity: Generando código de vinculación con alias: $deviceAlias")
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val response = apiService.generateLinkCode(
@@ -68,20 +82,26 @@ class AdminAddDeviceActivity : AppCompatActivity() {
                 )
 
                 withContext(Dispatchers.Main) {
+                    Timber.d("AdminAddDeviceActivity: Respuesta de generateLinkCode - isSuccessful=${response.isSuccessful}, code=${response.code()}")
                     if (response.isSuccessful) {
                         val linkCodeData = response.body()
                         if (linkCodeData != null) {
+                            Timber.d("AdminAddDeviceActivity: Código generado exitosamente: ${linkCodeData.linkCode}")
                             linkCode = linkCodeData.linkCode
                             displayLinkCode(linkCodeData.linkCode, linkCodeData.qrCodeData)
                             startPolling(linkCodeData.linkCode)
                         } else {
-                            Toast.makeText(this@AdminAddDeviceActivity, "Error al generar código", Toast.LENGTH_LONG).show()
+                            Timber.e("AdminAddDeviceActivity: Respuesta vacía al generar código")
+                            Toast.makeText(this@AdminAddDeviceActivity, "Error al generar código: respuesta vacía", Toast.LENGTH_LONG).show()
                         }
                     } else {
-                        Toast.makeText(this@AdminAddDeviceActivity, "Error ${response.code()}", Toast.LENGTH_LONG).show()
+                        val errorBody = response.errorBody()?.string()
+                        Timber.e("AdminAddDeviceActivity: Error al generar código - code=${response.code()}, body=$errorBody")
+                        Toast.makeText(this@AdminAddDeviceActivity, "Error ${response.code()}: ${errorBody ?: "Sin detalles"}", Toast.LENGTH_LONG).show()
                     }
                 }
             } catch (e: Exception) {
+                Timber.e(e, "AdminAddDeviceActivity: Excepción al generar código")
                 withContext(Dispatchers.Main) {
                     Toast.makeText(this@AdminAddDeviceActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                 }

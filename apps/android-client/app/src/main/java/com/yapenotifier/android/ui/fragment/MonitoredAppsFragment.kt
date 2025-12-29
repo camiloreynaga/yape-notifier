@@ -8,20 +8,27 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.yapenotifier.android.data.api.ApiService
-import com.yapenotifier.android.data.api.RetrofitClient
 import com.yapenotifier.android.data.local.PreferencesManager
 import com.yapenotifier.android.data.model.MonitorPackage
 import com.yapenotifier.android.databinding.FragmentMonitoredAppsBinding
 import com.yapenotifier.android.ui.MonitoredAppsAdapter
 import com.yapenotifier.android.ui.MonitoredAppCheckableItem
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class MonitoredAppsFragment : Fragment() {
     private var _binding: FragmentMonitoredAppsBinding? = null
     private val binding get() = _binding!!
-    private lateinit var preferencesManager: PreferencesManager
-    private lateinit var apiService: ApiService
+    
+    @Inject
+    lateinit var preferencesManager: PreferencesManager
+    
+    @Inject
+    lateinit var apiService: ApiService
+    
     private lateinit var adapter: MonitoredAppsAdapter
     private val selectedPackages = mutableSetOf<String>()
 
@@ -37,8 +44,7 @@ class MonitoredAppsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         
-        preferencesManager = PreferencesManager(requireContext())
-        apiService = RetrofitClient.createApiService(requireContext())
+        // Dependencias inyectadas automáticamente por Hilt
         setupRecyclerView()
         loadSelectedPackages()
         loadAvailablePackages()

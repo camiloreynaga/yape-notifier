@@ -5,18 +5,20 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
-import com.yapenotifier.android.data.api.RetrofitClient
 import com.yapenotifier.android.data.local.PreferencesManager
 import com.yapenotifier.android.data.repository.MonitoredAppsRepository
 import com.yapenotifier.android.ui.MonitoredAppCheckableItem
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class MonitoredAppsViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val apiService = RetrofitClient.createApiService(application)
-    private val repository = MonitoredAppsRepository(apiService)
-    private val preferencesManager = PreferencesManager(application)
+@HiltViewModel
+class MonitoredAppsViewModel @Inject constructor(
+    application: Application,
+    private val repository: MonitoredAppsRepository,
+    private val preferencesManager: PreferencesManager
+) : AndroidViewModel(application) {
 
     sealed class MonitoredAppsState {
         object Loading : MonitoredAppsState()

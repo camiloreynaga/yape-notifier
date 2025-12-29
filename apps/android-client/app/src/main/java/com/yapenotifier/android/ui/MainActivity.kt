@@ -19,10 +19,12 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.ViewModelProvider
+import androidx.activity.viewModels
+import dagger.hilt.android.AndroidEntryPoint
 import androidx.lifecycle.lifecycleScope
 import com.yapenotifier.android.R
 import com.yapenotifier.android.data.local.PreferencesManager
+import javax.inject.Inject
 import com.yapenotifier.android.databinding.ActivityMainBinding
 import com.yapenotifier.android.ui.viewmodel.MainViewModel
 import com.yapenotifier.android.ui.viewmodel.StatisticsState
@@ -39,11 +41,14 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+@AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
-    private lateinit var viewModel: MainViewModel
-    private lateinit var statisticsViewModel: StatisticsViewModel
-    private lateinit var preferencesManager: PreferencesManager
+    private val viewModel: MainViewModel by viewModels()
+    private val statisticsViewModel: StatisticsViewModel by viewModels()
+    
+    @Inject
+    lateinit var preferencesManager: PreferencesManager
 
     private val TEST_CHANNEL_ID = "TEST_CHANNEL_ID"
     private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
@@ -62,13 +67,12 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        preferencesManager = PreferencesManager(this)
+        // Dependencias inyectadas automáticamente por Hilt
         
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        viewModel = ViewModelProvider(this, ViewModelProvider.AndroidViewModelFactory.getInstance(application))[MainViewModel::class.java]
-        statisticsViewModel = ViewModelProvider(this, ViewModelProvider.AndroidViewModelFactory.getInstance(application))[StatisticsViewModel::class.java]
+        // ViewModels inyectados automáticamente por Hilt (ya declarados arriba)
 
         setupUI()
         setupObservers()

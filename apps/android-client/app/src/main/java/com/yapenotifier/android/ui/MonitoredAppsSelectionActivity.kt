@@ -5,9 +5,9 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
-import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.chip.Chip
 import com.yapenotifier.android.R
@@ -15,10 +15,12 @@ import com.yapenotifier.android.databinding.ActivityMonitoredAppsSelectionBindin
 import com.yapenotifier.android.ui.adapter.MonitoredAppAdapter
 import com.yapenotifier.android.ui.viewmodel.FilterType
 import com.yapenotifier.android.ui.viewmodel.MonitoredAppsSelectionViewModel
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MonitoredAppsSelectionActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMonitoredAppsSelectionBinding
-    private lateinit var viewModel: MonitoredAppsSelectionViewModel
+    private val viewModel: MonitoredAppsSelectionViewModel by viewModels()
     private lateinit var adapter: MonitoredAppAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -26,10 +28,7 @@ class MonitoredAppsSelectionActivity : AppCompatActivity() {
         binding = ActivityMonitoredAppsSelectionBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        viewModel = ViewModelProvider(
-            this,
-            ViewModelProvider.AndroidViewModelFactory.getInstance(application)
-        )[MonitoredAppsSelectionViewModel::class.java]
+        // ViewModel inyectado automáticamente por Hilt
 
         setupToolbar()
         setupRecyclerView()
