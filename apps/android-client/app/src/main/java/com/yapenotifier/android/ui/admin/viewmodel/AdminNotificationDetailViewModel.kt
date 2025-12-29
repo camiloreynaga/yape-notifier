@@ -5,10 +5,13 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
+import com.yapenotifier.android.data.api.ApiCallHandler
 import com.yapenotifier.android.data.api.ApiService
+import com.yapenotifier.android.data.model.ApiResult
 import com.yapenotifier.android.data.model.Notification
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 data class AdminNotificationDetailUiState(
@@ -29,28 +32,40 @@ class AdminNotificationDetailViewModel @Inject constructor(
 
     fun loadNotification(notificationId: Long) {
         viewModelScope.launch {
-            try {
-                _uiState.value = _uiState.value?.copy(loading = true, error = null)
+            _uiState.value = _uiState.value?.copy(loading = true, error = null, statusUpdated = false)
 
-                val response = apiService.getNotification(notificationId)
+            val result = ApiCallHandler.safeApiCall(getApplication()) {
+                apiService.getNotification(notificationId)
+            }
 
-                if (response.isSuccessful) {
-                    val notification = response.body()
+            when (result) {
+                is ApiResult.Success -> {
+                    val notification = result.data
+                    Timber.d("AdminNotificationDetailViewModel: Notificación cargada - id=${notification.id}, status=${notification.status}")
                     _uiState.value = AdminNotificationDetailUiState(
                         notification = notification,
                         loading = false
                     )
-                } else {
+                }
+                is ApiResult.HttpError -> {
                     _uiState.value = _uiState.value?.copy(
                         loading = false,
-                        error = "Error al cargar la notificación: ${response.code()}"
+                        error = result.getErrorMessage()
                     )
                 }
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value?.copy(
-                    loading = false,
-                    error = e.message ?: "Error de conexión"
-                )
+                is ApiResult.NetworkError -> {
+                    _uiState.value = _uiState.value?.copy(
+                        loading = false,
+                        error = result.getErrorMessage()
+                    )
+                }
+                is ApiResult.UnknownError -> {
+                    _uiState.value = _uiState.value?.copy(
+                        loading = false,
+                        error = result.getErrorMessage()
+                    )
+                }
+                else -> {}
             }
         }
     }
@@ -59,32 +74,44 @@ class AdminNotificationDetailViewModel @Inject constructor(
         val currentNotification = _uiState.value?.notification ?: return
 
         viewModelScope.launch {
-            try {
-                _uiState.value = _uiState.value?.copy(loading = true, error = null)
+            _uiState.value = _uiState.value?.copy(loading = true, error = null, statusUpdated = false)
 
-                val response = apiService.updateNotificationStatus(
+            val result = ApiCallHandler.safeApiCall(getApplication()) {
+                apiService.updateNotificationStatus(
                     currentNotification.id,
                     mapOf("status" to status)
                 )
+            }
 
-                if (response.isSuccessful) {
+            when (result) {
+                is ApiResult.Success -> {
+                    Timber.d("AdminNotificationDetailViewModel: Estado actualizado - id=${currentNotification.id}, nuevoStatus=$status")
                     _uiState.value = _uiState.value?.copy(
                         loading = false,
                         statusUpdated = true
                     )
                     // Reload notification to get updated status
                     loadNotification(currentNotification.id)
-                } else {
+                }
+                is ApiResult.HttpError -> {
                     _uiState.value = _uiState.value?.copy(
                         loading = false,
-                        error = "Error al actualizar el estado: ${response.code()}"
+                        error = result.getErrorMessage()
                     )
                 }
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value?.copy(
-                    loading = false,
-                    error = e.message ?: "Error de conexión"
-                )
+                is ApiResult.NetworkError -> {
+                    _uiState.value = _uiState.value?.copy(
+                        loading = false,
+                        error = result.getErrorMessage()
+                    )
+                }
+                is ApiResult.UnknownError -> {
+                    _uiState.value = _uiState.value?.copy(
+                        loading = false,
+                        error = result.getErrorMessage()
+                    )
+                }
+                else -> {}
             }
         }
     }

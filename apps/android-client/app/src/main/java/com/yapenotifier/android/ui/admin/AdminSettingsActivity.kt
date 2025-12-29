@@ -44,6 +44,10 @@ class AdminSettingsActivity : AppCompatActivity() {
 
     private fun setupClickListeners() {
         binding.btnMonitoredApps.setOnClickListener {
+            // TODO: Navigate to AdminMonitoredAppsActivity when created
+            // val intent = Intent(this, AdminMonitoredAppsActivity::class.java)
+            // startActivity(intent)
+            // For now, use existing activity
             val intent = Intent(this, MonitoredAppsSelectionActivity::class.java)
             startActivity(intent)
         }

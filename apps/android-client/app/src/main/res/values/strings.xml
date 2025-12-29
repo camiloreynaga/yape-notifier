@@ -7,12 +7,18 @@
     <string name="not_monitored_filter">No Monitoreadas</string>
     <string name="monitored_apps_stats">%1$d de %2$d aplicaciones monitoreadas</string>
     <string name="last_updated">Última actualización: %1$s</string>
-    <string name="syncing">Sincronizando...</string>
-    <string name="updating">Actualizando...</string>
+    <string name="syncing">Sincronizando…</string>
+    <string name="updating">Actualizando…</string>
     <string name="admin_panel_title">Panel Admin</string>
     <string name="admin_panel_subtitle">Central de Pagos</string>
     <string name="filter_all">Todas</string>
     <string name="filter_today">Hoy</string>
+    <string name="filter_pending">Pendientes</string>
+    <string name="filter_last_7_days">Últimos 7 días</string>
+    <string name="filter_by_device">Filtrar por Dispositivo</string>
+    <string name="filter_by_app">Filtrar por App</string>
+    <string name="filter_by_status">Filtrar por Estado</string>
+    <string name="filter_by_date">Filtrar por Fecha</string>
     <string name="mark_all_as_read_toast">Todas las notificaciones marcadas como leídas</string>
     <string name="version_info">Versión %1$s • Conexión Segura</string>
 
@@ -26,7 +32,8 @@
     <string name="forgot_password">¿Olvidaste tu contraseña?</string>
     <string name="sign_in">Iniciar Sesión</string>
     <string name="dont_have_account">¿No tienes una cuenta? Registrarse</string>
-    <string name="need_help">¿Necesitas ayuda para acceder a tu panel?\nContactar Soporte</string>
+    <string name="need_help">¿Necesitas ayuda para acceder a tu panel?
+Contactar Soporte</string>
 
     <!-- Admin Add Device -->
     <string name="connect_device_title">Conectar Dispositivo</string>
@@ -36,11 +43,11 @@
     <string name="device_alias_description">Este nombre aparecerá en las notificaciones de tu panel.</string>
     <string name="pairing_code_label">Código de Vinculación</string>
     <string name="pairing_code_description">Escanea o ingresa este código en el dispositivo captador.</string>
-    <string name="waiting_for_connection">Esperando conexión del dispositivo...</string>
+    <string name="waiting_for_connection">Esperando conexión del dispositivo…</string>
     <string name="how_to_connect">CÓMO CONECTAR</string>
     <string name="step_1_title">Abre la App Captadora</string>
     <string name="step_1_description">En el teléfono que recibe las notificaciones.</string>
-    <string name="step_2_title">Selecciona \"Vincular como Captador\"</string>
+    <string name="step_2_title">Selecciona "Vincular como Captador"</string>
     <string name="step_2_description">Toca el botón + en la pantalla principal.</string>
     <string name="step_3_title">Escanea QR o Ingresa Código</string>
     <string name="step_3_description">Usa el código mostrado arriba para completar la vinculación.</string>
@@ -63,7 +70,7 @@
     <string name="default_commerce_name">el comercio</string>
 
     <!-- Common -->
-    <string name="loading">Cargando...</string>
+    <string name="loading">Cargando…</string>
     <string name="error">Error</string>
     <string name="success">Éxito</string>
     <string name="ok">Aceptar</string>
@@ -83,4 +90,49 @@
     <string name="multiple_instances_detected">Se detectaron %1$d instancias de %2$s</string>
     <string name="multiple_instances_multiple_apps">Se detectaron múltiples instancias en %1$d aplicaciones</string>
     <string name="error_getting_device_id">No se pudo obtener el ID del dispositivo</string>
+
+    <!-- Admin Overview -->
+    <string name="overview_title">Resumen</string>
+    <string name="overview_subtitle">Estadísticas y KPIs</string>
+    <string name="total_notifications">Notificaciones Totales</string>
+    <string name="total_amount">Monto Total</string>
+    <string name="active_devices">Dispositivos Activos</string>
+    <string name="pending_notifications">Pendientes de Validar</string>
+    <string name="duplicate_notifications">Duplicados Detectados</string>
+    <string name="active_instances">Instancias Activas</string>
+    <string name="refresh_statistics">Actualizar Estadísticas</string>
+    <string name="quick_actions">Acciones Rápidas</string>
+    <string name="add_device">Agregar Dispositivo</string>
+    <string name="view_all_notifications">Ver Todas las Notificaciones</string>
+    <string name="manage_instances">Gestionar Instancias</string>
+    <string name="configure_apps">Configurar Apps</string>
+
+    <!-- Admin Monitored Apps -->
+    <string name="monitored_apps_admin_title">Apps Monitoreadas</string>
+    <string name="monitored_apps_admin_subtitle">Gestiona las aplicaciones a monitorear</string>
+    <string name="create_package">Crear Paquete</string>
+    <string name="edit_package">Editar Paquete</string>
+    <string name="delete_package">Eliminar Paquete</string>
+    <string name="package_name_label">Nombre del Paquete</string>
+    <string name="app_name_label">Nombre de la App</string>
+    <string name="description_label">Descripción</string>
+    <string name="priority_label">Prioridad</string>
+    <string name="bulk_create">Crear Múltiples</string>
+    <string name="show_active_only">Mostrar Solo Activos</string>
+    <string name="package_created">Paquete creado exitosamente</string>
+    <string name="package_updated">Paquete actualizado exitosamente</string>
+    <string name="package_deleted">Paquete eliminado exitosamente</string>
+    <string name="confirm_delete_package">¿Estás seguro de que deseas eliminar este paquete?</string>
+
+    <!-- Admin App Instances -->
+    <string name="app_instances_title">Instancias de Apps</string>
+    <string name="app_instances_subtitle">Gestiona las instancias de aplicaciones</string>
+    <string name="all_devices">Todos los Dispositivos</string>
+    <string name="assigned_instances">Instancias Asignadas</string>
+    <string name="unassigned_instances">Instancias Sin Asignar</string>
+    <string name="edit_instance_label">Editar Nombre</string>
+    <string name="instance_label_hint">Nombre de la instancia</string>
+    <string name="instance_label_updated">Nombre actualizado exitosamente</string>
+    <string name="package_name">Paquete: %1$s</string>
+    <string name="no_label">Sin nombre</string>
 </resources>

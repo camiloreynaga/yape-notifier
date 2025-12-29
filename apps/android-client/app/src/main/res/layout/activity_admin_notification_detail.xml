@@ -123,5 +123,12 @@
             android:layout_marginTop="8dp"
             android:text="Marcar como Inconsistente" />
 
+        <Button
+            android:id="@+id/btnMarkPending"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Marcar como Pendiente" />
+
     </LinearLayout>
 </ScrollView>

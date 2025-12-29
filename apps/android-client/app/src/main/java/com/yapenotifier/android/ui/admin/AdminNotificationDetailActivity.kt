@@ -52,6 +52,10 @@ class AdminNotificationDetailActivity : AppCompatActivity() {
         binding.btnMarkInconsistent.setOnClickListener {
             viewModel.updateStatus("inconsistent")
         }
+
+        binding.btnMarkPending.setOnClickListener {
+            viewModel.updateStatus("pending")
+        }
     }
 
     private fun setupObservers() {
@@ -143,10 +147,29 @@ class AdminNotificationDetailActivity : AppCompatActivity() {
                 else -> notification.status
             }
 
-            // Action buttons visibility
-            val isPending = notification.status == "pending"
-            btnMarkValidated.visibility = if (isPending) View.VISIBLE else View.GONE
-            btnMarkInconsistent.visibility = if (isPending) View.VISIBLE else View.GONE
+            // Action buttons visibility - Show all buttons, highlight current status
+            btnMarkValidated.visibility = View.VISIBLE
+            btnMarkInconsistent.visibility = View.VISIBLE
+            btnMarkPending.visibility = View.VISIBLE
+            
+            // Highlight current status button
+            when (notification.status) {
+                "pending" -> {
+                    btnMarkPending.isEnabled = false
+                    btnMarkValidated.isEnabled = true
+                    btnMarkInconsistent.isEnabled = true
+                }
+                "validated" -> {
+                    btnMarkValidated.isEnabled = false
+                    btnMarkPending.isEnabled = true
+                    btnMarkInconsistent.isEnabled = true
+                }
+                "inconsistent" -> {
+                    btnMarkInconsistent.isEnabled = false
+                    btnMarkPending.isEnabled = true
+                    btnMarkValidated.isEnabled = true
+                }
+            }
         }
     }
 

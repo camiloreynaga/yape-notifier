@@ -22,6 +22,8 @@ import java.util.*
 
 data class AdminPanelUiState(
     val notifications: List<Notification> = emptyList(),
+    val devices: List<com.yapenotifier.android.data.model.Device> = emptyList(),
+    val sourceApps: List<String> = emptyList(),
     val loading: Boolean = false,
     val error: String? = null,
     val hasMore: Boolean = false,
@@ -63,6 +65,33 @@ class AdminPanelViewModel @Inject constructor(
     init {
         Timber.d("AdminPanelViewModel init - cargando notificaciones iniciales")
         loadNotifications()
+        loadFilterOptions()
+    }
+
+    /**
+     * Carga opciones para los filtros (dispositivos, apps)
+     */
+    fun loadFilterOptions() {
+        viewModelScope.launch {
+            try {
+                // Cargar dispositivos
+                val devicesResponse = apiService.getDevices()
+                if (devicesResponse.isSuccessful) {
+                    val devices = devicesResponse.body()?.devices ?: emptyList()
+                    val currentState = _uiState.value ?: AdminPanelUiState()
+                    _uiState.value = currentState.copy(devices = devices)
+                    
+                    // Extraer source apps únicas de las notificaciones actuales
+                    val sourceAppsSet = mutableSetOf<String>()
+                    currentState.notifications.forEach { notification ->
+                        notification.sourceApp?.let { sourceAppsSet.add(it) }
+                    }
+                    _uiState.value = _uiState.value?.copy(sourceApps = sourceAppsSet.toList().sorted())
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Error loading filter options")
+            }
+        }
     }
 
     fun loadNotifications(refresh: Boolean = false) {
@@ -110,8 +139,17 @@ class AdminPanelViewModel @Inject constructor(
                         currentState.notifications + paginatedResponse.data
                     }
 
+                    val currentState = _uiState.value ?: AdminPanelUiState()
+                    // Actualizar source apps únicas de las notificaciones
+                    val sourceAppsSet = mutableSetOf<String>()
+                    newNotifications.forEach { notification ->
+                        notification.sourceApp?.let { sourceAppsSet.add(it) }
+                    }
+                    
                     _uiState.value = AdminPanelUiState(
                         notifications = newNotifications,
+                        devices = currentState.devices,
+                        sourceApps = sourceAppsSet.toList().sorted(),
                         loading = false,
                         hasMore = paginatedResponse.currentPage < paginatedResponse.lastPage,
                         currentPage = paginatedResponse.currentPage,
@@ -259,6 +297,21 @@ class AdminPanelViewModel @Inject constructor(
     fun getTodayDateFilter(): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         return sdf.format(Date())
+    }
+
+    fun getDateRangeFilter(days: Int): Pair<String, String> {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val endDate = Date()
+        val startDate = Calendar.getInstance().apply {
+            time = endDate
+            add(Calendar.DAY_OF_YEAR, -days)
+        }.time
+        return Pair(sdf.format(startDate), sdf.format(endDate))
+    }
+
+    fun clearAllFilters() {
+        currentFilters.clear()
+        refresh()
     }
 
     /**

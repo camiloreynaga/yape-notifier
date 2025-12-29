@@ -151,15 +151,20 @@ class AdminPanelActivity : AppCompatActivity() {
     }
 
     private fun setupFilters() {
+        binding.chipGroup.removeAllViews()
+        
         // "Todos" filter (default)
         val chipAll = Chip(this).apply {
             text = getString(R.string.filter_all)
             isChecked = true
             setOnCheckedChangeListener { _, isChecked ->
                 if (isChecked) {
-                    viewModel.setFilter("device_id", null)
-                    viewModel.setFilter("source_app", null)
-                    viewModel.setFilter("start_date", null)
+                    viewModel.clearAllFilters()
+                    // Uncheck other chips
+                    for (i in 0 until binding.chipGroup.childCount) {
+                        val chip = binding.chipGroup.getChildAt(i) as? Chip
+                        if (chip != this) chip?.isChecked = false
+                    }
                 }
             }
         }
@@ -176,6 +181,43 @@ class AdminPanelActivity : AppCompatActivity() {
             }
         }
         binding.chipGroup.addView(chipToday)
+
+        // "Pendientes" filter
+        val chipPending = Chip(this).apply {
+            text = getString(R.string.filter_pending)
+            setOnCheckedChangeListener { _, isChecked ->
+                if (isChecked) {
+                    viewModel.setFilter("status", "pending")
+                    chipAll.isChecked = false
+                } else {
+                    viewModel.setFilter("status", null)
+                }
+            }
+        }
+        binding.chipGroup.addView(chipPending)
+
+        // "Últimos 7 días" filter
+        val chipLast7Days = Chip(this).apply {
+            text = getString(R.string.filter_last_7_days)
+            setOnCheckedChangeListener { _, isChecked ->
+                if (isChecked) {
+                    val (startDate, endDate) = viewModel.getDateRangeFilter(7)
+                    viewModel.setFilter("start_date", startDate)
+                    viewModel.setFilter("end_date", endDate)
+                    chipAll.isChecked = false
+                } else {
+                    viewModel.setFilter("start_date", null)
+                    viewModel.setFilter("end_date", null)
+                }
+            }
+        }
+        binding.chipGroup.addView(chipLast7Days)
+
+        // Observer para actualizar filtros cuando cambian los datos
+        viewModel.uiState.observe(this) { state ->
+            // Si hay dispositivos o apps disponibles, se pueden agregar filtros dinámicos
+            // Por ahora, los filtros básicos están implementados
+        }
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {

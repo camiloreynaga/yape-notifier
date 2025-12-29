@@ -45,18 +45,19 @@ class DeviceAdapter(
                 // Device name
                 tvDeviceName.text = device.name
 
-                // Status badge (Online/Offline)
-                val isOnline = isDeviceOnline(device.lastSeenAt)
+                // Status badge (Online/Offline) - Use last_heartbeat for connection status
+                val isOnline = isDeviceOnline(device)
                 if (isOnline) {
-                    tvStatus.text = "Online"
+                    tvStatus.text = "En línea"
                     tvStatus.setBackgroundResource(com.yapenotifier.android.R.drawable.bg_badge_online)
                 } else {
-                    tvStatus.text = "Offline"
+                    tvStatus.text = "Desconectado"
                     tvStatus.setBackgroundResource(com.yapenotifier.android.R.drawable.bg_badge_offline)
                 }
 
-                // Last activity
-                tvLastActivity.text = formatLastActivity(device.lastSeenAt)
+                // Last activity - Use last_heartbeat if available, otherwise last_seen_at
+                val lastActivity = device.lastHeartbeat ?: device.lastSeenAt
+                tvLastActivity.text = formatLastActivity(lastActivity)
 
                 // Expand/collapse
                 val isExpanded = expandedDevices.contains(device.id)
@@ -135,13 +136,22 @@ class DeviceAdapter(
             }
         }
 
-        private fun isDeviceOnline(lastSeenAt: String?): Boolean {
-            if (lastSeenAt == null) return false
+        private fun isDeviceOnline(device: Device): Boolean {
+            // Use last_heartbeat instead of last_seen_at for connection status
+            // Device is online if last_heartbeat is within 5 minutes
+            val lastHeartbeat = device.lastHeartbeat ?: return false
             return try {
-                val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-                val lastSeen = sdf.parse(lastSeenAt) ?: return false
+                // Parse ISO 8601 format or standard format
+                val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+                val sdf2 = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+                val lastHeartbeatDate = try {
+                    sdf.parse(lastHeartbeat)
+                } catch (e: Exception) {
+                    sdf2.parse(lastHeartbeat)
+                } ?: return false
+                
                 val now = Date()
-                val diff = now.time - lastSeen.time
+                val diff = now.time - lastHeartbeatDate.time
                 diff < 5 * 60 * 1000 // 5 minutes
             } catch (e: Exception) {
                 false
@@ -172,7 +182,7 @@ class DeviceAdapter(
             if (device.batteryLevel != null && device.batteryLevel < 20) issues++
             if (device.notificationPermissionEnabled == false) issues++
             if (device.batteryOptimizationDisabled == false) issues++
-            if (!isDeviceOnline(device.lastSeenAt)) issues++
+            if (!isDeviceOnline(device)) issues++
 
             return when {
                 issues == 0 -> Pair("OK", com.yapenotifier.android.R.drawable.bg_badge_success)

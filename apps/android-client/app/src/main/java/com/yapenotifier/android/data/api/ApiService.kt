@@ -27,6 +27,7 @@ import com.yapenotifier.android.data.model.LinkCodeGenerateResponse
 import com.yapenotifier.android.data.model.DevicesResponse
 import com.yapenotifier.android.data.model.MonitorPackage
 import com.yapenotifier.android.data.model.MonitorPackagesResponse
+import com.yapenotifier.android.data.model.NotificationStatistics
 import com.yapenotifier.android.data.model.User
 import retrofit2.Response
 import retrofit2.http.Body
@@ -165,4 +166,32 @@ interface ApiService {
         @Path("id") id: Long,
         @Body request: Map<String, Boolean>
     ): Response<MonitorPackage>
+
+    @POST("api/monitor-packages")
+    suspend fun createMonitorPackage(@Body request: Map<String, Any>): Response<MonitorPackage>
+
+    @PUT("api/monitor-packages/{id}")
+    suspend fun updateMonitorPackage(
+        @Path("id") id: Long,
+        @Body request: Map<String, Any>
+    ): Response<MonitorPackage>
+
+    @DELETE("api/monitor-packages/{id}")
+    suspend fun deleteMonitorPackage(@Path("id") id: Long): Response<Unit>
+
+    @POST("api/monitor-packages/bulk-create")
+    suspend fun bulkCreateMonitorPackages(@Body request: Map<String, Any>): Response<List<MonitorPackage>>
+
+    // --- Statistics ---
+    @GET("api/notifications/statistics")
+    suspend fun getNotificationStatistics(
+        @Query("start_date") startDate: String? = null,
+        @Query("end_date") endDate: String? = null
+    ): Response<NotificationStatistics>
+
+    // --- App Instances (Admin) ---
+    @GET("api/app-instances")
+    suspend fun getAppInstances(
+        @Query("device_id") deviceId: Long? = null
+    ): Response<AppInstancesResponse>
 }
