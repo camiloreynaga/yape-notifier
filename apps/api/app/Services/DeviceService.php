@@ -120,16 +120,60 @@ class DeviceService
 
     /**
      * Find device by UUID and user.
-     * Automatically syncs commerce_id if device doesn't have one but user does.
+     * 
+     * Professional Architecture Approach:
+     * - Devices can be linked without user_id (flexible UX for capturer mode)
+     * - UUID is the primary identifier - if device exists, use it
+     * - Multi-tenant security: device commerce_id must match user commerce_id (if both exist)
+     * - Auto-sync user_id if device doesn't have one but user is authenticated
+     * - Auto-sync commerce_id ONLY if device doesn't have one (device's commerce_id takes priority)
+     * - This ensures devices linked via QR code work correctly while maintaining security
+     * 
+     * Security Rules:
+     * 1. If device has commerce_id AND user has commerce_id → must match (multi-tenant security)
+     * 2. If device has commerce_id but user doesn't → allow (device was linked via QR)
+     * 3. If device doesn't have commerce_id but user does → sync (safe operation)
+     * 4. If neither has commerce_id → allow (edge case, will be handled later)
      */
     public function findDeviceByUuid(User $user, string $uuid): ?Device
     {
-        $device = Device::where('user_id', $user->id)
-            ->where('uuid', $uuid)
-            ->first();
+        // Find device by UUID (UUID is the primary identifier)
+        $device = Device::where('uuid', $uuid)->first();
 
-        // Auto-sync commerce_id if device doesn't have one but user does
-        if ($device && !$device->commerce_id && $user->commerce_id) {
+        if (!$device) {
+            return null;
+        }
+
+        // Multi-tenant security validation
+        // If both device and user have commerce_id, they must match
+        if ($device->commerce_id && $user->commerce_id) {
+            if ($device->commerce_id !== $user->commerce_id) {
+                // Security violation: device belongs to different commerce
+                Log::warning('Device commerce_id mismatch - multi-tenant security violation', [
+                    'device_id' => $device->id,
+                    'device_uuid' => $uuid,
+                    'device_commerce_id' => $device->commerce_id,
+                    'user_id' => $user->id,
+                    'user_commerce_id' => $user->commerce_id,
+                ]);
+                return null; // Reject for security
+            }
+        }
+
+        // Auto-sync user_id if device doesn't have one but user is authenticated
+        // This allows devices linked without auth to be associated with authenticated users
+        if (!$device->user_id && $user->id) {
+            $device->update(['user_id' => $user->id]);
+            Log::info('Device user_id auto-synced from authenticated user', [
+                'device_id' => $device->id,
+                'user_id' => $user->id,
+            ]);
+        }
+
+        // Auto-sync commerce_id ONLY if device doesn't have one
+        // If device has commerce_id (from QR link), it takes priority (already validated above)
+        // This ensures devices linked via QR code work correctly
+        if (!$device->commerce_id && $user->commerce_id) {
             $device->update(['commerce_id' => $user->commerce_id]);
             
             Log::info('Device commerce_id auto-synced from user', [
@@ -138,7 +182,7 @@ class DeviceService
             ]);
         }
 
-        return $device;
+        return $device->fresh();
     }
 
     /**

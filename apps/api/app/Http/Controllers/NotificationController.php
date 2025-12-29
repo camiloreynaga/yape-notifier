@@ -60,9 +60,18 @@ class NotificationController extends Controller
             $device = $this->deviceService->findDeviceByUuid($user, $deviceUuid);
 
             if (! $device) {
+                // Log detailed information for debugging
+                $deviceExists = \App\Models\Device::where('uuid', $deviceUuid)->exists();
+                $deviceInfo = \App\Models\Device::where('uuid', $deviceUuid)->first();
+                
                 Log::warning('Device not found for notification', [
                     'user_id' => $user->id,
+                    'user_commerce_id' => $user->commerce_id,
                     'device_uuid' => $deviceUuid,
+                    'device_exists' => $deviceExists,
+                    'device_user_id' => $deviceInfo?->user_id,
+                    'device_commerce_id' => $deviceInfo?->commerce_id,
+                    'device_is_active' => $deviceInfo?->is_active,
                 ]);
 
                 return response()->json([
@@ -81,13 +90,22 @@ class NotificationController extends Controller
                 ], 403);
             }
 
-            // Ensure device has commerce_id
-            if (!$device->commerce_id && $user->commerce_id) {
-                $device->update(['commerce_id' => $user->commerce_id]);
-                Log::info('Device commerce_id updated from user', [
+            // Note: Device commerce_id is already synced by findDeviceByUuid if needed
+            // This ensures device has commerce_id for notification creation
+            // The device's commerce_id (from QR link) takes priority over user's commerce_id
+            if (!$device->commerce_id) {
+                // This should not happen if findDeviceByUuid worked correctly
+                // But we add this as a safety check
+                Log::error('Device has no commerce_id after findDeviceByUuid', [
                     'device_id' => $device->id,
-                    'commerce_id' => $user->commerce_id,
+                    'user_id' => $user->id,
+                    'user_commerce_id' => $user->commerce_id,
                 ]);
+                
+                return response()->json([
+                    'message' => 'Device configuration error. Please re-link your device.',
+                    'error' => 'device_commerce_missing',
+                ], 500);
             }
 
             $notification = $this->notificationService->createNotification(
