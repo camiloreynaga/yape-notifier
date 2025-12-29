@@ -54,6 +54,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('monitor-packages', MonitorPackageController::class);
     Route::post('/monitor-packages/{id}/toggle-status', [MonitorPackageController::class, 'toggleStatus']);
     Route::post('/monitor-packages/bulk-create', [MonitorPackageController::class, 'bulkCreate']);
+    Route::get('/monitor-packages/detected', [MonitorPackageController::class, 'getDetectedPackages']);
 
     // App Instance routes (for dual apps management)
     Route::get('/app-instances', [AppInstanceController::class, 'index']);

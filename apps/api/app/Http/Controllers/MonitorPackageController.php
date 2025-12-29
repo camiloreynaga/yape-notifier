@@ -245,5 +245,45 @@ class MonitorPackageController extends Controller
             'packages' => $packages,
         ], 201);
     }
+
+    /**
+     * Get detected packages from notifications and app instances.
+     * Returns packages that are being used but not yet configured as MonitorPackages.
+     */
+    public function getDetectedPackages(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        
+        if (!$user->commerce_id) {
+            return response()->json([
+                'detected_packages' => [],
+            ]);
+        }
+
+        $undetected = $this->monitorPackageService->getUndetectedPackages($user->commerce_id);
+        
+        // Get additional info from notifications/app instances
+        $packagesWithInfo = [];
+        foreach ($undetected as $packageName) {
+            // Try to get app name from notifications
+            $notification = \App\Models\Notification::where('package_name', $packageName)
+                ->where('commerce_id', $user->commerce_id)
+                ->whereNotNull('source_app')
+                ->first();
+            
+            $packagesWithInfo[] = [
+                'package_name' => $packageName,
+                'app_name' => $notification?->source_app ?? $packageName,
+                'detected_from' => 'notifications', // or 'app_instances'
+                'notification_count' => \App\Models\Notification::where('package_name', $packageName)
+                    ->where('commerce_id', $user->commerce_id)
+                    ->count(),
+            ];
+        }
+
+        return response()->json([
+            'detected_packages' => $packagesWithInfo,
+        ]);
+    }
 }
 

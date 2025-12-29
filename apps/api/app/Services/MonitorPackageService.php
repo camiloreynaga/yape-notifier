@@ -91,25 +91,96 @@ class MonitorPackageService
     /**
      * Bulk create packages from an array of package names.
      */
-    public function bulkCreatePackages(array $packageNames): Collection
+    public function bulkCreatePackages(array $packageNames, ?int $commerceId = null): Collection
     {
         $packages = collect();
 
         foreach ($packageNames as $packageName) {
-            // Skip if already exists
-            if (MonitorPackage::where('package_name', $packageName)->exists()) {
+            // Skip if already exists for this commerce
+            $query = MonitorPackage::where('package_name', $packageName);
+            if ($commerceId) {
+                $query->where('commerce_id', $commerceId);
+            }
+            if ($query->exists()) {
                 continue;
             }
 
             $packages->push(
                 MonitorPackage::create([
                     'package_name' => $packageName,
+                    'commerce_id' => $commerceId,
                     'is_active' => true,
                 ])
             );
         }
 
         return $packages;
+    }
+
+    /**
+     * Get detected package names from notifications for a commerce.
+     * Returns unique package names that have sent notifications.
+     */
+    public function getDetectedPackagesFromNotifications(?int $commerceId = null): array
+    {
+        $query = \App\Models\Notification::query()
+            ->whereNotNull('package_name')
+            ->where('package_name', '!=', '');
+
+        if ($commerceId) {
+            $query->where('commerce_id', $commerceId);
+        }
+
+        return $query
+            ->distinct()
+            ->pluck('package_name')
+            ->toArray();
+    }
+
+    /**
+     * Get detected package names from app instances for a commerce.
+     * Returns unique package names from app instances.
+     */
+    public function getDetectedPackagesFromAppInstances(?int $commerceId = null): array
+    {
+        $query = \App\Models\AppInstance::query()
+            ->whereNotNull('package_name')
+            ->where('package_name', '!=', '');
+
+        if ($commerceId) {
+            $query->where('commerce_id', $commerceId);
+        }
+
+        return $query
+            ->distinct()
+            ->pluck('package_name')
+            ->toArray();
+    }
+
+    /**
+     * Get all detected packages (from notifications and app instances) for a commerce.
+     * Returns packages that are not yet in MonitorPackage list.
+     */
+    public function getUndetectedPackages(?int $commerceId = null): array
+    {
+        // Get packages from notifications
+        $fromNotifications = $this->getDetectedPackagesFromNotifications($commerceId);
+        
+        // Get packages from app instances
+        $fromAppInstances = $this->getDetectedPackagesFromAppInstances($commerceId);
+        
+        // Merge and get unique
+        $allDetected = array_unique(array_merge($fromNotifications, $fromAppInstances));
+        
+        // Get existing monitor packages for this commerce
+        $existingQuery = MonitorPackage::query();
+        if ($commerceId) {
+            $existingQuery->where('commerce_id', $commerceId);
+        }
+        $existing = $existingQuery->pluck('package_name')->toArray();
+        
+        // Return only packages that are not yet configured
+        return array_values(array_diff($allDetected, $existing));
     }
 }
 
