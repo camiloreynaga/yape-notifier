@@ -40,11 +40,6 @@ export default function NotificationsPage() {
     onNewNotification: handleNewNotification,
   });
 
-  useEffect(() => {
-    loadDevices();
-    loadAppInstances();
-  }, [loadDevices, loadAppInstances]);
-
   const loadDevices = useCallback(async () => {
     try {
       const deviceList = await apiService.getDevices();
@@ -64,6 +59,11 @@ export default function NotificationsPage() {
       // No mostrar toast para errores silenciosos de carga inicial
     }
   }, []);
+
+  useEffect(() => {
+    loadDevices();
+    loadAppInstances();
+  }, [loadDevices, loadAppInstances]);
 
   const handleFilterChange = (key: keyof NotificationFilters, value: string | number | boolean | undefined) => {
     setFilters({ ...filters, [key]: value, page: 1 });

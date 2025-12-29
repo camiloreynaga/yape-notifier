@@ -48,7 +48,6 @@ export default function MonitoredAppsPage() {
     detected_from: string;
     notification_count: number;
   }>>([]);
-  const [loadingDetected, setLoadingDetected] = useState(false);
 
   const isAdmin = user?.role === 'admin';
 
@@ -66,15 +65,12 @@ export default function MonitoredAppsPage() {
   }, [showActiveOnly, toast]);
 
   const loadDetectedPackages = useCallback(async () => {
-    setLoadingDetected(true);
     try {
       const detected = await apiService.getDetectedPackages();
       setDetectedPackages(detected);
     } catch (error) {
       logger.error('Error loading detected packages', error as Error, { source: 'MonitoredAppsPage' });
       // Error silencioso, no mostrar toast
-    } finally {
-      setLoadingDetected(false);
     }
   }, []);
 
