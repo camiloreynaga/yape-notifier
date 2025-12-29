@@ -23,7 +23,7 @@ import {
 
 export default function MonitoredAppsPage() {
   const { user } = useAuth();
-  const toast = useToast();
+  const { showError, showSuccess } = useToast();
   const [packages, setPackages] = useState<MonitorPackage[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -58,11 +58,11 @@ export default function MonitoredAppsPage() {
       setPackages(packagesData);
     } catch (error) {
       logger.error('Error loading monitor packages', error as Error, { source: 'MonitoredAppsPage' });
-      toast.showError('Error al cargar apps monitoreadas');
+      showError('Error al cargar apps monitoreadas');
     } finally {
       setLoading(false);
     }
-  }, [showActiveOnly, toast]);
+  }, [showActiveOnly, showError]);
 
   const loadDetectedPackages = useCallback(async () => {
     try {
@@ -117,7 +117,7 @@ export default function MonitoredAppsPage() {
       setShowModal(false);
       loadPackages();
       loadDetectedPackages(); // Recargar apps detectadas
-      toast.showSuccess(editingPackage ? 'Paquete actualizado correctamente' : 'Paquete creado correctamente');
+      showSuccess(editingPackage ? 'Paquete actualizado correctamente' : 'Paquete creado correctamente');
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } };
       const errorMessage =
@@ -141,11 +141,11 @@ export default function MonitoredAppsPage() {
     try {
       await apiService.deleteMonitorPackage(id);
       loadPackages();
-      toast.showSuccess('Paquete eliminado correctamente');
+      showSuccess('Paquete eliminado correctamente');
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       logger.error('Error deleting monitor package', error as Error, { packageId: id });
-      toast.showError(err.response?.data?.message || 'Error al eliminar paquete');
+      showError(err.response?.data?.message || 'Error al eliminar paquete');
     }
   };
 
@@ -153,11 +153,11 @@ export default function MonitoredAppsPage() {
     try {
       await apiService.toggleMonitorPackageStatus(pkg.id, !pkg.is_active);
       loadPackages();
-      toast.showSuccess(`Paquete ${!pkg.is_active ? 'activado' : 'desactivado'} correctamente`);
+      showSuccess(`Paquete ${!pkg.is_active ? 'activado' : 'desactivado'} correctamente`);
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       logger.error('Error toggling monitor package status', error as Error, { packageId: pkg.id });
-      toast.showError(err.response?.data?.message || 'Error al cambiar estado');
+      showError(err.response?.data?.message || 'Error al cambiar estado');
     }
   };
 
@@ -181,7 +181,7 @@ export default function MonitoredAppsPage() {
       const result = await apiService.bulkCreateMonitorPackages(packageNames);
       setShowBulkModal(false);
       setBulkPackages('');
-      toast.showSuccess(`Se crearon ${result.created_count} packages exitosamente`);
+      showSuccess(`Se crearon ${result.created_count} packages exitosamente`);
       loadPackages();
       loadDetectedPackages();
     } catch (err: unknown) {
@@ -375,7 +375,7 @@ export default function MonitoredAppsPage() {
                     loadDetectedPackages();
                   } catch (error) {
                     logger.error('Error adding detected packages', error as Error, { source: 'MonitoredAppsPage' });
-                    toast.showError('Error al agregar apps detectadas');
+                    showError('Error al agregar apps detectadas');
                   }
                 }}
                 className="btn btn-primary text-sm"
@@ -422,7 +422,7 @@ export default function MonitoredAppsPage() {
                           loadDetectedPackages();
                         } catch (error) {
                           logger.error('Error adding detected app', error as Error, { packageName: detected.package_name });
-                          toast.showError('Error al agregar app');
+                          showError('Error al agregar app');
                         }
                       }}
                       className="ml-2 btn btn-sm btn-primary flex-shrink-0"
