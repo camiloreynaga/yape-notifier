@@ -120,7 +120,7 @@
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:src="@drawable/ic_chevron_right"
-                        android:tint="#757575"
+                        app:tint="#757575"
                         android:contentDescription="Chevron" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -185,27 +185,23 @@
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:src="@drawable/ic_chevron_right"
-                        android:tint="#757575"
+                        app:tint="#757575"
                         android:contentDescription="Chevron" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Help Link -->
             <TextView
                 android:id="@+id/tvHelp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="32dp"
-                android:text="¿Necesitas ayuda para configurar?"
-                android:textSize="14sp"
+                android:layout_marginTop="24dp"
+                android:gravity="center"
+                android:text="@string/need_help"
                 android:textColor="#757575"
-                android:clickable="true"
-                android:focusable="true"
-                android:foreground="?attr/selectableItemBackground"
-                android:padding="8dp"
+                android:textSize="14sp"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/cardCapturer" />
+                app:layout_constraintTop_toBottomOf="@+id/cardCapturer" />
 
             <!-- Version Info -->
             <TextView
@@ -224,4 +220,3 @@
         </androidx.constraintlayout.widget.ConstraintLayout>
     </ScrollView>
 </androidx.constraintlayout.widget.ConstraintLayout>
-

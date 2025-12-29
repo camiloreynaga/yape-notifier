@@ -30,6 +30,32 @@ class MainViewModel @Inject constructor(
         _statusMessage.value = null
     }
 
+    /**
+     * Unlink device - clears device linking data but preserves login if exists.
+     * This makes sense for capturer mode where login is optional but device linking is required.
+     */
+    fun unlinkDevice() {
+        viewModelScope.launch {
+            try {
+                // Only clear device-related data, not auth token/user email
+                // This allows the device to be re-linked without losing login session
+                preferencesManager.clearDeviceId()
+                preferencesManager.clearCommerceId()
+                
+                Timber.tag("MainViewModel").d("Device unlinked successfully")
+            } catch (e: Exception) {
+                Timber.tag("MainViewModel").e(e, "Error unlinking device")
+            }
+            
+            // Notify the UI that unlink is complete
+            _logoutComplete.value = true
+        }
+    }
+    
+    /**
+     * Full logout - clears all data including auth token.
+     * Use this only if user explicitly wants to logout (not common in capturer mode).
+     */
     fun logout() {
         viewModelScope.launch {
             try {

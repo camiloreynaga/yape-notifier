@@ -5,29 +5,46 @@ import androidx.work.Constraints
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.yapenotifier.android.data.local.PreferencesManager
 import com.yapenotifier.android.worker.DeviceHealthWorker
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
 
 object DeviceHealthWorkerHelper {
-    private const val TAG = "DeviceHealthWorkerHelper"
-    private const val REPEAT_INTERVAL_MINUTES = 15L
+    private const val TAG = "DeviceHealthWorker"
 
     /**
      * Schedules a periodic work request for device health reporting.
-     * The worker will run every 15 minutes (or the configured interval) when network is available.
+     * The worker will run at the configured interval (default: 15 minutes) when network is available.
      * 
-     * Professional approach: Uses enqueueUniquePeriodicWork to prevent duplicate workers
-     * and ensures only one periodic worker is active at a time.
+     * Professional approach:
+     * - Uses configured heartbeat interval from PreferencesManager
+     * - Falls back to default if not configured
+     * - Uses enqueueUniquePeriodicWork to prevent duplicate workers
+     * - Ensures only one periodic worker is active at a time
+     * - Validates interval is within acceptable range
      */
     fun scheduleDeviceHealthWorker(context: Context) {
         try {
+            val preferencesManager = PreferencesManager(context)
+            val intervalMinutes = runBlocking {
+                preferencesManager.heartbeatIntervalMinutes.first()
+            }
+            
+            // Validate interval is within acceptable range
+            val validInterval = intervalMinutes.coerceIn(
+                PreferencesManager.MIN_HEARTBEAT_INTERVAL_MINUTES,
+                PreferencesManager.MAX_HEARTBEAT_INTERVAL_MINUTES
+            )
+
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build()
 
             val periodicWorkRequest = PeriodicWorkRequestBuilder<DeviceHealthWorker>(
-                REPEAT_INTERVAL_MINUTES,
+                validInterval.toLong(),
                 TimeUnit.MINUTES
             )
                 .setConstraints(constraints)
@@ -36,14 +53,14 @@ object DeviceHealthWorkerHelper {
 
             val workManager = WorkManager.getInstance(context)
             // Use enqueueUniquePeriodicWork to prevent duplicate workers
-            // KEEP policy: if worker already exists, keep the existing one
+            // REPLACE policy: replace existing worker with new interval if configuration changed
             workManager.enqueueUniquePeriodicWork(
                 DeviceHealthWorker.WORK_NAME,
-                androidx.work.ExistingPeriodicWorkPolicy.KEEP,
+                androidx.work.ExistingPeriodicWorkPolicy.REPLACE,
                 periodicWorkRequest
             )
 
-            Timber.tag(TAG).i("Device health worker scheduled to run every $REPEAT_INTERVAL_MINUTES minutes")
+            Timber.tag(TAG).i("Device health worker scheduled to run every $validInterval minutes")
         } catch (e: Exception) {
             Timber.tag(TAG).e(e, "Error scheduling device health worker")
         }
@@ -86,4 +103,3 @@ object DeviceHealthWorkerHelper {
         }
     }
 }
-

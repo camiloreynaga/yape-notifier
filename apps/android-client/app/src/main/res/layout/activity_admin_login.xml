@@ -97,13 +97,17 @@
                         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                         app:startIconDrawable="@drawable/ic_person"
                         app:boxBackgroundMode="filled"
-                        app:boxBackgroundColor="#F5F5F5">
+                        app:boxBackgroundColor="#F5F5F5"
+                        app:hintTextColor="#757575"
+                        app:boxStrokeColor="#6200EE">
 
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/etEmailOrPhone"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:inputType="text"
+                            android:textColor="#212121"
+                            android:textColorHint="#9E9E9E"
                             android:autofillHints="email" />
                     </com.google.android.material.textfield.TextInputLayout>
 
@@ -129,13 +133,17 @@
                         app:passwordToggleEnabled="true"
                         app:startIconDrawable="@drawable/ic_lock"
                         app:boxBackgroundMode="filled"
-                        app:boxBackgroundColor="#F5F5F5">
+                        app:boxBackgroundColor="#F5F5F5"
+                        app:hintTextColor="#757575"
+                        app:boxStrokeColor="#6200EE">
 
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/etPassword"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:inputType="textPassword"
+                            android:textColor="#212121"
+                            android:textColorHint="#9E9E9E"
                             android:autofillHints="password" />
                     </com.google.android.material.textfield.TextInputLayout>
 

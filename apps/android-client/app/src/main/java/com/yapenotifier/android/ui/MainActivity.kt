@@ -97,7 +97,7 @@ class MainActivity : AppCompatActivity() {
 
         viewModel.logoutComplete.observe(this) { isComplete ->
             if (isComplete) {
-                navigateToLogin()
+                navigateToLinkDevice()
             }
         }
 
@@ -199,9 +199,9 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnLogout.setOnClickListener {
             AlertDialog.Builder(this)
-                .setTitle("Cerrar Sesión")
-                .setMessage("¿Estás seguro de que quieres cerrar sesión?")
-                .setPositiveButton("Aceptar") { _, _ -> viewModel.logout() }
+                .setTitle("Desvincular Dispositivo")
+                .setMessage("¿Estás seguro de que quieres desvincular este dispositivo? Deberás volver a vincularlo con un código QR para continuar capturando notificaciones.")
+                .setPositiveButton("Desvincular") { _, _ -> viewModel.unlinkDevice() }
                 .setNegativeButton("Cancelar", null)
                 .show()
         }
@@ -276,8 +276,8 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun navigateToLogin() {
-        val intent = Intent(this, LoginActivity::class.java)
+    private fun navigateToLinkDevice() {
+        val intent = Intent(this, LinkDeviceActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
         finish()

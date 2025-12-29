@@ -170,7 +170,8 @@ object PaymentNotificationFilter {
      * @return FilterResult with validation result and reason if invalid
      */
     private fun validatePaymentStructure(text: String): FilterResult {
-        // Check for payment action keywords
+        // Check for payment action keywords -- THIS CHECK IS TOO STRICT AND IS BEING REMOVED
+        /*
         val paymentActions = listOf(
             "te envió", "te transferió", "te ha plineado", "te plineó",
             "recibiste", "pago recibido", "transferencia recibida"
@@ -182,6 +183,7 @@ object PaymentNotificationFilter {
         if (!hasPaymentAction) {
             return FilterResult(false, "Missing payment action (envió, transferió, plineado, etc.)")
         }
+        */
         
         // Check for amount pattern (S/ or $ followed by digits)
         val amountPattern = """(S/|\$)\s*(\d+(?:\.\d+)?)""".toRegex(RegexOption.IGNORE_CASE)
@@ -225,4 +227,3 @@ object PaymentNotificationFilter {
         return validatePaymentStructure(text).isValid
     }
 }
-

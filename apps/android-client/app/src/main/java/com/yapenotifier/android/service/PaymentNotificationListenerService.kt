@@ -1,10 +1,10 @@
 package com.yapenotifier.android.service
 
+import android.content.pm.PackageManager
 import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
-import androidx.annotation.RequiresApi
 import androidx.work.Constraints
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
@@ -75,7 +75,15 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         } else {
             null // Should not happen as minSdk is 24, but safe fallback
         }
-        val androidUid = sbn.uid // Optional UID
+        val androidUid = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            sbn.uid
+        } else {
+            try {
+                applicationContext.packageManager.getApplicationInfo(sbn.packageName, 0).uid
+            } catch (e: PackageManager.NameNotFoundException) {
+                -1 // Fallback value
+            }
+        }
         val postedAt = sbn.postTime // Original notification timestamp
 
         val paymentDetails = PaymentNotificationParser.parse(title, text)

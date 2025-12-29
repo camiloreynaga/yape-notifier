@@ -2,6 +2,8 @@ package com.yapenotifier.android.ui.admin
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.EditText
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -11,7 +13,9 @@ import com.yapenotifier.android.data.api.ApiService
 import com.yapenotifier.android.data.local.PreferencesManager
 import com.yapenotifier.android.ui.LoginActivity
 import com.yapenotifier.android.ui.MonitoredAppsSelectionActivity
+import com.yapenotifier.android.util.DeviceHealthWorkerHelper
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -35,6 +39,7 @@ class AdminSettingsActivity : AppCompatActivity() {
         setupToolbar()
         setupClickListeners()
         loadUserInfo()
+        loadHeartbeatInterval()
     }
 
     private fun setupToolbar() {
@@ -52,8 +57,88 @@ class AdminSettingsActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
+        binding.btnConfigureHeartbeat.setOnClickListener {
+            showHeartbeatIntervalDialog()
+        }
+
         binding.btnLogout.setOnClickListener {
             showLogoutDialog()
+        }
+    }
+
+    private fun loadHeartbeatInterval() {
+        lifecycleScope.launch {
+            val interval = preferencesManager.heartbeatIntervalMinutes.first()
+            binding.tvHeartbeatInterval.text = 
+                getString(R.string.heartbeat_interval_display, interval)
+        }
+    }
+
+    private fun showHeartbeatIntervalDialog() {
+        lifecycleScope.launch {
+            val currentInterval = preferencesManager.heartbeatIntervalMinutes.first()
+            
+            val input = EditText(this@AdminSettingsActivity).apply {
+                setHint("Minutos (${PreferencesManager.MIN_HEARTBEAT_INTERVAL_MINUTES}-${PreferencesManager.MAX_HEARTBEAT_INTERVAL_MINUTES})")
+                setText(currentInterval.toString())
+                inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            }
+
+            val message = getString(
+                R.string.heartbeat_interval_description,
+                PreferencesManager.MIN_HEARTBEAT_INTERVAL_MINUTES,
+                PreferencesManager.MAX_HEARTBEAT_INTERVAL_MINUTES
+            )
+
+            AlertDialog.Builder(this@AdminSettingsActivity)
+                .setTitle(getString(R.string.configure_heartbeat_interval))
+                .setMessage(message)
+                .setView(input)
+                .setPositiveButton(getString(R.string.save)) { _, _ ->
+                    val inputValue = input.text.toString().toIntOrNull()
+                    if (inputValue != null) {
+                        saveHeartbeatInterval(inputValue)
+                    } else {
+                        Toast.makeText(
+                            this@AdminSettingsActivity,
+                            getString(R.string.invalid_heartbeat_interval),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+                .setNegativeButton(getString(R.string.cancel), null)
+                .show()
+        }
+    }
+
+    private fun saveHeartbeatInterval(intervalMinutes: Int) {
+        lifecycleScope.launch {
+            val success = preferencesManager.saveHeartbeatInterval(intervalMinutes)
+            if (success) {
+                // Reschedule worker with new interval
+                DeviceHealthWorkerHelper.scheduleDeviceHealthWorker(this@AdminSettingsActivity)
+                
+                // Update UI
+                binding.tvHeartbeatInterval.text = 
+                    getString(R.string.heartbeat_interval_display, intervalMinutes)
+                
+                Toast.makeText(
+                    this@AdminSettingsActivity,
+                    getString(R.string.heartbeat_interval_saved, intervalMinutes),
+                    Toast.LENGTH_SHORT
+                ).show()
+            } else {
+                val errorMessage = getString(
+                    R.string.invalid_heartbeat_interval_range,
+                    PreferencesManager.MIN_HEARTBEAT_INTERVAL_MINUTES,
+                    PreferencesManager.MAX_HEARTBEAT_INTERVAL_MINUTES
+                )
+                Toast.makeText(
+                    this@AdminSettingsActivity,
+                    errorMessage,
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
     }
 

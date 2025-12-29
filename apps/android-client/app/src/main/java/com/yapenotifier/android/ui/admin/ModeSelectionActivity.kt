@@ -53,11 +53,6 @@ class ModeSelectionActivity : AppCompatActivity() {
             Timber.d("ModeSelection: Usuario seleccionó Modo Capturer")
             checkDeviceStatusAndNavigate()
         }
-
-        // Help link
-        binding.tvHelp.setOnClickListener {
-            // TODO: Open help/setup wizard
-        }
     }
     
     private fun checkDeviceStatusAndNavigate() {

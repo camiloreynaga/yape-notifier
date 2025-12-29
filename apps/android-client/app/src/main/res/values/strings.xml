@@ -22,6 +22,16 @@
     <string name="mark_all_as_read_toast">Todas las notificaciones marcadas como leídas</string>
     <string name="version_info">Versión %1$s • Conexión Segura</string>
 
+    <!-- Heartbeat Configuration -->
+    <string name="configure_heartbeat_interval">Configurar Intervalo de Heartbeat</string>
+    <string name="heartbeat_interval_description">Ingresa el intervalo en minutos (mínimo: %1$d, máximo: %2$d).\n\nEl heartbeat reporta el estado del dispositivo al servidor. Intervalos más cortos consumen más batería pero proporcionan información más precisa.</string>
+    <string name="heartbeat_interval_display">Intervalo de Heartbeat: %1$d minutos</string>
+    <string name="heartbeat_interval_saved">Intervalo de heartbeat configurado a %1$d minutos</string>
+    <string name="invalid_heartbeat_interval">Por favor, ingresa un número válido</string>
+    <string name="invalid_heartbeat_interval_range">El intervalo debe estar entre %1$d y %2$d minutos</string>
+    <string name="save">Guardar</string>
+    <string name="cancel">Cancelar</string>
+
     <!-- Admin Login -->
     <string name="admin_portal_title">Portal de Administrador</string>
     <string name="admin_portal_subtitle">Central de Pagos</string>
@@ -51,7 +61,6 @@ Contactar Soporte</string>
     <string name="step_2_description">Toca el botón + en la pantalla principal.</string>
     <string name="step_3_title">Escanea QR o Ingresa Código</string>
     <string name="step_3_description">Usa el código mostrado arriba para completar la vinculación.</string>
-    <string name="cancel">Cancelar</string>
     <string name="copy_code">Copiar código</string>
 
     <!-- LinkDeviceActivity -->
