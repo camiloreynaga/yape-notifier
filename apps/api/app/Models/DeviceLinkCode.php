@@ -55,7 +55,8 @@ class DeviceLinkCode extends Model
     }
 
     /**
-     * Generate a unique code (6-8 characters alphanumeric).
+     * Generate a unique code (8 characters alphanumeric).
+     * Format: 8 uppercase alphanumeric characters (A-Z, 0-9)
      *
      * @return string
      */

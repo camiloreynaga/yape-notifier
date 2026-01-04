@@ -40,12 +40,20 @@ class DeviceLinkController extends Controller
             }
 
             $linkCode = $this->deviceLinkService->generateLinkCode($user->commerce_id);
+            
+            // Get device alias from request if provided (for mobile admin app)
+            $deviceAlias = $request->input('device_alias', null);
 
             return response()->json([
                 'message' => 'Código de vinculación generado exitosamente',
                 'code' => $linkCode->code,
                 'expires_at' => $linkCode->expires_at->toIso8601String(),
-                'link_code' => $linkCode,
+                // For web compatibility: return code as string
+                'link_code' => $linkCode->code,
+                // QR code data: the code itself (string format for scanning)
+                'qr_code_data' => $linkCode->code,
+                // Device alias from request (optional, for mobile admin app)
+                'device_alias' => $deviceAlias,
             ], 201);
         } catch (\Exception $e) {
             Log::error('Failed to generate device link code', [
