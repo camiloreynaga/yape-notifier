@@ -14,10 +14,17 @@ class DeviceService
      * Create a new device for a user, or return existing device if UUID already exists.
      * Automatically assigns commerce_id from user if available.
      * 
-     * This implements "find or create" pattern based on UUID:
-     * - If device with UUID exists for this user, return existing device
-     * - If UUID doesn't exist, create new device
-     * - This ensures UUID uniqueness and prevents duplicate device creation
+     * Professional Architecture Approach - Handles QR Linking Flow:
+     * 1. Search by UUID first (primary identifier) - regardless of user_id
+     * 2. If device exists:
+     *    a. If device has no user_id → associate with current user (QR link scenario)
+     *    b. If device has different user_id → reject (security violation)
+     *    c. If device belongs to current user → update and return
+     * 3. If device doesn't exist → create new device
+     * 
+     * This prevents duplicate UUID errors when:
+     * - Device is linked via QR without authentication (user_id = null)
+     * - User logs in and tries to register the same device
      */
     public function createDevice(User $user, array $data): Device
     {
@@ -25,14 +32,68 @@ class DeviceService
         $user->refresh();
         $commerceId = $user->commerce_id ?? $data['commerce_id'] ?? null;
 
-        // If UUID is provided, check if device already exists
+        // If UUID is provided, check if device already exists (search by UUID only)
         if (isset($data['uuid']) && !empty($data['uuid'])) {
-            $existingDevice = Device::where('uuid', $data['uuid'])
-                ->where('user_id', $user->id)
-                ->first();
+            $existingDevice = Device::where('uuid', $data['uuid'])->first();
 
             if ($existingDevice) {
-                // Device already exists with this UUID for this user
+                // Device exists - handle different scenarios
+                
+                // Scenario 1: Device has no user_id (linked via QR without auth)
+                // → Associate with current user
+                if (!$existingDevice->user_id) {
+                    // Multi-tenant security: verify commerce_id compatibility
+                    if ($existingDevice->commerce_id && $commerceId && $existingDevice->commerce_id !== $commerceId) {
+                        Log::warning('Device commerce_id mismatch during user association', [
+                            'device_id' => $existingDevice->id,
+                            'device_commerce_id' => $existingDevice->commerce_id,
+                            'user_id' => $user->id,
+                            'user_commerce_id' => $commerceId,
+                        ]);
+                        
+                        throw new \RuntimeException(
+                            'Este dispositivo pertenece a otro negocio. No se puede vincular a tu cuenta.'
+                        );
+                    }
+                    
+                    // Associate device with user
+                    $updateData = ['user_id' => $user->id, 'last_seen_at' => now()];
+                    
+                    // Sync commerce_id if device doesn't have one but user does
+                    if (!$existingDevice->commerce_id && $commerceId) {
+                        $updateData['commerce_id'] = $commerceId;
+                    }
+                    
+                    $existingDevice->update($updateData);
+                    
+                    Log::info('Device associated with user after QR link', [
+                        'device_id' => $existingDevice->id,
+                        'uuid' => $data['uuid'],
+                        'user_id' => $user->id,
+                        'commerce_id' => $existingDevice->commerce_id,
+                    ]);
+                    
+                    return $existingDevice->fresh();
+                }
+                
+                // Scenario 2: Device belongs to a different user
+                // → Security violation - reject
+                if ($existingDevice->user_id !== $user->id) {
+                    Log::warning('Attempted to register device belonging to another user', [
+                        'device_id' => $existingDevice->id,
+                        'device_user_id' => $existingDevice->user_id,
+                        'requesting_user_id' => $user->id,
+                        'uuid' => $data['uuid'],
+                    ]);
+                    
+                    throw new \RuntimeException(
+                        'Este dispositivo ya está registrado con otra cuenta.'
+                    );
+                }
+                
+                // Scenario 3: Device already belongs to current user
+                // → Update and return
+                
                 // Update commerce_id if user has one and device doesn't
                 if (!$existingDevice->commerce_id && $commerceId) {
                     $existingDevice->update(['commerce_id' => $commerceId]);
@@ -191,6 +252,58 @@ class DeviceService
     public function toggleDeviceStatus(Device $device, bool $isActive): Device
     {
         $device->update(['is_active' => $isActive]);
+
+        return $device->fresh();
+    }
+
+    /**
+     * Unlink a device from its commerce.
+     * 
+     * Professional Architecture Approach (QR Authorization):
+     * - Clears commerce_id to allow re-linking to a different commerce
+     * - Also clears user_id to allow complete re-association
+     * - Preserves device UUID (physical device identifier)
+     * - Does NOT delete the device (maintains historical data)
+     * - Logs the operation for audit trail
+     * 
+     * Use cases:
+     * - Device needs to be transferred to another commerce
+     * - Device was linked to wrong commerce by mistake
+     * - Commerce wants to remove a device from their fleet
+     * - Device needs to be reset to "unlinked" state
+     * 
+     * Security:
+     * - Only the commerce admin can unlink devices from their commerce
+     * - Verified in controller layer (user must belong to device's commerce)
+     * 
+     * After unlinking:
+     * - Device can be re-linked via QR code to any commerce
+     * - Device cannot send notifications (no commerce_id)
+     * - Device UUID is preserved for re-linking
+     * 
+     * @param Device $device Device to unlink
+     * @return Device Updated device
+     */
+    public function unlinkDevice(Device $device): Device
+    {
+        $oldCommerceId = $device->commerce_id;
+        $oldUserId = $device->user_id;
+        
+        // Clear both commerce and user linkage to allow complete re-association
+        // This is the "reset to unlinked state" operation
+        $device->update([
+            'commerce_id' => null,
+            'user_id' => null, // Also clear user_id for complete reset
+            'is_active' => false, // Deactivate device for security
+            'last_seen_at' => now(),
+        ]);
+
+        Log::info('Device unlinked from commerce and user', [
+            'device_id' => $device->id,
+            'device_uuid' => $device->uuid,
+            'old_commerce_id' => $oldCommerceId,
+            'old_user_id' => $oldUserId,
+        ]);
 
         return $device->fresh();
     }

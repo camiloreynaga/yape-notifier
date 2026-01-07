@@ -94,4 +94,72 @@ class DeviceController extends Controller
             'device' => $device,
         ]);
     }
+
+    /**
+     * Unlink a device from its commerce.
+     * 
+     * Professional Architecture Approach (QR Authorization):
+     * - Allows device to be re-linked to a different commerce
+     * - Requires authentication and commerce ownership
+     * - Maintains audit trail via logging
+     * - Resets device to "unlinked" state (no commerce, no user)
+     * 
+     * Security:
+     * - User must be authenticated
+     * - User must belong to the device's commerce (commerce admin)
+     * - Device must exist
+     * - Operation is logged for audit
+     * 
+     * Use cases:
+     * - Transfer device to another commerce
+     * - Fix incorrect commerce linkage
+     * - Remove device from commerce fleet
+     * - Reset device to allow re-linking
+     * 
+     * POST /api/devices/{id}/unlink
+     */
+    public function unlink(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        
+        // Find device by ID
+        $device = Device::findOrFail($id);
+        
+        // Security validation: User must belong to device's commerce
+        // This ensures only commerce admins can unlink devices from their commerce
+        if (!$device->commerce_id) {
+            return response()->json([
+                'message' => 'Dispositivo ya está desvinculado',
+            ], 400);
+        }
+        
+        if ($device->commerce_id !== $user->commerce_id) {
+            Log::warning('Unauthorized unlink attempt', [
+                'user_id' => $user->id,
+                'user_commerce_id' => $user->commerce_id,
+                'device_id' => $device->id,
+                'device_commerce_id' => $device->commerce_id,
+            ]);
+            
+            return response()->json([
+                'message' => 'No tienes permiso para desvincular este dispositivo',
+            ], 403);
+        }
+
+        // Check if device is already unlinked
+        if (!$device->commerce_id) {
+            return response()->json([
+                'message' => 'El dispositivo ya está desvinculado',
+                'device' => $device,
+            ], 400);
+        }
+
+        // Unlink device
+        $device = $this->deviceService->unlinkDevice($device);
+
+        return response()->json([
+            'message' => 'Dispositivo desvinculado exitosamente. Ahora puede vincularse a otro negocio.',
+            'device' => $device,
+        ]);
+    }
 }

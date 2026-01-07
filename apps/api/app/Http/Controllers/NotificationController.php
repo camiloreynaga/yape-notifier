@@ -22,90 +22,79 @@ class NotificationController extends Controller
 
     /**
      * Create a new notification.
+     * 
+     * Professional Architecture Approach:
+     * - Authentication is OPTIONAL (device linking via QR is the authorization)
+     * - Device must have commerce_id (from QR linking)
+     * - Device UUID is the primary authorization mechanism
+     * - User association is optional (for traceability only)
+     * 
+     * This allows "capturer mode" where devices send notifications without user accounts.
+     * The QR code linking is the authorization - if device has commerce_id, it's authorized.
      */
     public function store(CreateNotificationRequest $request): JsonResponse
     {
         try {
-            $user = $request->user();
-            
-            if (!$user) {
-                Log::error('Notification creation attempted without authenticated user');
-                return response()->json([
-                    'message' => 'Authentication required',
-                ], 401);
-            }
-
+            $user = $request->user(); // Nullable - authentication is optional
             $deviceUuid = $request->input('device_id');
 
-            // Validate user has commerce (critical operation)
-            if (!$user->commerce_id) {
-                Log::warning('Notification creation attempted without commerce', [
-                    'user_id' => $user->id,
-                    'device_uuid' => $deviceUuid,
-                ]);
-
-                return response()->json([
-                    'message' => 'Debes pertenecer a un negocio para recibir notificaciones. Por favor, crea un negocio primero.',
-                    'error' => 'commerce_required',
-                ], 403);
-            }
-
             Log::info('Notification creation request received', [
-                'user_id' => $user->id,
+                'user_id' => $user?->id,
                 'device_uuid' => $deviceUuid,
-                'has_commerce' => !is_null($user->commerce_id),
+                'authenticated' => !is_null($user),
             ]);
 
-            // Find device by UUID
-            $device = $this->deviceService->findDeviceByUuid($user, $deviceUuid);
+            // Find device by UUID (primary authorization mechanism)
+            // If user is authenticated, verify device belongs to same commerce
+            // If user is NOT authenticated, just verify device exists and has commerce_id
+            if ($user) {
+                // Authenticated: use existing method with user validation
+                $device = $this->deviceService->findDeviceByUuid($user, $deviceUuid);
+            } else {
+                // Not authenticated: find device by UUID only
+                $device = \App\Models\Device::where('uuid', $deviceUuid)
+                    ->where('is_active', true)
+                    ->first();
+            }
 
             if (! $device) {
-                // Log detailed information for debugging
-                $deviceExists = \App\Models\Device::where('uuid', $deviceUuid)->exists();
-                $deviceInfo = \App\Models\Device::where('uuid', $deviceUuid)->first();
-                
                 Log::warning('Device not found for notification', [
-                    'user_id' => $user->id,
-                    'user_commerce_id' => $user->commerce_id,
+                    'user_id' => $user?->id,
                     'device_uuid' => $deviceUuid,
-                    'device_exists' => $deviceExists,
-                    'device_user_id' => $deviceInfo?->user_id,
-                    'device_commerce_id' => $deviceInfo?->commerce_id,
-                    'device_is_active' => $deviceInfo?->is_active,
+                    'authenticated' => !is_null($user),
                 ]);
 
                 return response()->json([
-                    'message' => 'Device not found',
+                    'message' => 'Dispositivo no encontrado. Por favor, vincula tu dispositivo con un código QR.',
+                    'error' => 'device_not_found',
                 ], 404);
+            }
+
+            // Critical validation: Device MUST have commerce_id (from QR linking)
+            // This is the authorization mechanism - QR linking authorizes the device
+            if (!$device->commerce_id) {
+                Log::error('Device has no commerce_id - not linked via QR', [
+                    'device_id' => $device->id,
+                    'device_uuid' => $deviceUuid,
+                    'user_id' => $user?->id,
+                ]);
+                
+                return response()->json([
+                    'message' => 'Dispositivo no vinculado. Por favor, escanea el código QR para vincular tu dispositivo a un negocio.',
+                    'error' => 'device_not_linked',
+                ], 403);
             }
 
             if (! $device->is_active) {
                 Log::warning('Inactive device attempted to create notification', [
-                    'user_id' => $user->id,
+                    'user_id' => $user?->id,
                     'device_id' => $device->id,
                 ]);
 
                 return response()->json([
-                    'message' => 'Device is not active',
+                    'message' => 'Dispositivo inactivo',
+                    'error' => 'device_inactive',
                 ], 403);
-            }
-
-            // Note: Device commerce_id is already synced by findDeviceByUuid if needed
-            // This ensures device has commerce_id for notification creation
-            // The device's commerce_id (from QR link) takes priority over user's commerce_id
-            if (!$device->commerce_id) {
-                // This should not happen if findDeviceByUuid worked correctly
-                // But we add this as a safety check
-                Log::error('Device has no commerce_id after findDeviceByUuid', [
-                    'device_id' => $device->id,
-                    'user_id' => $user->id,
-                    'user_commerce_id' => $user->commerce_id,
-                ]);
-                
-                return response()->json([
-                    'message' => 'Device configuration error. Please re-link your device.',
-                    'error' => 'device_commerce_missing',
-                ], 500);
             }
 
             $notification = $this->notificationService->createNotification(
@@ -115,9 +104,11 @@ class NotificationController extends Controller
 
             Log::info('Notification created successfully', [
                 'notification_id' => $notification->id,
-                'user_id' => $user->id,
+                'user_id' => $user?->id,
                 'device_id' => $device->id,
+                'commerce_id' => $device->commerce_id,
                 'is_duplicate' => $notification->is_duplicate,
+                'authenticated' => !is_null($user),
             ]);
 
             return response()->json([

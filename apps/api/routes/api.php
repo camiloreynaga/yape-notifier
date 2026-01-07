@@ -36,6 +36,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Device routes
     Route::apiResource('devices', DeviceController::class);
     Route::post('/devices/{id}/toggle-status', [DeviceController::class, 'toggleStatus']);
+    Route::post('/devices/{id}/unlink', [DeviceController::class, 'unlink']);
     Route::get('/devices/{id}/monitored-apps', [DeviceMonitoredAppController::class, 'index']);
     Route::post('/devices/{id}/monitored-apps', [DeviceMonitoredAppController::class, 'store']);
 
@@ -43,8 +44,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/devices/generate-link-code', [DeviceLinkController::class, 'generateLinkCode']);
     Route::get('/devices/link-codes', [DeviceLinkController::class, 'getActiveCodes']);
 
-    // Notification routes
-    Route::post('/notifications', [NotificationController::class, 'store']);
+    // Notification routes (admin/management - require authentication)
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::get('/notifications/statistics', [NotificationController::class, 'statistics']);
     Route::get('/notifications/{id}', [NotificationController::class, 'show']);
@@ -72,6 +72,12 @@ Route::middleware('auth:sanctum')->group(function () {
 // Devices can be linked without prior registration or authentication
 // If user is authenticated, device is associated with user for traceability
 Route::post('/devices/link-by-code', [DeviceLinkController::class, 'linkByCode']);
+
+// Public notification creation endpoint (authentication optional)
+// Professional Architecture: QR linking is the authorization mechanism
+// Devices with commerce_id (from QR) can send notifications without user authentication
+// This enables "capturer mode" where devices work without user accounts
+Route::post('/notifications', [NotificationController::class, 'store']);
 
 // Public device health endpoint (authentication optional)
 // Professional Architecture: Devices can report health without authentication
