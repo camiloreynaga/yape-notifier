@@ -60,7 +60,7 @@ log_info "Creando backup de base de datos..."
 
 BACKUP_FILE="backup_$(date +%Y%m%d_%H%M%S).sql"
 
-docker exec yape-notifier-postgres-prod pg_dump \
+docker exec yape-notifier-db-prod pg_dump \
     -U yapenotifier \
     -d yapenotifier_prod \
     > "$BACKUP_FILE"
@@ -97,7 +97,7 @@ fi
 # ============================================
 log_info "Verificando schema de devices..."
 
-SCHEMA=$(docker exec yape-notifier-postgres-prod psql -U yapenotifier -d yapenotifier_prod -t -c "\d devices" | grep -E "(user_id|commerce_id)")
+SCHEMA=$(docker exec yape-notifier-db-prod psql -U yapenotifier -d yapenotifier_prod -t -c "\d devices" | grep -E "(user_id|commerce_id)")
 
 if echo "$SCHEMA" | grep -q "user_id.*bigint"; then
     log_success "user_id está presente"
@@ -118,7 +118,7 @@ fi
 # ============================================
 log_info "Diagnosticando dispositivos..."
 
-DEVICE_STATS=$(docker exec yape-notifier-postgres-prod psql -U yapenotifier -d yapenotifier_prod -t -c "
+DEVICE_STATS=$(docker exec yape-notifier-db-prod psql -U yapenotifier -d yapenotifier_prod -t -c "
 SELECT 
     COUNT(*) as total,
     COUNT(commerce_id) as con_comercio,
@@ -159,7 +159,7 @@ if [ "$SIN_COMERCIO" -gt 0 ]; then
             log_info "Opción seleccionada: Migración proactiva"
             log_info "Sincronizando commerce_id de usuarios a dispositivos..."
             
-            UPDATED=$(docker exec yape-notifier-postgres-prod psql -U yapenotifier -d yapenotifier_prod -t -c "
+            UPDATED=$(docker exec yape-notifier-db-prod psql -U yapenotifier -d yapenotifier_prod -t -c "
 UPDATE devices d
 SET 
     commerce_id = u.commerce_id,
@@ -187,7 +187,7 @@ fi
 # ============================================
 log_info "Verificando estado final..."
 
-FINAL_STATS=$(docker exec yape-notifier-postgres-prod psql -U yapenotifier -d yapenotifier_prod -t -c "
+FINAL_STATS=$(docker exec yape-notifier-db-prod psql -U yapenotifier -d yapenotifier_prod -t -c "
 SELECT 
     COUNT(*) as total,
     COUNT(commerce_id) as con_comercio,
