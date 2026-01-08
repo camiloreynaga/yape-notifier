@@ -34,19 +34,13 @@ class NotificationService
      */
     public function createNotification(array $data, Device $device): Notification
     {
-        // Ensure user relationship is loaded
+        // Ensure user relationship is loaded (optional - for capturer mode)
         if (!$device->relationLoaded('user')) {
             $device->load('user');
         }
 
-        // Validate user exists
-        if (!$device->user) {
-            Log::error('Device has no associated user', [
-                'device_id' => $device->id,
-                'user_id' => $device->user_id,
-            ]);
-            throw new \RuntimeException('Device has no associated user');
-        }
+        // Note: user is OPTIONAL in capturer mode (device linked via QR without user account)
+        // The commerce_id from device is the authorization mechanism
 
         // Validate that this is a real payment notification (not publicity/promotion)
         $validation = PaymentNotificationValidator::isValid($data);
@@ -68,10 +62,11 @@ class NotificationService
         }
 
         // Ensure device has commerce_id (from device or user)
-        $commerceId = $device->commerce_id ?? $device->user->commerce_id;
+        // Professional approach: commerce_id can come from device (QR linking) or user
+        $commerceId = $device->commerce_id ?? $device->user?->commerce_id;
 
-        // If no commerce_id, try to ensure user has one
-        if (!$commerceId) {
+        // If no commerce_id, try to ensure user has one (only if user exists)
+        if (!$commerceId && $device->user) {
             Log::warning('Notification creation attempted without commerce_id', [
                 'device_id' => $device->id,
                 'user_id' => $device->user_id,
@@ -79,6 +74,15 @@ class NotificationService
 
             // Try to ensure user has commerce (fallback: create one)
             $commerceId = $this->ensureUserHasCommerce($device->user);
+        }
+
+        // If still no commerce_id, reject (device must be linked via QR)
+        if (!$commerceId) {
+            Log::error('Device has no commerce_id - not linked via QR', [
+                'device_id' => $device->id,
+                'user_id' => $device->user_id,
+            ]);
+            throw new \RuntimeException('Device not linked to commerce. Please scan QR code to link device.');
         }
 
         // Find or create app instance if dual app identifiers are provided
