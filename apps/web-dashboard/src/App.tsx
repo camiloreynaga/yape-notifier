@@ -9,7 +9,6 @@ import AddDevicePage from './pages/AddDevicePage';
 import AppInstancesPage from './pages/AppInstancesPage';
 import NotificationDetailPage from './pages/NotificationDetailPage';
 import CreateCommercePage from './pages/CreateCommercePage';
-import EmployeesPage from './pages/EmployeesPage';
 import Layout from './components/Layout';
 import { NotificationToastContainer } from './components/NotificationToast';
 import ToastContainer from './components/Toast/ToastContainer';
