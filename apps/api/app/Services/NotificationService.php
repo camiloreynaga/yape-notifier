@@ -216,18 +216,28 @@ class NotificationService
 
     /**
      * Get notifications for a user with filters.
+     * 
+     * Professional Architecture Approach:
+     * - Prioritize commerce_id over user_id (supports capturer mode)
+     * - If user has commerce_id, show ALL notifications for that commerce
+     * - This includes notifications from devices without user_id (capturer mode)
+     * - Fallback to user_id for backward compatibility
      */
     public function getUserNotifications(
         User $user,
         array $filters = []
     ) {
-        $query = Notification::where('user_id', $user->id)
-            ->with(['device', 'appInstance'])
-            ->orderBy('received_at', 'desc');
-
-        // Filter by commerce if user has one
+        // Prioritize commerce_id over user_id
         if ($user->commerce_id) {
-            $query->where('commerce_id', $user->commerce_id);
+            // Show ALL notifications for this commerce (including capturer devices)
+            $query = Notification::where('commerce_id', $user->commerce_id)
+                ->with(['device', 'appInstance'])
+                ->orderBy('received_at', 'desc');
+        } else {
+            // Fallback: show only user's own notifications
+            $query = Notification::where('user_id', $user->id)
+                ->with(['device', 'appInstance'])
+                ->orderBy('received_at', 'desc');
         }
 
         // Filter by device
@@ -274,10 +284,20 @@ class NotificationService
 
     /**
      * Get statistics for a user.
+     * 
+     * Professional Architecture Approach:
+     * - Prioritize commerce_id over user_id (supports capturer mode)
+     * - If user has commerce_id, show statistics for ALL commerce notifications
+     * - This includes notifications from devices without user_id (capturer mode)
      */
     public function getStatistics(User $user, array $filters = []): array
     {
-        $baseQuery = Notification::where('notifications.user_id', $user->id);
+        // Prioritize commerce_id over user_id
+        if ($user->commerce_id) {
+            $baseQuery = Notification::where('notifications.commerce_id', $user->commerce_id);
+        } else {
+            $baseQuery = Notification::where('notifications.user_id', $user->id);
+        }
 
         // Apply date filters
         if (isset($filters['start_date'])) {

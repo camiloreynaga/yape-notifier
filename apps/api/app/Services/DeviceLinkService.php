@@ -87,20 +87,29 @@ class DeviceLinkService
     /**
      * Link a device to a commerce using a link code.
      * 
-     * Professional Architecture Approach:
-     * - The link code is the primary authorization mechanism (not user authentication)
-     * - Device can be linked without prior registration (flexible UX)
-     * - If user is authenticated, device is also associated with user (optional traceability)
-     * - If device doesn't exist, it's created automatically (find-or-create pattern)
+     * Professional Architecture Approach (WITH PIN AUTHENTICATION):
+     * - User authentication is REQUIRED (via PIN)
+     * - Every device MUST have an owner (user_id NOT NULL)
+     * - Complete traceability: who owns which device
+     * - The link code validates the commerce, the user provides accountability
      *
      * @param string $code
      * @param string $deviceUuid
-     * @param User|null $user Optional authenticated user for traceability
+     * @param User $user REQUIRED authenticated user (from PIN login)
      * @param string|null $deviceName Optional device name from request
      * @return array{success: bool, device: Device|null, message: string}
      */
-    public function linkDevice(string $code, string $deviceUuid, ?User $user = null, ?string $deviceName = null): array
+    public function linkDevice(string $code, string $deviceUuid, User $user, ?string $deviceName = null): array
     {
+        // User is now REQUIRED (not nullable)
+        if (!$user) {
+            return [
+                'success' => false,
+                'device' => null,
+                'message' => 'Autenticación requerida. Por favor, inicia sesión con tu PIN.',
+            ];
+        }
+
         // Validate code
         $validation = $this->validateCode($code);
 
@@ -131,11 +140,11 @@ class DeviceLinkService
         $wasCreated = false;
         
         if (!$device) {
-            // Device doesn't exist - create it automatically
-            // This enables flexible UX: devices can be linked without prior registration
-            Log::info('Device not found, creating automatically during link', [
+            // Device doesn't exist - create it WITH user_id (REQUIRED)
+            Log::info('Device not found, creating with authenticated user', [
                 'device_uuid' => $deviceUuid,
-                'user_id' => $user?->id,
+                'user_id' => $user->id,
+                'user_name' => $user->name,
                 'commerce_id' => $linkCode->commerce_id,
                 'code' => $code,
             ]);
@@ -143,9 +152,10 @@ class DeviceLinkService
             try {
                 $device = Device::create([
                     'uuid' => $deviceUuid,
-                    'user_id' => $user?->id, // Optional: associate with user if authenticated (nullable)
+                    'user_id' => $user->id, // REQUIRED: Every device has an owner
                     'commerce_id' => $linkCode->commerce_id,
                     'name' => $deviceName ?? 'Android Device',
+                    'alias' => $user->name ? "Teléfono de {$user->name}" : null,
                     'platform' => 'android',
                     'is_active' => true,
                     'last_seen_at' => now(),
@@ -154,7 +164,7 @@ class DeviceLinkService
                 // Log the specific database error for debugging
                 Log::error('Failed to create device during link', [
                     'device_uuid' => $deviceUuid,
-                    'user_id' => $user?->id,
+                    'user_id' => $user->id,
                     'commerce_id' => $linkCode->commerce_id,
                     'error' => $e->getMessage(),
                     'sql_state' => $e->getSqlState() ?? null,
@@ -171,14 +181,31 @@ class DeviceLinkService
             
             $wasCreated = true;
 
-            Log::info('Device created automatically during link', [
+            Log::info('Device created with authenticated user', [
                 'device_id' => $device->id,
                 'device_uuid' => $deviceUuid,
                 'commerce_id' => $linkCode->commerce_id,
-                'user_id' => $user?->id,
+                'user_id' => $user->id,
+                'user_name' => $user->name,
             ]);
         } else {
-            // Device exists - verify and update
+            // Device exists - verify ownership and update
+            
+            // Security check: Verify device belongs to the same user
+            if ($device->user_id !== $user->id) {
+                Log::warning('Device ownership mismatch during link', [
+                    'device_id' => $device->id,
+                    'device_user_id' => $device->user_id,
+                    'attempting_user_id' => $user->id,
+                ]);
+                
+                return [
+                    'success' => false,
+                    'device' => null,
+                    'message' => 'Este dispositivo ya está vinculado a otro usuario',
+                ];
+            }
+            
             // Check if device already belongs to a different commerce
             if ($device->commerce_id && $device->commerce_id !== $linkCode->commerce_id) {
                 return [
@@ -188,34 +215,30 @@ class DeviceLinkService
                 ];
             }
 
-            // Update device with commerce_id and optionally user_id
-            $updateData = [
+            // Update device with new commerce_id
+            $device->update([
                 'commerce_id' => $linkCode->commerce_id,
                 'last_seen_at' => now(),
-            ];
-
-            // If user is authenticated and device doesn't have user_id, associate it
-            if ($user && !$device->user_id) {
-                $updateData['user_id'] = $user->id;
-                Log::info('Associating existing device with authenticated user', [
-                    'device_id' => $device->id,
-                    'user_id' => $user->id,
-                ]);
-            }
-
-            $device->update($updateData);
+            ]);
+            
+            Log::info('Device updated with new commerce', [
+                'device_id' => $device->id,
+                'user_id' => $user->id,
+                'commerce_id' => $linkCode->commerce_id,
+            ]);
         }
 
         // Mark code as used
         $linkCode->markAsUsed();
         $linkCode->update(['device_id' => $device->id]);
 
-        Log::info('Device linked to commerce via code', [
+        Log::info('Device linked to commerce via code with user', [
             'device_id' => $device->id,
             'device_uuid' => $deviceUuid,
             'commerce_id' => $linkCode->commerce_id,
             'code' => $code,
-            'user_id' => $user?->id,
+            'user_id' => $user->id,
+            'user_name' => $user->name,
             'was_created' => $wasCreated,
         ]);
 

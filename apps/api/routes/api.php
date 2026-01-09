@@ -9,6 +9,7 @@ use App\Http\Controllers\DeviceLinkController;
 use App\Http\Controllers\DeviceMonitoredAppController;
 use App\Http\Controllers\MonitorPackageController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PinAuthController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -20,6 +21,9 @@ use Illuminate\Support\Facades\Route;
 // Public routes
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+
+// PIN Authentication (public endpoint)
+Route::post('/auth/login-pin', [PinAuthController::class, 'loginWithPin']);
 
 // Public settings endpoint (used by Android clients)
 Route::get('/settings/monitored-packages', [MonitorPackageController::class, 'getActivePackages']);
@@ -67,20 +71,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/commerces/check', [CommerceController::class, 'check']);
 });
 
-// Public device linking endpoint (authentication optional)
-// Professional Architecture: The link code itself is the authorization mechanism
-// Devices can be linked without prior registration or authentication
-// If user is authenticated, device is associated with user for traceability
-Route::post('/devices/link-by-code', [DeviceLinkController::class, 'linkByCode']);
+// Device linking endpoint (REQUIRES authentication with PIN)
+// Professional Architecture: User must be authenticated to link device
+// This ensures complete traceability: every device has an owner (user_id)
+Route::middleware('auth:sanctum')->post('/devices/link-by-code', [DeviceLinkController::class, 'linkByCode']);
 
-// Public notification creation endpoint (authentication optional)
-// Professional Architecture: QR linking is the authorization mechanism
-// Devices with commerce_id (from QR) can send notifications without user authentication
-// This enables "capturer mode" where devices work without user accounts
-Route::post('/notifications', [NotificationController::class, 'store']);
+// Notification creation endpoint (REQUIRES authentication with PIN)
+// Professional Architecture: User must be authenticated to send notifications
+// This ensures complete traceability: every notification has a capturer (user_id)
+Route::middleware('auth:sanctum')->post('/notifications', [NotificationController::class, 'store']);
 
-// Public device health endpoint (authentication optional)
-// Professional Architecture: Devices can report health without authentication
-// If user is authenticated, verify device belongs to user (security)
-// If not authenticated, allow health updates (devices can exist without user)
-Route::post('/devices/{id}/health', [DeviceHealthController::class, 'update']);
+// Device health endpoint (REQUIRES authentication)
+// Professional Architecture: Only authenticated devices can report health
+Route::middleware('auth:sanctum')->post('/devices/{id}/health', [DeviceHealthController::class, 'update']);
