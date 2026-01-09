@@ -19,7 +19,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Paso 1: Crear usuario "Sistema" para dispositivos huérfanos
+        // Paso 1: Asegurar que la columna is_active existe (robustez)
+        if (!Schema::hasColumn('users', 'is_active')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->boolean('is_active')->default(true)->after('role');
+                $table->index('is_active');
+            });
+        }
+
+        // Paso 2: Crear usuario "Sistema" para dispositivos huérfanos
         $systemUser = User::firstOrCreate(
             ['email' => 'system@yapenotifier.internal'],
             [
@@ -36,22 +44,22 @@ return new class extends Migration
             $systemUser->update(['commerce_id' => $firstCommerce->id]);
         }
 
-        // Paso 2: Asignar user_id a dispositivos sin usuario
+        // Paso 3: Asignar user_id a dispositivos sin usuario
         Device::whereNull('user_id')->update([
             'user_id' => $systemUser->id,
         ]);
 
-        // Paso 3: Drop foreign key constraint
+        // Paso 4: Drop foreign key constraint
         Schema::table('devices', function (Blueprint $table) {
             $table->dropForeign(['user_id']);
         });
 
-        // Paso 4: Hacer user_id NOT NULL
+        // Paso 5: Hacer user_id NOT NULL
         Schema::table('devices', function (Blueprint $table) {
             $table->unsignedBigInteger('user_id')->nullable(false)->change();
         });
 
-        // Paso 5: Re-add foreign key constraint
+        // Paso 6: Re-add foreign key constraint
         Schema::table('devices', function (Blueprint $table) {
             $table->foreign('user_id')
                 ->references('id')
