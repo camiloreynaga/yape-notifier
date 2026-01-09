@@ -365,6 +365,56 @@ class ApiService {
     }>(API_ENDPOINTS.monitorPackages.detected);
     return response.data.detected_packages;
   }
+
+  // User/Employee methods
+  async getUsers(): Promise<User[]> {
+    const response = await this.client.get<{ users: User[] }>(API_ENDPOINTS.users.list);
+    return response.data.users;
+  }
+
+  async createUser(data: {
+    name: string;
+    email: string;
+    role: 'admin' | 'captador';
+    is_active?: boolean;
+  }): Promise<{ user: User; pin: string }> {
+    const response = await this.client.post<{
+      message: string;
+      user: User;
+    }>(API_ENDPOINTS.users.create, data);
+    return {
+      user: response.data.user,
+      pin: response.data.user.pin || '',
+    };
+  }
+
+  async updateUser(
+    id: number,
+    data: {
+      name?: string;
+      email?: string;
+      role?: 'admin' | 'captador';
+      is_active?: boolean;
+    }
+  ): Promise<User> {
+    const response = await this.client.put<{
+      message: string;
+      user: User;
+    }>(API_ENDPOINTS.users.update(id), data);
+    return response.data.user;
+  }
+
+  async deleteUser(id: number): Promise<void> {
+    await this.client.delete(API_ENDPOINTS.users.delete(id));
+  }
+
+  async regenerateUserPin(id: number): Promise<{ pin: string }> {
+    const response = await this.client.post<{
+      message: string;
+      pin: string;
+    }>(API_ENDPOINTS.users.regeneratePin(id));
+    return { pin: response.data.pin };
+  }
 }
 
 export const apiService = new ApiService();

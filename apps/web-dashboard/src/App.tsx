@@ -9,6 +9,7 @@ import AddDevicePage from './pages/AddDevicePage';
 import AppInstancesPage from './pages/AppInstancesPage';
 import NotificationDetailPage from './pages/NotificationDetailPage';
 import CreateCommercePage from './pages/CreateCommercePage';
+import EmployeesPage from './pages/EmployeesPage';
 import Layout from './components/Layout';
 import { NotificationToastContainer } from './components/NotificationToast';
 import ToastContainer from './components/Toast/ToastContainer';
@@ -100,6 +101,7 @@ function AppRoutes() {
         <Route path="notifications/:id" element={<NotificationDetailPage />} />
         <Route path="devices" element={<Navigate to="/dashboard?tab=devices" replace />} />
         <Route path="devices/add" element={<AddDevicePage />} />
+        <Route path="employees" element={<Navigate to="/dashboard?tab=employees" replace />} />
         <Route path="app-instances" element={<AppInstancesPage />} />
         <Route path="settings/monitored-apps" element={<Navigate to="/dashboard?tab=settings" replace />} />
       </Route>

@@ -52,4 +52,12 @@ export const API_ENDPOINTS = {
       `/api/devices/${deviceId}/app-instances`,
     updateLabel: (id: number) => `/api/app-instances/${id}/label`,
   },
+  users: {
+    list: "/api/users",
+    create: "/api/users",
+    show: (id: number) => `/api/users/${id}`,
+    update: (id: number) => `/api/users/${id}`,
+    delete: (id: number) => `/api/users/${id}`,
+    regeneratePin: (id: number) => `/api/users/${id}/regenerate-pin`,
+  },
 } as const;

@@ -10,6 +10,7 @@ use App\Http\Controllers\DeviceMonitoredAppController;
 use App\Http\Controllers\MonitorPackageController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PinAuthController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -69,6 +70,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/commerces', [CommerceController::class, 'store']);
     Route::get('/commerces/me', [CommerceController::class, 'show']);
     Route::get('/commerces/check', [CommerceController::class, 'check']);
+
+    // User/Employee routes (admin only)
+    Route::apiResource('users', UserController::class);
+    Route::post('/users/{id}/regenerate-pin', [UserController::class, 'regeneratePin']);
 });
 
 // Device linking endpoint (REQUIRES authentication with PIN)

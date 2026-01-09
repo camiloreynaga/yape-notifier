@@ -3,6 +3,7 @@ import DashboardOverview from '@/components/DashboardOverview';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import NotificationsPage from './NotificationsPage';
 import DevicesPage from './DevicesPage';
+import EmployeesPage from './EmployeesPage';
 import MonitoredAppsPage from './MonitoredAppsPage';
 
 export default function DashboardPage() {
@@ -24,6 +25,12 @@ export default function DashboardPage() {
         return (
           <ErrorBoundary>
             <DevicesPage />
+          </ErrorBoundary>
+        );
+      case 'employees':
+        return (
+          <ErrorBoundary>
+            <EmployeesPage />
           </ErrorBoundary>
         );
       case 'settings':
