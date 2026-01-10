@@ -195,7 +195,7 @@ class AdminPanelActivity : AppCompatActivity() {
                 if (isChecked) {
                     val today = viewModel.getTodayDateFilter()
                     viewModel.setFilter("start_date", today)
-                    viewModel.setFilter("end_date", today)
+                    viewModel.setFilter("end_date", null) // Remove end_date for single day
                     uncheckAllChipsExcept(this)
                 }
             }
@@ -210,7 +210,7 @@ class AdminPanelActivity : AppCompatActivity() {
                 if (isChecked) {
                     val yesterday = viewModel.getYesterdayDateFilter()
                     viewModel.setFilter("start_date", yesterday)
-                    viewModel.setFilter("end_date", yesterday)
+                    viewModel.setFilter("end_date", null) // Remove end_date for single day
                     uncheckAllChipsExcept(this)
                 }
             }

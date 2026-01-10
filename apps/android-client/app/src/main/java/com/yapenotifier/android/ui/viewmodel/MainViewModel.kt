@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.yapenotifier.android.data.api.ApiService
 import com.yapenotifier.android.data.local.PreferencesManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -31,22 +32,46 @@ class MainViewModel @Inject constructor(
     }
 
     /**
-     * Unlink device - clears device linking data but preserves login if exists.
+     * Unlink device - calls API to unlink and then clears local data.
      * This makes sense for capturer mode where login is optional but device linking is required.
      */
     fun unlinkDevice() {
         viewModelScope.launch {
             try {
-                // Only clear device-related data, not auth token/user email
+                // Get device ID before clearing
+                val deviceId = preferencesManager.deviceId.first()
+
+                if (!deviceId.isNullOrBlank()) {
+                    // Call API to unlink device
+                    try {
+                        val response = apiService.unlinkDevice(deviceId.toLong())
+                        if (response.isSuccessful) {
+                            Timber.tag("MainViewModel").d("Device unlinked successfully via API")
+                            _statusMessage.value = "Dispositivo desvinculado exitosamente"
+                        } else {
+                            Timber.tag("MainViewModel").w("API unlink failed: ${response.code()}, proceeding with local clear")
+                            _statusMessage.value = "Advertencia: Error al desvincular en servidor, datos locales borrados"
+                        }
+                    } catch (e: Exception) {
+                        Timber.tag("MainViewModel").e(e, "Error calling unlink API, proceeding with local clear")
+                        _statusMessage.value = "Advertencia: Sin conexión, datos locales borrados"
+                    }
+                } else {
+                    _statusMessage.value = "No hay dispositivo vinculado"
+                }
+
+                // Clear device-related data, not auth token/user email
                 // This allows the device to be re-linked without losing login session
                 preferencesManager.clearDeviceId()
                 preferencesManager.clearCommerceId()
-                
-                Timber.tag("MainViewModel").d("Device unlinked successfully")
+                preferencesManager.clearIsAdminMode() // Also clear mode flag
+
+                Timber.tag("MainViewModel").d("Local device data cleared successfully")
             } catch (e: Exception) {
                 Timber.tag("MainViewModel").e(e, "Error unlinking device")
+                _statusMessage.value = "Error al desvincular dispositivo"
             }
-            
+
             // Notify the UI that unlink is complete
             _logoutComplete.value = true
         }

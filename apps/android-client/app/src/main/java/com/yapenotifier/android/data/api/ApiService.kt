@@ -153,6 +153,9 @@ interface ApiService {
         @Body request: Map<String, String>
     ): Response<DeviceResponse>
 
+    @POST("api/devices/{id}/unlink")
+    suspend fun unlinkDevice(@Path("id") id: Long): Response<DeviceResponse>
+
     // --- Admin: Link Codes ---
     @POST("api/devices/generate-link-code")
     suspend fun generateLinkCode(@Body request: LinkCodeGenerateRequest): Response<LinkCodeGenerateResponse>

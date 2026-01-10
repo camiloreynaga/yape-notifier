@@ -45,20 +45,20 @@ class AdminDevicesActivity : AppCompatActivity() {
     }
 
     private fun setupBottomNavigation() {
-        binding.bottomNavigation.selectedItemId = com.yapenotifier.android.R.id.nav_devices
+        binding.bottomNavigation.selectedItemId = R.id.nav_devices
         binding.bottomNavigation.setOnItemSelectedListener { item ->
             when (item.itemId) {
-                com.yapenotifier.android.R.id.nav_notifications -> {
+                R.id.nav_notifications -> {
                     val intent = Intent(this, AdminPanelActivity::class.java)
                     startActivity(intent)
                     finish()
                     true
                 }
-                com.yapenotifier.android.R.id.nav_devices -> {
+                R.id.nav_devices -> {
                     // Already on devices tab
                     true
                 }
-                com.yapenotifier.android.R.id.nav_settings -> {
+                R.id.nav_settings -> {
                     val intent = Intent(this, AdminSettingsActivity::class.java)
                     startActivity(intent)
                     finish()

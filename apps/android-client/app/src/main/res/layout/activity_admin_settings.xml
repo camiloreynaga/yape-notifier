@@ -89,39 +89,25 @@
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
+                        android:orientation="vertical">
 
-                        <ImageView
-                            android:layout_width="48dp"
-                            android:layout_height="48dp"
-                            android:src="@drawable/ic_profile"
-                            android:tint="#742384"
-                            android:layout_marginEnd="16dp" />
-
-                        <LinearLayout
-                            android:layout_width="0dp"
+                        <TextView
+                            android:id="@+id/tvUserName"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
+                            android:text="Usuario Administrador"
+                            android:textSize="16sp"
+                            android:textStyle="bold"
+                            android:textColor="#212121"
+                            android:layout_marginBottom="4dp" />
 
-                            <TextView
-                                android:id="@+id/tvUserName"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Usuario Administrador"
-                                android:textSize="16sp"
-                                android:textStyle="bold"
-                                android:textColor="#212121" />
-
-                            <TextView
-                                android:id="@+id/tvUserEmail"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="admin@example.com"
-                                android:textSize="14sp"
-                                android:textColor="#757575" />
-                        </LinearLayout>
+                        <TextView
+                            android:id="@+id/tvUserEmail"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="admin@example.com"
+                            android:textSize="14sp"
+                            android:textColor="#757575" />
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -172,8 +158,6 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="Configurar Intervalo"
-                        app:icon="@drawable/ic_settings"
-                        app:iconGravity="start"
                         style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -207,8 +191,6 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="Aplicaciones Monitoreadas"
-                        app:icon="@drawable/ic_apps"
-                        app:iconGravity="start"
                         style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -234,8 +216,6 @@
                         android:layout_height="wrap_content"
                         android:text="Cerrar Sesión"
                         android:backgroundTint="#D32F2F"
-                        app:icon="@drawable/ic_logout"
-                        app:iconGravity="start"
                         style="@style/Widget.MaterialComponents.Button" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
