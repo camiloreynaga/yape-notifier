@@ -121,13 +121,57 @@ info "✅ Base de datos lista"
 # ============================================
 step "3/5: Limpiando base de datos actual..."
 
+# Terminar todas las conexiones activas a la base de datos
+info "Terminando conexiones activas a la base de datos..."
+docker compose --env-file .env exec -T db psql -U postgres -c "
+SELECT pg_terminate_backend(pg_stat_activity.pid)
+FROM pg_stat_activity
+WHERE pg_stat_activity.datname = 'yape_notifier'
+  AND pid <> pg_backend_pid();
+" 2>/dev/null || true
+
+# Esperar un momento para que las conexiones se cierren
+sleep 2
+
+# Intentar eliminar la base de datos (con FORCE si está disponible en PostgreSQL 13+)
 info "Eliminando base de datos..."
-docker compose --env-file .env exec -T db psql -U postgres -c "DROP DATABASE IF EXISTS yape_notifier;" || true
+if docker compose --env-file .env exec -T db psql -U postgres -c "DROP DATABASE yape_notifier WITH (FORCE);" 2>/dev/null; then
+    info "✅ Base de datos eliminada con FORCE"
+elif docker compose --env-file .env exec -T db psql -U postgres -c "DROP DATABASE IF EXISTS yape_notifier;" 2>/dev/null; then
+    info "✅ Base de datos eliminada"
+else
+    # Si aún falla, intentar terminar conexiones de nuevo y esperar más
+    warn "No se pudo eliminar la base de datos, intentando cerrar conexiones más agresivamente..."
+    docker compose --env-file .env exec -T db psql -U postgres -c "
+    SELECT pg_terminate_backend(pg_stat_activity.pid)
+    FROM pg_stat_activity
+    WHERE pg_stat_activity.datname = 'yape_notifier'
+      AND pid <> pg_backend_pid();
+    " 2>/dev/null || true
+    sleep 3
+    
+    # Intentar de nuevo
+    if docker compose --env-file .env exec -T db psql -U postgres -c "DROP DATABASE IF EXISTS yape_notifier;" 2>/dev/null; then
+        info "✅ Base de datos eliminada en segundo intento"
+    else
+        error "❌ No se pudo eliminar la base de datos. Hay conexiones activas que no se pueden cerrar."
+        error "Intenta manualmente:"
+        error "  docker compose --env-file .env exec db psql -U postgres -c \"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'yape_notifier' AND pid <> pg_backend_pid();\""
+        error "  docker compose --env-file .env exec db psql -U postgres -c \"DROP DATABASE yape_notifier;\""
+        exit 1
+    fi
+fi
 
+# Recrear base de datos limpia
 info "Recreando base de datos limpia..."
-docker compose --env-file .env exec -T db psql -U postgres -c "CREATE DATABASE yape_notifier;" || true
+if docker compose --env-file .env exec -T db psql -U postgres -c "CREATE DATABASE yape_notifier;" 2>/dev/null; then
+    info "✅ Base de datos recreada"
+else
+    error "❌ No se pudo recrear la base de datos"
+    exit 1
+fi
 
-info "✅ Base de datos limpiada"
+info "✅ Base de datos limpiada completamente"
 
 # ============================================
 # PASO 4: RESTAURAR BACKUP
