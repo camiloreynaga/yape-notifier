@@ -28,7 +28,7 @@ export function useAppInstances(deviceId?: number, enabled = true) {
     gcTime: 10 * 60 * 1000, // 10 minutos - tiempo en cache después de no usarse
     refetchOnWindowFocus: true,
     retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+    retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
   });
 }
 
@@ -51,7 +51,7 @@ export function useDeviceAppInstances(deviceId: number, enabled = true) {
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: true,
     retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 }
 
@@ -62,10 +62,15 @@ export function useDeviceAppInstances(deviceId: number, enabled = true) {
 export function useUpdateAppInstanceLabel() {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutation<
+    AppInstance,
+    Error,
+    { id: number; label: string },
+    { previousInstances: Map<string, AppInstance[] | undefined> }
+  >({
     mutationFn: ({ id, label }: { id: number; label: string }) =>
       apiService.updateAppInstanceLabel(id, label),
-    onMutate: async ({ id, label }) => {
+    onMutate: async ({ id, label }: { id: number; label: string }) => {
       // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['appInstances'] });
 
@@ -75,16 +80,16 @@ export function useUpdateAppInstanceLabel() {
       // Get all cached queries for appInstances
       queryClient
         .getQueriesData<AppInstance[]>({ queryKey: ['appInstances'] })
-        .forEach(([queryKey, data]) => {
+        .forEach(([queryKey, data]: [unknown, AppInstance[] | undefined]) => {
           previousInstances.set(JSON.stringify(queryKey), data);
         });
 
       // Optimistically update all related queries
       queryClient.setQueriesData<AppInstance[]>(
         { queryKey: ['appInstances'] },
-        (old) => {
+        (old: AppInstance[] | undefined) => {
           if (!old) return old;
-          return old.map((instance) =>
+          return old.map((instance: AppInstance) =>
             instance.id === id ? { ...instance, instance_label: label } : instance
           );
         }
@@ -92,10 +97,10 @@ export function useUpdateAppInstanceLabel() {
 
       return { previousInstances };
     },
-    onError: (error, variables, context) => {
+    onError: (error: Error, variables: { id: number; label: string }, context?: { previousInstances: Map<string, AppInstance[] | undefined> }) => {
       // Rollback on error
       if (context?.previousInstances) {
-        context.previousInstances.forEach((data, queryKey) => {
+        context.previousInstances.forEach((data: AppInstance[] | undefined, queryKey: string) => {
           queryClient.setQueryData(JSON.parse(queryKey), data);
         });
       }
@@ -103,7 +108,7 @@ export function useUpdateAppInstanceLabel() {
         instanceId: variables.id,
       });
     },
-    onSuccess: (updatedInstance) => {
+    onSuccess: (updatedInstance: AppInstance) => {
       logger.info('App instance label updated successfully', {
         instanceId: updatedInstance.id,
         label: updatedInstance.instance_label,
@@ -131,7 +136,7 @@ export function useAppInstanceFromCache(instanceId: number): AppInstance | undef
 
   for (const [, instances] of queries) {
     if (instances) {
-      const found = instances.find((instance) => instance.id === instanceId);
+      const found = instances.find((instance: AppInstance) => instance.id === instanceId);
       if (found) return found;
     }
   }

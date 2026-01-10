@@ -102,6 +102,7 @@ docker compose --env-file .env logs -f
 ```
 
 **Usa `deploy.sh` cuando:**
+
 - ✅ Es el **primer despliegue** en el servidor
 - ✅ Necesitas **reconstrucción completa** sin cache
 - ✅ Cambiaste **configuración de Docker** (Dockerfile, docker-compose.yml)
@@ -109,6 +110,7 @@ docker compose --env-file .env logs -f
 - ✅ Quieres **validar todo desde cero**
 
 **Lo que hace `deploy.sh`:**
+
 1. Valida configuración (.env, DB_PASSWORD, APP_KEY)
 2. Valida `composer.lock` (PHP 8.2 LTS)
 3. **Detiene contenedores** (docker compose down)
@@ -129,6 +131,7 @@ docker compose --env-file .env logs -f
 ```
 
 **Usa `update.sh` cuando:**
+
 - ✅ Ya tienes el sistema **desplegado y funcionando**
 - ✅ Solo actualizaste **código de la aplicación** (PHP, React)
 - ✅ Hiciste **git pull** y quieres aplicar los cambios
@@ -136,6 +139,7 @@ docker compose --env-file .env logs -f
 - ✅ Quieres **rollback fácil** si algo falla
 
 **Lo que hace `update.sh`:**
+
 1. **Crea backup** de la base de datos (comprimido)
 2. **Genera script de rollback** automático
 3. Valida que el código esté actualizado (pregunta confirmación)
@@ -187,6 +191,7 @@ El script `update.sh` genera automáticamente un script de rollback:
 ```
 
 El script de rollback:
+
 1. Detiene servicios
 2. Restaura backup de la base de datos
 3. Reinicia servicios
@@ -266,16 +271,152 @@ docker compose --env-file .env logs dashboard
 
 ---
 
+## 🎨 Actualización Solo del Dashboard (Optimizada)
+
+Si **solo modificaste el código del dashboard** (React/Vite) y no hay cambios en:
+
+- ❌ Backend (Laravel/PHP)
+- ❌ Base de datos (migraciones)
+- ❌ Configuración de Docker
+- ❌ Variables de entorno críticas
+
+Entonces puedes usar un proceso **más rápido y ligero** que no requiere backup ni migraciones.
+
+### Proceso Optimizado para Solo Dashboard
+
+#### Opción A: Usar Script Automatizado (Recomendado)
+
+```bash
+# 1. Actualizar código en el servidor
+ssh deploy@tu-servidor
+cd /var/apps/yape-notifier
+git pull origin tenant-version
+
+# 2. Ir al directorio de producción
+cd infra/docker/environments/production
+
+# 3. Ejecutar script optimizado para dashboard
+chmod +x update-dashboard.sh
+./update-dashboard.sh
+```
+
+El script `update-dashboard.sh` automáticamente:
+
+- ✅ Verifica que el código esté actualizado
+- ✅ Reconstruye la imagen del dashboard (con BuildKit)
+- ✅ Reinicia el contenedor del dashboard
+- ✅ Verifica healthcheck y respuesta del dashboard
+
+#### Opción B: Proceso Manual
+
+```bash
+# 1. Actualizar código en el servidor
+ssh deploy@tu-servidor
+cd /var/apps/yape-notifier
+git pull origin tenant-version
+
+# 2. Ir al directorio de producción
+cd infra/docker/environments/production
+
+# 3. Reconstruir SOLO el servicio dashboard (con BuildKit para cache)
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+docker compose --env-file .env build dashboard
+
+# 4. Reiniciar SOLO el contenedor dashboard
+docker compose --env-file .env up -d dashboard
+
+# 5. Verificar que el dashboard funciona
+curl -f https://dashboard.notificaciones.space/health
+# O abrir en navegador: https://dashboard.notificaciones.space
+```
+
+### ¿Por qué es más rápido?
+
+- ✅ **No hace backup** (no hay cambios en BD)
+- ✅ **No ejecuta migraciones** (no hay cambios en BD)
+- ✅ **No limpia caches de Laravel** (no hay cambios en backend)
+- ✅ **No valida composer.lock** (no hay cambios en PHP)
+- ✅ **Solo reconstruye el dashboard** (React/Vite)
+- ✅ **Solo reinicia el contenedor dashboard**
+
+### Tiempo estimado
+
+- **Proceso completo (`update.sh`)**: 5-10 minutos (backup, validaciones, migraciones, etc.)
+- **Solo dashboard**: 2-3 minutos (solo build de React + reinicio)
+
+### Cuándo usar cada proceso
+
+| Escenario                                     | Proceso Recomendado                            |
+| --------------------------------------------- | ---------------------------------------------- |
+| Solo cambios en `apps/web-dashboard/` (React) | **Solo dashboard** (proceso optimizado arriba) |
+| Cambios en `apps/api/` (Laravel)              | `./update.sh` (proceso completo)               |
+| Cambios en ambos (API + Dashboard)            | `./update.sh` (proceso completo)               |
+| Cambios en migraciones/BD                     | `./update.sh` (proceso completo)               |
+| Cambios en Dockerfiles o docker-compose.yml   | `./deploy.sh` (reconstrucción completa)        |
+
+### Verificación Post-Actualización (Solo Dashboard)
+
+```bash
+# 1. Verificar que el contenedor está corriendo
+docker compose --env-file .env ps dashboard
+
+# 2. Verificar healthcheck
+docker compose --env-file .env ps dashboard | grep healthy
+
+# 3. Verificar que responde
+curl -f https://dashboard.notificaciones.space/health
+
+# 4. Ver logs si hay problemas
+docker compose --env-file .env logs dashboard --tail=50
+
+# 5. Abrir en navegador y verificar visualmente
+# https://dashboard.notificaciones.space
+```
+
+### Si algo falla (Rollback del Dashboard)
+
+Si el nuevo dashboard tiene problemas, puedes hacer rollback rápido:
+
+```bash
+# 1. Ver imágenes disponibles
+docker images | grep dashboard
+
+# 2. Si tienes una imagen anterior, puedes recrear el contenedor con esa imagen
+# O simplemente hacer git checkout a un commit anterior y reconstruir
+
+# 3. Volver a un commit anterior
+cd /var/apps/yape-notifier
+git log --oneline -10  # Ver últimos commits
+git checkout <commit-anterior>  # Volver a commit anterior
+
+# 4. Reconstruir dashboard
+cd infra/docker/environments/production
+docker compose --env-file .env build dashboard
+docker compose --env-file .env up -d dashboard
+```
+
+---
+
 ## ✅ Resumen Final
 
-**Para actualizar API o Dashboard:**
+### Para actualizar **Solo Dashboard** (React):
 
-1. `git pull` en el servidor
-2. `cd infra/docker/environments/production`
-3. `./update.sh` ← **Este es el paso crítico**
-4. Verificar que todo funciona
+```bash
+git pull
+cd infra/docker/environments/production
+docker compose --env-file .env build dashboard
+docker compose --env-file .env up -d dashboard
+```
 
-**NO hagas solo `docker compose build`** - te perderás pasos críticos como backup, limpieza de caches, migraciones, etc.
+### Para actualizar **API o ambos** (API + Dashboard):
 
-El script `update.sh` está diseñado para ser **seguro, automatizado y con rollback fácil**. Úsalo siempre para actualizaciones en producción.
+```bash
+git pull
+cd infra/docker/environments/production
+./update.sh  ← **Este es el paso crítico**
+```
 
+**NO hagas solo `docker compose build`** sin el script cuando hay cambios en la API - te perderás pasos críticos como backup, limpieza de caches, migraciones, etc.
+
+El script `update.sh` está diseñado para ser **seguro, automatizado y con rollback fácil**. Úsalo siempre para actualizaciones que involucren el backend.

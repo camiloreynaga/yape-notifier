@@ -36,10 +36,14 @@ export class CircuitBreaker {
   private readonly config: CircuitBreakerConfig;
 
   constructor(config: CircuitBreakerConfig) {
-    this.config = {
+    // Construir config con valores por defecto, permitiendo que config los sobrescriba
+    const defaults = {
       failureThreshold: 5,
       resetTimeout: 60000, // 1 minuto
       successThreshold: 2,
+    };
+    this.config = {
+      ...defaults,
       ...config,
     };
 

@@ -3,7 +3,6 @@
 
 import { useEffect, useState } from 'react';
 import { AlertCircle, WifiOff, RefreshCw, X } from 'lucide-react';
-import { CircuitState } from '@/services/circuitBreaker';
 
 interface ErrorNotificationProps {
   id: string;
@@ -148,7 +147,6 @@ export function ErrorNotificationContainer() {
     // Escuchar eventos de circuit breaker abierto
     const handleCircuitOpen = (event: Event) => {
       const customEvent = event as CustomEvent<{ name: string; nextAttempt: number }>;
-      const nextAttempt = new Date(customEvent.detail.nextAttempt);
       const timeUntilRetry = Math.round((customEvent.detail.nextAttempt - Date.now()) / 1000);
 
       addNotification({

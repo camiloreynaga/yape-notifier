@@ -28,7 +28,7 @@ export function useDevices(activeOnly = false, enabled = true) {
     gcTime: 10 * 60 * 1000, // 10 minutos - tiempo en cache después de no usarse
     refetchOnWindowFocus: true,
     retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff: 1s, 2s, 4s
+    retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff: 1s, 2s, 4s
   });
 }
 
@@ -42,7 +42,7 @@ export function useCreateDevice() {
   return useMutation({
     mutationFn: (data: { name: string; platform: string }) =>
       apiService.createDevice(data),
-    onSuccess: (newDevice) => {
+    onSuccess: (newDevice: Device) => {
       logger.info('Device created successfully', { deviceId: newDevice.id });
       // Invalidar cache para refrescar la lista
       queryClient.invalidateQueries({ queryKey: ['devices'] });
@@ -60,10 +60,15 @@ export function useCreateDevice() {
 export function useUpdateDevice() {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutation<
+    Device,
+    Error,
+    { id: number; data: { name?: string; platform?: string } },
+    { previousDevices: Device[] | undefined }
+  >({
     mutationFn: ({ id, data }: { id: number; data: { name?: string; platform?: string } }) =>
       apiService.updateDevice(id, data),
-    onMutate: async ({ id, data }) => {
+    onMutate: async ({ id, data }: { id: number; data: { name?: string; platform?: string } }) => {
       // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['devices'] });
 
@@ -71,23 +76,23 @@ export function useUpdateDevice() {
       const previousDevices = queryClient.getQueryData<Device[]>(['devices', { activeOnly: false }]);
 
       // Optimistically update
-      queryClient.setQueryData<Device[]>(['devices', { activeOnly: false }], (old) => {
+      queryClient.setQueryData<Device[]>(['devices', { activeOnly: false }], (old: Device[] | undefined) => {
         if (!old) return old;
-        return old.map((device) =>
+        return old.map((device: Device) =>
           device.id === id ? { ...device, ...data } : device
         );
       });
 
       return { previousDevices };
     },
-    onError: (error, variables, context) => {
+    onError: (error: Error, variables: { id: number; data: { name?: string; platform?: string } }, context?: { previousDevices: Device[] | undefined }) => {
       // Rollback on error
       if (context?.previousDevices) {
         queryClient.setQueryData(['devices', { activeOnly: false }], context.previousDevices);
       }
       logger.error('Error updating device', error as Error, { deviceId: variables.id });
     },
-    onSuccess: (updatedDevice) => {
+    onSuccess: (updatedDevice: Device) => {
       logger.info('Device updated successfully', { deviceId: updatedDevice.id });
       // Invalidar cache para asegurar consistencia
       queryClient.invalidateQueries({ queryKey: ['devices'] });
@@ -103,12 +108,12 @@ export function useDeleteDevice() {
 
   return useMutation({
     mutationFn: (id: number) => apiService.deleteDevice(id),
-    onSuccess: (_, deletedId) => {
+    onSuccess: (_: void, deletedId: number) => {
       logger.info('Device deleted successfully', { deviceId: deletedId });
       // Invalidar cache para refrescar la lista
       queryClient.invalidateQueries({ queryKey: ['devices'] });
     },
-    onError: (error: Error, deviceId) => {
+    onError: (error: Error, deviceId: number) => {
       logger.error('Error deleting device', error, { deviceId });
     },
   });
@@ -123,7 +128,7 @@ export function useToggleDeviceStatus() {
   return useMutation({
     mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) =>
       apiService.toggleDeviceStatus(id, isActive),
-    onSuccess: (updatedDevice) => {
+    onSuccess: (updatedDevice: Device) => {
       logger.info('Device status toggled successfully', {
         deviceId: updatedDevice.id,
         isActive: updatedDevice.is_active
@@ -131,7 +136,7 @@ export function useToggleDeviceStatus() {
       // Invalidar cache para refrescar la lista
       queryClient.invalidateQueries({ queryKey: ['devices'] });
     },
-    onError: (error: Error, variables) => {
+    onError: (error: Error, variables: { id: number; isActive: boolean }) => {
       logger.error('Error toggling device status', error, { deviceId: variables.id });
     },
   });
@@ -155,12 +160,12 @@ export function useUpdateDeviceHealth() {
         notification_permission_enabled?: boolean;
       }
     }) => apiService.updateDeviceHealth(id, data),
-    onSuccess: (updatedDevice) => {
+    onSuccess: (updatedDevice: Device) => {
       logger.info('Device health updated successfully', { deviceId: updatedDevice.id });
       // Invalidar cache para refrescar
       queryClient.invalidateQueries({ queryKey: ['devices'] });
     },
-    onError: (error: Error, variables) => {
+    onError: (error: Error, variables: { id: number; data: { battery_level?: number; battery_optimization_disabled?: boolean; notification_permission_enabled?: boolean } }) => {
       logger.error('Error updating device health', error, { deviceId: variables.id });
     },
   });

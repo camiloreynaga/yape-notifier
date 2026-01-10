@@ -1,7 +1,7 @@
 // src/hooks/useWebSocket.ts
 // Hook centralizado para WebSocket subscriptions
 
-import { useEffect, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { websocketManager } from '@/services/websocketManager';
 import { logger } from '@/services/logger';
 import { useAuth } from '@/contexts/AuthContext';

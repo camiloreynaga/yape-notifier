@@ -16,7 +16,7 @@ export interface QueuedRequest<T = unknown> {
 }
 
 export class RequestQueue {
-  private queue: QueuedRequest[] = [];
+  private queue: QueuedRequest<unknown>[] = [];
   private processing = false;
   private maxQueueSize = 50;
   private processingDelay = 1000; // 1 segundo entre requests
@@ -45,15 +45,15 @@ export class RequestQueue {
       this.queue.shift(); // Remover el más antiguo
     }
 
-    const request: QueuedRequest<T> = {
+    const request: QueuedRequest<unknown> = {
       id,
-      fn,
+      fn: fn as () => Promise<unknown>,
       retries: 0,
       maxRetries: options.maxRetries ?? 3,
       priority: options.priority ?? 0,
       timestamp: Date.now(),
       name: options.name,
-      onSuccess: options.onSuccess,
+      onSuccess: options.onSuccess ? ((result: unknown) => options.onSuccess!(result as T)) : undefined,
       onError: options.onError,
     };
 

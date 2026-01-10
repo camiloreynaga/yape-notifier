@@ -326,7 +326,13 @@ export function logPerformanceSummary(): void {
   logger.info('=== Performance Summary ===');
 
   const vitals = getWebVitals();
-  logger.info('Web Vitals:', vitals);
+  logger.info('Web Vitals:', {
+    fcp: vitals.fcp,
+    lcp: vitals.lcp,
+    fid: vitals.fid,
+    cls: vitals.cls,
+    ttfb: vitals.ttfb,
+  });
 
   const memory = getMemoryUsage();
   if (memory) {
