@@ -54,6 +54,7 @@ export interface Notification {
   amount: number | null;
   currency: string | null;
   payer_name: string | null;
+  security_code: string | null;
   posted_at: string | null;
   received_at: string;
   raw_json: Record<string, unknown> | null;

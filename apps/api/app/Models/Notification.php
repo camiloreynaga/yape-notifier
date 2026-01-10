@@ -29,6 +29,7 @@ class Notification extends Model
         'amount',
         'currency',
         'payer_name',
+        'security_code',
         'posted_at',
         'received_at',
         'raw_json',

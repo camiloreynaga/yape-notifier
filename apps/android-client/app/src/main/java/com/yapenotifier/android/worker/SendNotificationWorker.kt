@@ -89,11 +89,12 @@ class SendNotificationWorker(appContext: Context, workerParams: WorkerParameters
             }
 
             // If payment details couldn't be parsed, we still send the notification
-            // but with null values for amount, currency, and payer_name
+            // but with null values for amount, currency, payer_name, and security_code
             // The backend can handle these null values
             val amount = paymentDetails?.amount
             val currency = paymentDetails?.currency ?: "PEN"
             val payerName = paymentDetails?.sender
+            val securityCode = paymentDetails?.securityCode
 
             // Format posted_at timestamp if available
             val postedAt = notification.postedAt?.let {
@@ -126,6 +127,7 @@ class SendNotificationWorker(appContext: Context, workerParams: WorkerParameters
                 amount = amount,
                 currency = currency,
                 payerName = payerName,
+                securityCode = securityCode,
                 postedAt = postedAt,
                 receivedAt = receivedAt,
                 rawJson = rawJson,

@@ -3,7 +3,12 @@ package com.yapenotifier.android.util
 import android.util.Log
 import kotlin.text.RegexOption
 
-data class PaymentDetails(val sender: String, val amount: Double, val currency: String)
+data class PaymentDetails(
+    val sender: String,
+    val amount: Double,
+    val currency: String,
+    val securityCode: String? = null  // Código de seguridad (solo Yape -> Yape)
+)
 
 object PaymentNotificationParser {
 
@@ -39,6 +44,28 @@ object PaymentNotificationParser {
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing amount: '$amountStr'", e)
             null
+        }
+    }
+
+    /**
+     * Extrae el código de seguridad de una notificación de Yape.
+     * Ejemplo: "El cód. de seguridad es: 693" -> "693"
+     * Ejemplo: "El código de seguridad es: 161" -> "161"
+     *
+     * IMPORTANTE: Solo las transferencias Yape -> Yape incluyen código de seguridad.
+     * Transferencias de otros bancos/billeteras -> Yape NO tienen código.
+     *
+     * @param text El texto completo de la notificación
+     * @return El código de seguridad o null si no se encuentra
+     */
+    private fun extractSecurityCode(text: String): String? {
+        // Patrón para capturar el código de seguridad
+        // Soporta variaciones: "cód.", "código", "cod.", "codigo"
+        val securityCodePattern = """c[óo]d(?:igo|\.)?\s+de\s+seguridad\s+es:\s*(\d{2,4})""".toRegex(RegexOption.IGNORE_CASE)
+
+        val matchResult = securityCodePattern.find(text)
+        return matchResult?.groupValues?.get(1)?.also {
+            Log.d(TAG, "Security code extracted: $it")
         }
     }
 
@@ -96,8 +123,12 @@ object PaymentNotificationParser {
                     val amount = parseAmount(amountStr) ?: return null
                     val cleanedSender = sender.trim()
                     val currency = normalizeCurrency(currencySymbol)
-                    Log.i(TAG, "✅ Parsed Yape payment: Sender='$cleanedSender', Amount=$amount, Currency='$currency'")
-                    PaymentDetails(cleanedSender, amount, currency)
+
+                    // Extract security code (only for Yape -> Yape transfers)
+                    val securityCode = extractSecurityCode(text)
+
+                    Log.i(TAG, "✅ Parsed Yape payment: Sender='$cleanedSender', Amount=$amount, Currency='$currency', SecurityCode='$securityCode'")
+                    PaymentDetails(cleanedSender, amount, currency, securityCode)
                 } catch (e: Exception) {
                     Log.e(TAG, "Error parsing matched Yape notification", e)
                     null

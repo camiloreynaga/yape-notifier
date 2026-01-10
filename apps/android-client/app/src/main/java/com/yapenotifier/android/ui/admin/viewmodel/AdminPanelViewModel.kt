@@ -266,6 +266,45 @@ class AdminPanelViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Valida una notificación rápidamente (marca como validated)
+     * Esta función se usa cuando el usuario presiona el botón "Validar" en la tarjeta
+     */
+    fun validateNotification(notificationId: Long) {
+        viewModelScope.launch {
+            try {
+                Timber.d("Validating notification: $notificationId")
+                val response = apiService.updateNotificationStatus(
+                    notificationId,
+                    mapOf("status" to "validated")
+                )
+                if (response.isSuccessful) {
+                    Timber.d("Notification $notificationId validated successfully")
+                    // Update local state immediately for instant UI feedback
+                    val currentState = _uiState.value ?: return@launch
+                    val updatedNotifications = currentState.notifications.map { notification ->
+                        if (notification.id == notificationId) {
+                            notification.copy(status = "validated")
+                        } else {
+                            notification
+                        }
+                    }
+                    _uiState.value = currentState.copy(notifications = updatedNotifications)
+                } else {
+                    Timber.e("Failed to validate notification: ${response.code()}")
+                    _uiState.value = _uiState.value?.copy(
+                        error = "Error al validar la notificación"
+                    )
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Error validating notification")
+                _uiState.value = _uiState.value?.copy(
+                    error = "Error de conexión al validar"
+                )
+            }
+        }
+    }
+
     fun markAllAsRead() {
         viewModelScope.launch {
             val currentState = _uiState.value ?: return@launch

@@ -123,6 +123,7 @@ class NotificationService
             'amount' => $data['amount'] ?? null,
             'currency' => $data['currency'] ?? 'PEN',
             'payer_name' => $data['payer_name'] ?? null,
+            'security_code' => $data['security_code'] ?? null,
             'posted_at' => isset($data['posted_at'])
                 ? Carbon::parse($data['posted_at'])
                 : null,

@@ -32,6 +32,7 @@ class CreateNotificationRequest extends FormRequest
             'amount' => ['nullable', 'numeric', 'min:0'],
             'currency' => ['nullable', 'string', 'size:3'],
             'payer_name' => ['nullable', 'string', 'max:255'],
+            'security_code' => ['nullable', 'string', 'max:10'],
             'posted_at' => ['nullable', 'date'],
             'received_at' => ['nullable', 'date'],
             'raw_json' => ['nullable', 'array'],

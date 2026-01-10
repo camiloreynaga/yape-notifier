@@ -48,6 +48,9 @@ data class Notification(
     @SerializedName("payer_name")
     val payerName: String?,
 
+    @SerializedName("security_code")
+    val securityCode: String?,
+
     @SerializedName("posted_at")
     val postedAt: String?,
 

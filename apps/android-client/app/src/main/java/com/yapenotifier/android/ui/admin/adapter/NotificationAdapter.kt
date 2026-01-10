@@ -1,17 +1,20 @@
 package com.yapenotifier.android.ui.admin.adapter
 
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.yapenotifier.android.R
 import com.yapenotifier.android.data.model.Notification
 import com.yapenotifier.android.databinding.ItemNotificationCardBinding
 import java.text.SimpleDateFormat
 import java.util.*
 
 class NotificationAdapter(
-    private val onItemClick: (Notification) -> Unit
+    private val onItemClick: (Notification) -> Unit,
+    private val onValidateClick: (Notification) -> Unit
 ) : ListAdapter<Notification, NotificationAdapter.NotificationViewHolder>(NotificationDiffCallback()) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): NotificationViewHolder {
@@ -20,7 +23,7 @@ class NotificationAdapter(
             parent,
             false
         )
-        return NotificationViewHolder(binding, onItemClick)
+        return NotificationViewHolder(binding, onItemClick, onValidateClick)
     }
 
     override fun onBindViewHolder(holder: NotificationViewHolder, position: Int) {
@@ -29,108 +32,175 @@ class NotificationAdapter(
 
     class NotificationViewHolder(
         private val binding: ItemNotificationCardBinding,
-        private val onItemClick: (Notification) -> Unit
+        private val onItemClick: (Notification) -> Unit,
+        private val onValidateClick: (Notification) -> Unit
     ) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(notification: Notification) {
             binding.apply {
-                // App icon
-                val appIconBg = when (notification.sourceApp.lowercase()) {
-                    "yape" -> com.yapenotifier.android.R.drawable.bg_app_icon_yape
-                    "plin" -> com.yapenotifier.android.R.drawable.bg_app_icon_plin
-                    "bcp" -> com.yapenotifier.android.R.drawable.bg_app_icon_bcp
-                    else -> com.yapenotifier.android.R.drawable.bg_app_icon_yape
+                // App Badge
+                val appName = when (notification.sourceApp.lowercase()) {
+                    "yape" -> "Yape"
+                    "plin" -> "Plin"
+                    "bcp" -> "BCP"
+                    "interbank" -> "Interbank"
+                    "bbva" -> "BBVA"
+                    "scotiabank" -> "Scotiabank"
+                    else -> notification.sourceApp.capitalize()
                 }
-                ivAppIcon.setBackgroundResource(appIconBg)
-                // You can set a specific icon here if needed
-                ivAppIcon.setImageResource(com.yapenotifier.android.R.drawable.ic_bell_notification)
+                tvAppBadge.text = appName
 
-                // App info and time
-                tvAppInfo.text = buildAppInfo(notification)
-                tvTime.text = formatTime(notification.receivedAt)
+                val appBadgeBg = when (notification.sourceApp.lowercase()) {
+                    "yape" -> R.drawable.bg_app_badge_yape
+                    "plin" -> R.drawable.bg_app_badge_plin
+                    "bcp" -> R.drawable.bg_app_badge_bcp
+                    else -> R.drawable.bg_app_badge_yape
+                }
+                tvAppBadge.setBackgroundResource(appBadgeBg)
 
-                // Title and body
-                tvTitle.text = "Confirmación de Pago"
-                
-                // Build body with amount highlighted
+                // Instance Badge (Color-coded)
+                val instanceLabel = notification.appInstance?.label
+                if (instanceLabel != null) {
+                    tvInstanceBadge.text = instanceLabel
+                    tvInstanceBadge.visibility = View.VISIBLE
+
+                    // Color-code based on instance name
+                    val (bgRes, textColor) = when {
+                        instanceLabel.contains("Katty", ignoreCase = true) ->
+                            Pair(R.drawable.bg_instance_badge_katty, "#7C3B92")
+                        instanceLabel.contains("Almendra", ignoreCase = true) ->
+                            Pair(R.drawable.bg_instance_badge_almendra, "#D97706")
+                        instanceLabel.contains("Testing", ignoreCase = true) ||
+                        instanceLabel.contains("Test", ignoreCase = true) ->
+                            Pair(R.drawable.bg_instance_badge_testing, "#0369A1")
+                        else ->
+                            Pair(R.drawable.bg_instance_badge_katty, "#7C3B92")
+                    }
+                    tvInstanceBadge.setBackgroundResource(bgRes)
+                    tvInstanceBadge.setTextColor(android.graphics.Color.parseColor(textColor))
+                } else {
+                    tvInstanceBadge.visibility = View.GONE
+                }
+
+                // Time - Format: "10 Ene • 02:55"
+                tvTime.text = formatDateTime(notification.receivedAt)
+
+                // Payer Name
+                tvPayerName.text = notification.payerName ?: "Usuario"
+
+                // Amount
                 notification.amount?.let { amount ->
                     val currency = notification.currency ?: "PEN"
                     val amountText = when (currency) {
                         "PEN" -> "S/${String.format("%.2f", amount)}"
-                        "USD" -> "$${String.format("%.2f", amount)}"
+                        "USD" -> "\$${String.format("%.2f", amount)}"
                         else -> "$currency ${String.format("%.2f", amount)}"
                     }
-                    val payerName = notification.payerName ?: "Usuario"
-                    tvBody.text = "$payerName te envió un pago por $amountText"
                     tvAmount.text = amountText
-                    tvAmount.visibility = android.view.View.VISIBLE
+                    tvAmount.visibility = View.VISIBLE
                 } ?: run {
-                    tvBody.text = notification.body
-                    tvAmount.visibility = android.view.View.GONE
+                    tvAmount.visibility = View.GONE
                 }
 
-                // Status badge
+                // Status-based visibility
                 when (notification.status) {
                     "validated" -> {
-                        llStatusBadge.visibility = android.view.View.VISIBLE
-                        llStatusBadge.setBackgroundResource(com.yapenotifier.android.R.drawable.bg_badge_verified)
-                        tvStatus.text = "Verificado"
-                        ivCheckmark.visibility = android.view.View.VISIBLE
-                        tvCode.visibility = android.view.View.GONE
+                        // Show validated row
+                        llSecurityCodeRow.visibility = View.GONE
+                        llValidatedRow.visibility = View.VISIBLE
+
+                        // Show security code if available
+                        if (!notification.securityCode.isNullOrEmpty()) {
+                            tvSecurityCodeValidated.text = "Cód: ${notification.securityCode}"
+                            tvSecurityCodeValidated.visibility = View.VISIBLE
+                        } else {
+                            tvSecurityCodeValidated.visibility = View.GONE
+                        }
+
+                        // Change card background to light green
+                        cardRoot.setCardBackgroundColor(android.graphics.Color.parseColor("#F0FDF4"))
                     }
                     "pending" -> {
-                        llStatusBadge.visibility = android.view.View.GONE
-                        tvCode.visibility = android.view.View.GONE
+                        // Show security code row if available
+                        if (!notification.securityCode.isNullOrEmpty()) {
+                            llSecurityCodeRow.visibility = View.VISIBLE
+                            tvSecurityCode.text = notification.securityCode
+                            btnValidate.visibility = View.VISIBLE
+                        } else {
+                            llSecurityCodeRow.visibility = View.GONE
+                        }
+                        llValidatedRow.visibility = View.GONE
+
+                        // Default white background
+                        cardRoot.setCardBackgroundColor(android.graphics.Color.parseColor("#FFFFFF"))
+                    }
+                    "inconsistent" -> {
+                        // Show security code row if available (without validate button)
+                        if (!notification.securityCode.isNullOrEmpty()) {
+                            llSecurityCodeRow.visibility = View.VISIBLE
+                            tvSecurityCode.text = notification.securityCode
+                            btnValidate.visibility = View.GONE
+                        } else {
+                            llSecurityCodeRow.visibility = View.GONE
+                        }
+                        llValidatedRow.visibility = View.GONE
+
+                        // Light red background for inconsistent
+                        cardRoot.setCardBackgroundColor(android.graphics.Color.parseColor("#FEF2F2"))
                     }
                     else -> {
-                        llStatusBadge.visibility = android.view.View.GONE
-                        tvCode.text = "Cód: ${notification.id}"
-                        tvCode.visibility = android.view.View.VISIBLE
+                        llSecurityCodeRow.visibility = View.GONE
+                        llValidatedRow.visibility = View.GONE
+                        cardRoot.setCardBackgroundColor(android.graphics.Color.parseColor("#FFFFFF"))
                     }
                 }
 
-                root.setOnClickListener {
+                // Click handlers
+                cardRoot.setOnClickListener {
                     onItemClick(notification)
                 }
-            }
-        }
 
-        private fun buildAppInfo(notification: Notification): String {
-            val appName = when (notification.sourceApp) {
-                "yape" -> "Yape"
-                "plin" -> "Plin"
-                "bcp" -> "BCP"
-                "interbank" -> "Interbank"
-                "bbva" -> "BBVA"
-                "scotiabank" -> "Scotiabank"
-                else -> notification.sourceApp
-            }
-
-            val instanceLabel = notification.appInstance?.label
-            val deviceName = notification.device?.name ?: "Desconocido"
-
-            return buildString {
-                append(appName)
-                instanceLabel?.let { label -> append(" • $label") }
-                append(" • $deviceName")
-            }
-        }
-
-        private fun formatTime(dateString: String): String {
-            return try {
-                val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-                val date = sdf.parse(dateString) ?: return dateString
-                val now = Date()
-                val diff = now.time - date.time
-
-                when {
-                    diff < 60000 -> "Ahora"
-                    diff < 3600000 -> "${diff / 60000} min"
-                    diff < 86400000 -> "${diff / 3600000} h"
-                    else -> "${diff / 86400000} d"
+                btnValidate.setOnClickListener {
+                    onValidateClick(notification)
                 }
+            }
+        }
+
+        private fun formatDateTime(dateString: String): String {
+            return try {
+                // Parse ISO 8601 format: "2026-01-10T02:55:41.000000Z"
+                val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+                inputFormat.timeZone = TimeZone.getTimeZone("UTC")
+                val date = inputFormat.parse(dateString) ?: return dateString
+
+                // Format: "10 Ene • 02:55"
+                val dayFormat = SimpleDateFormat("d", Locale.getDefault())
+                val monthFormat = SimpleDateFormat("MMM", Locale("es", "ES"))
+                val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+
+                val day = dayFormat.format(date)
+                val month = monthFormat.format(date).capitalize()
+                val time = timeFormat.format(date)
+
+                "$day $month • $time"
             } catch (e: Exception) {
-                dateString
+                // Fallback: try to parse without milliseconds
+                try {
+                    val inputFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+                    val date = inputFormat.parse(dateString) ?: return dateString
+
+                    val dayFormat = SimpleDateFormat("d", Locale.getDefault())
+                    val monthFormat = SimpleDateFormat("MMM", Locale("es", "ES"))
+                    val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+
+                    val day = dayFormat.format(date)
+                    val month = monthFormat.format(date).capitalize()
+                    val time = timeFormat.format(date)
+
+                    "$day $month • $time"
+                } catch (e2: Exception) {
+                    dateString
+                }
             }
         }
     }
@@ -145,4 +215,3 @@ class NotificationAdapter(
         }
     }
 }
-
