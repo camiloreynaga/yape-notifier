@@ -26,8 +26,9 @@ Route::post('/login', [AuthController::class, 'login']);
 // PIN Authentication (public endpoint)
 Route::post('/auth/login-pin', [PinAuthController::class, 'loginWithPin']);
 
-// Public settings endpoint (used by Android clients)
-Route::get('/settings/monitored-packages', [MonitorPackageController::class, 'getActivePackages']);
+// Settings endpoint (used by Android clients - requires authentication)
+// Devices must be authenticated to get packages for their commerce
+Route::middleware('auth:sanctum')->get('/settings/monitored-packages', [MonitorPackageController::class, 'getActivePackages']);
 
 // Public device link code validation endpoint
 Route::get('/devices/link-code/{code}', [DeviceLinkController::class, 'validateLinkCode']);

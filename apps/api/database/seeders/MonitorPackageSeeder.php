@@ -8,11 +8,14 @@ use Illuminate\Database\Seeder;
 class MonitorPackageSeeder extends Seeder
 {
     /**
-     * Run the database seeds.
+     * Get default packages configuration.
+     * This method is used to seed packages for new commerces.
+     * 
+     * @return array
      */
-    public function run(): void
+    public static function getDefaultPackages(): array
     {
-        $packages = [
+        return [
             [
                 'package_name' => 'com.yapenotifier.android',
                 'app_name' => 'Yape Notifier',
@@ -70,13 +73,55 @@ class MonitorPackageSeeder extends Seeder
                 'priority' => 95,
             ],
         ];
+    }
+
+    /**
+     * Run the database seeds.
+     * 
+     * NOTE: This seeder is now deprecated for production use.
+     * Packages are automatically created when a commerce is created.
+     * This method is kept for backward compatibility and migration purposes.
+     */
+    public function run(): void
+    {
+        $packages = self::getDefaultPackages();
 
         foreach ($packages as $package) {
-            MonitorPackage::updateOrCreate(
-                ['package_name' => $package['package_name']],
+            // Only create if package doesn't exist (for migration purposes)
+            MonitorPackage::firstOrCreate(
+                ['package_name' => $package['package_name'], 'commerce_id' => null],
                 $package
             );
         }
+    }
+
+    /**
+     * Seed default packages for a specific commerce.
+     * 
+     * @param int $commerceId
+     * @return int Number of packages created
+     */
+    public static function seedForCommerce(int $commerceId): int
+    {
+        $packages = self::getDefaultPackages();
+        $created = 0;
+
+        foreach ($packages as $package) {
+            // Check if package already exists for this commerce
+            $exists = MonitorPackage::where('commerce_id', $commerceId)
+                ->where('package_name', $package['package_name'])
+                ->exists();
+
+            if (!$exists) {
+                MonitorPackage::create([
+                    ...$package,
+                    'commerce_id' => $commerceId,
+                ]);
+                $created++;
+            }
+        }
+
+        return $created;
     }
 }
 

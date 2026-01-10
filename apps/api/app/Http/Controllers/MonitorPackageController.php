@@ -16,12 +16,24 @@ class MonitorPackageController extends Controller
     ) {}
 
     /**
-     * Get active packages for clients (public endpoint).
+     * Get active packages for clients.
      * This endpoint is used by Android clients to get the list of packages to monitor.
+     * 
+     * The device must be authenticated to get packages for its commerce.
+     * If not authenticated, returns empty array (device should authenticate first).
      */
-    public function getActivePackages(): JsonResponse
+    public function getActivePackages(Request $request): JsonResponse
     {
-        $packages = $this->monitorPackageService->getActivePackagesArray();
+        $user = $request->user();
+        
+        // If user is authenticated and has a device with commerce_id
+        if ($user && $user->commerce_id) {
+            $packages = $this->monitorPackageService->getActivePackagesArray($user->commerce_id);
+        } else {
+            // Device not authenticated or not linked to commerce
+            // Return empty array - device should authenticate/link first
+            $packages = [];
+        }
 
         return response()->json([
             'packages' => $packages,
@@ -218,26 +230,9 @@ class MonitorPackageController extends Controller
             'packages.*' => 'required|string|regex:/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/',
         ]);
 
-        // Create packages with commerce_id
+        // Create packages with commerce_id using service
         $packageNames = $request->input('packages');
-        $packages = collect();
-        
-        foreach ($packageNames as $packageName) {
-            // Skip if already exists for this commerce
-            if (MonitorPackage::where('package_name', $packageName)
-                ->where('commerce_id', $user->commerce_id)
-                ->exists()) {
-                continue;
-            }
-
-            $packages->push(
-                MonitorPackage::create([
-                    'package_name' => $packageName,
-                    'commerce_id' => $user->commerce_id,
-                    'is_active' => true,
-                ])
-            );
-        }
+        $packages = $this->monitorPackageService->bulkCreatePackages($packageNames, $user->commerce_id);
 
         return response()->json([
             'message' => 'Packages created successfully',

@@ -10,32 +10,39 @@ class MonitorPackageService
     /**
      * Get all active monitor packages as a simple array.
      * This is used for the public API endpoint that clients consume.
-     * Filters by commerce_id if provided.
+     * Requires commerceId to return packages for that specific commerce.
      */
     public function getActivePackagesArray(?int $commerceId = null): array
     {
-        $query = MonitorPackage::active()->ordered();
-
-        if ($commerceId) {
-            $query->where('commerce_id', $commerceId);
+        if (!$commerceId) {
+            // If no commerce_id provided, return empty array
+            // Public endpoint should provide commerce_id via device linking
+            return [];
         }
 
-        return $query->pluck('package_name')->toArray();
+        return MonitorPackage::where('commerce_id', $commerceId)
+            ->active()
+            ->ordered()
+            ->pluck('package_name')
+            ->toArray();
     }
 
     /**
      * Get all monitor packages (for admin/management).
-     * Filters by commerce_id if provided.
+     * Returns packages for the specified commerce.
+     * 
+     * @param int|null $commerceId Commerce ID (required)
+     * @return \Illuminate\Database\Eloquent\Collection
      */
     public function getAllPackages(?int $commerceId = null)
     {
-        $query = MonitorPackage::ordered();
-
-        if ($commerceId) {
-            $query->where('commerce_id', $commerceId);
+        if (!$commerceId) {
+            return collect();
         }
 
-        return $query->get();
+        return MonitorPackage::where('commerce_id', $commerceId)
+            ->ordered()
+            ->get();
     }
 
     /**
@@ -90,18 +97,23 @@ class MonitorPackageService
 
     /**
      * Bulk create packages from an array of package names.
+     * Checks for duplicates within the commerce.
+     * 
+     * @param array $packageNames Array of package names
+     * @param int $commerceId Commerce ID (required)
+     * @return Collection Created packages
      */
-    public function bulkCreatePackages(array $packageNames, ?int $commerceId = null): Collection
+    public function bulkCreatePackages(array $packageNames, int $commerceId): Collection
     {
         $packages = collect();
 
         foreach ($packageNames as $packageName) {
-            // Skip if already exists for this commerce
-            $query = MonitorPackage::where('package_name', $packageName);
-            if ($commerceId) {
-                $query->where('commerce_id', $commerceId);
-            }
-            if ($query->exists()) {
+            // Check if package already exists for this commerce
+            $exists = MonitorPackage::where('commerce_id', $commerceId)
+                ->where('package_name', $packageName)
+                ->exists();
+
+            if ($exists) {
                 continue;
             }
 
@@ -173,11 +185,9 @@ class MonitorPackageService
         $allDetected = array_unique(array_merge($fromNotifications, $fromAppInstances));
         
         // Get existing monitor packages for this commerce
-        $existingQuery = MonitorPackage::query();
-        if ($commerceId) {
-            $existingQuery->where('commerce_id', $commerceId);
-        }
-        $existing = $existingQuery->pluck('package_name')->toArray();
+        $existing = MonitorPackage::where('commerce_id', $commerceId)
+            ->pluck('package_name')
+            ->toArray();
         
         // Return only packages that are not yet configured
         return array_values(array_diff($allDetected, $existing));

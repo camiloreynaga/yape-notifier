@@ -44,6 +44,7 @@
     <string name="dont_have_account">¿No tienes una cuenta? Registrarse</string>
     <string name="need_help">¿Necesitas ayuda para acceder a tu panel?
 Contactar Soporte</string>
+    <string name="admin_icon_description">Admin Icon</string>
 
     <!-- Admin Add Device -->
     <string name="connect_device_title">Conectar Dispositivo</string>

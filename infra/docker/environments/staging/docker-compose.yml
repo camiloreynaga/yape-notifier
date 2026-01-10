@@ -41,6 +41,14 @@ services:
     labels:
       - "com.yape-notifier.service=php-fpm"
       - "com.yape-notifier.environment=staging"
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
 
   nginx-api:
     image: nginx:alpine
@@ -159,6 +167,14 @@ services:
     labels:
       - "com.yape-notifier.service=postgresql"
       - "com.yape-notifier.environment=staging"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
 
 volumes:
   postgres_data_staging:

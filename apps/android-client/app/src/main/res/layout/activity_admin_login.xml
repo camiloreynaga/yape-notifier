@@ -26,7 +26,7 @@
                 android:src="@drawable/ic_admin_shield"
                 android:background="@drawable/bg_rounded_purple_dark"
                 android:padding="20dp"
-                android:contentDescription="Admin Icon"
+                android:contentDescription="@string/admin_icon_description"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent" />
