@@ -1,70 +1,63 @@
-import { useEffect, useState, useCallback } from 'react';
-import { apiService } from '@/services/api';
-import type { AppInstance, Device } from '@/types';
+import { useState, useMemo } from 'react';
+import { useDevices } from '@/hooks/useDevices';
+import { useAppInstances } from '@/hooks/useAppInstances';
+import { useDebouncedValue } from '@/hooks/useDebounce';
+import type { AppInstance } from '@/types';
 import AppInstanceCard from '@/components/AppInstanceCard';
 import { Smartphone, Filter, Search, Package } from 'lucide-react';
 
 export default function AppInstancesPage() {
-  const [instances, setInstances] = useState<AppInstance[]>([]);
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const loadInstances = useCallback(async () => {
-    try {
-      const instancesData = await apiService.getAppInstances(
-        selectedDeviceId || undefined
-      );
-      setInstances(instancesData);
-    } catch (error) {
-      console.error('Error loading instances:', error);
-    }
-  }, [selectedDeviceId]);
+  // Debounced search term (espera 300ms después de que el usuario deja de escribir)
+  const { debouncedValue: debouncedSearchTerm, isDebouncing } = useDebouncedValue(searchTerm, 300);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  // Usar React Query hooks para devices y app instances
+  const {
+    data: devices = [],
+    isLoading: devicesLoading,
+    error: devicesError
+  } = useDevices(false);
 
-  useEffect(() => {
-    loadInstances();
-  }, [loadInstances]);
+  const {
+    data: instances = [],
+    isLoading: instancesLoading,
+    error: instancesError,
+    refetch: refetchInstances
+  } = useAppInstances(selectedDeviceId || undefined);
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [instancesData, devicesData] = await Promise.all([
-        apiService.getAppInstances(),
-        apiService.getDevices(),
-      ]);
-      setInstances(instancesData);
-      setDevices(devicesData);
-    } catch (error) {
-      console.error('Error loading data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Estado de carga combinado
+  const loading = devicesLoading || instancesLoading;
 
   const handleUpdate = () => {
-    loadInstances();
+    refetchInstances();
   };
 
-  // Filtrar instancias
-  const filteredInstances = instances.filter((instance) => {
-    const matchesDevice = !selectedDeviceId || instance.device_id === selectedDeviceId;
-    const matchesSearch =
-      !searchTerm ||
-      instance.package_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (instance.instance_label &&
-        instance.instance_label.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      instance.android_user_id.toString().includes(searchTerm);
-    return matchesDevice && matchesSearch;
-  });
+  // Filtrar instancias usando useMemo para optimización
+  // Usa debouncedSearchTerm en lugar de searchTerm para evitar filtrados innecesarios
+  const filteredInstances = useMemo(() => {
+    return instances.filter((instance) => {
+      const matchesDevice = !selectedDeviceId || instance.device_id === selectedDeviceId;
+      const matchesSearch =
+        !debouncedSearchTerm ||
+        instance.package_name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        (instance.instance_label &&
+          instance.instance_label.toLowerCase().includes(debouncedSearchTerm.toLowerCase())) ||
+        instance.android_user_id.toString().includes(debouncedSearchTerm);
+      return matchesDevice && matchesSearch;
+    });
+  }, [instances, selectedDeviceId, debouncedSearchTerm]);
 
   // Separar instancias asignadas y sin asignar
-  const assignedInstances = filteredInstances.filter((i) => i.instance_label);
-  const unassignedInstances = filteredInstances.filter((i) => !i.instance_label);
+  const assignedInstances = useMemo(() =>
+    filteredInstances.filter((i) => i.instance_label),
+    [filteredInstances]
+  );
+  const unassignedInstances = useMemo(() =>
+    filteredInstances.filter((i) => !i.instance_label),
+    [filteredInstances]
+  );
 
   if (loading) {
     return (
@@ -74,8 +67,25 @@ export default function AppInstancesPage() {
     );
   }
 
+  // Mostrar errores si existen
+  const hasError = devicesError || instancesError;
+
   return (
     <div className="space-y-6">
+      {/* Error message */}
+      {hasError && (
+        <div className="card bg-red-50 border-l-4 border-red-400">
+          <div className="flex">
+            <div className="ml-3">
+              <p className="text-sm text-red-700">
+                {devicesError && `Error al cargar dispositivos: ${devicesError.message}`}
+                {devicesError && instancesError && ' | '}
+                {instancesError && `Error al cargar instancias: ${instancesError.message}`}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Header con navegación */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -112,11 +122,14 @@ export default function AppInstancesPage() {
             </select>
           </div>
 
-          {/* Búsqueda */}
+          {/* Búsqueda con indicador de debouncing */}
           <div>
             <label htmlFor="search-instance" className="block text-sm font-medium text-gray-700 mb-2">
               <Search className="h-4 w-4 inline mr-1" />
               Buscar
+              {isDebouncing && (
+                <span className="ml-2 text-xs text-primary-600">(buscando...)</span>
+              )}
             </label>
             <input
               id="search-instance"

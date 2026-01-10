@@ -1,9 +1,8 @@
-// src/hooks/useUnreadNotifications.ts (actualizado para usar WebSockets)
+// src/hooks/useUnreadNotifications.ts (optimizado con WebSocket Manager)
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { apiService } from "@/services/api";
-import { echo } from "@/services/echo";
-import { useAuth } from "@/contexts/AuthContext";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 const STORAGE_KEY = "yape_notifier_read_notifications";
 
@@ -16,8 +15,6 @@ interface UseUnreadNotificationsReturn {
 
 export function useUnreadNotifications(): UseUnreadNotificationsReturn {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const commerceId = user?.commerce_id;
 
   // Query inicial para obtener contador
   const query = useQuery({
@@ -30,28 +27,22 @@ export function useUnreadNotifications(): UseUnreadNotificationsReturn {
       });
       return response.total; // Total de notificaciones pendientes
     },
-    enabled: !!commerceId,
     staleTime: Infinity, // No hacer refetch automático, WebSocket actualizará
   });
 
-  // Escuchar eventos WebSocket para actualizar contador
-  useEffect(() => {
-    if (!commerceId || !echo) return;
+  // Handler para nuevas notificaciones
+  const handleNewNotification = useCallback(() => {
+    // Incrementar contador cuando llega nueva notificación
+    queryClient.setQueryData<number>(
+      ["notifications", "unread-count"],
+      (oldCount: number | undefined) => (oldCount ?? 0) + 1
+    );
+  }, [queryClient]);
 
-    const channel = echo.private(`commerce.${commerceId}`);
-
-    channel.listen(".notification.created", () => {
-      // Incrementar contador cuando llega nueva notificación
-      queryClient.setQueryData<number>(
-        ["notifications", "unread-count"],
-        (oldCount: number | undefined) => (oldCount ?? 0) + 1
-      );
-    });
-
-    return () => {
-      channel.stopListening(".notification.created");
-    };
-  }, [commerceId, queryClient]);
+  // Suscribirse a WebSocket usando el manager centralizado
+  useWebSocket(handleNewNotification, {
+    listenerId: 'use-unread-notifications',
+  });
 
   // Cargar IDs leídos desde localStorage
   const [readNotificationIds, setReadNotificationIds] = useState<Set<number>>(new Set());
