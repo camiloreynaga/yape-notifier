@@ -271,35 +271,43 @@ class AdminPanelViewModel @Inject constructor(
      * Esta función se usa cuando el usuario presiona el botón "Validar" en la tarjeta
      */
     fun validateNotification(notificationId: Long) {
+        updateNotificationStatus(notificationId, "validated")
+    }
+
+    /**
+     * Actualiza el estado de una notificación (genérico)
+     * Soporta: "pending", "validated", "inconsistent"
+     */
+    fun updateNotificationStatus(notificationId: Long, status: String) {
         viewModelScope.launch {
             try {
-                Timber.d("Validating notification: $notificationId")
+                Timber.d("Updating notification $notificationId to status: $status")
                 val response = apiService.updateNotificationStatus(
                     notificationId,
-                    mapOf("status" to "validated")
+                    mapOf("status" to status)
                 )
                 if (response.isSuccessful) {
-                    Timber.d("Notification $notificationId validated successfully")
+                    Timber.d("Notification $notificationId updated successfully to $status")
                     // Update local state immediately for instant UI feedback
                     val currentState = _uiState.value ?: return@launch
                     val updatedNotifications = currentState.notifications.map { notification ->
                         if (notification.id == notificationId) {
-                            notification.copy(status = "validated")
+                            notification.copy(status = status)
                         } else {
                             notification
                         }
                     }
                     _uiState.value = currentState.copy(notifications = updatedNotifications)
                 } else {
-                    Timber.e("Failed to validate notification: ${response.code()}")
+                    Timber.e("Failed to update notification status: ${response.code()}")
                     _uiState.value = _uiState.value?.copy(
-                        error = "Error al validar la notificación"
+                        error = "Error al actualizar el estado"
                     )
                 }
             } catch (e: Exception) {
-                Timber.e(e, "Error validating notification")
+                Timber.e(e, "Error updating notification status")
                 _uiState.value = _uiState.value?.copy(
-                    error = "Error de conexión al validar"
+                    error = "Error de conexión al actualizar"
                 )
             }
         }
@@ -336,6 +344,14 @@ class AdminPanelViewModel @Inject constructor(
     fun getTodayDateFilter(): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         return sdf.format(Date())
+    }
+
+    fun getYesterdayDateFilter(): String {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val yesterday = Calendar.getInstance().apply {
+            add(Calendar.DAY_OF_YEAR, -1)
+        }.time
+        return sdf.format(yesterday)
     }
 
     fun getDateRangeFilter(days: Int): Pair<String, String> {

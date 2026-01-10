@@ -74,7 +74,17 @@ class AdminPanelActivity : AppCompatActivity() {
             onValidateClick = { notification ->
                 // Validate notification (quick action)
                 viewModel.validateNotification(notification.id)
-                Toast.makeText(this, "Notificación validada", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Notificación validada ✓", Toast.LENGTH_SHORT).show()
+            },
+            onMarkInconsistent = { notification ->
+                // Mark as inconsistent
+                viewModel.updateNotificationStatus(notification.id, "inconsistent")
+                Toast.makeText(this, "Marcado como inconsistente", Toast.LENGTH_SHORT).show()
+            },
+            onMarkPending = { notification ->
+                // Mark as pending
+                viewModel.updateNotificationStatus(notification.id, "pending")
+                Toast.makeText(this, "Marcado como pendiente", Toast.LENGTH_SHORT).show()
             }
         )
 
@@ -159,43 +169,78 @@ class AdminPanelActivity : AppCompatActivity() {
 
     private fun setupFilters() {
         binding.chipGroup.removeAllViews()
-        
+
         // "Todos" filter (default)
         val chipAll = Chip(this).apply {
-            text = getString(R.string.filter_all)
+            text = "Todos"
             isChecked = true
+            isCheckable = true
             setOnCheckedChangeListener { _, isChecked ->
                 if (isChecked) {
                     viewModel.clearAllFilters()
-                    // Uncheck other chips
-                    for (i in 0 until binding.chipGroup.childCount) {
-                        val chip = binding.chipGroup.getChildAt(i) as? Chip
-                        if (chip != this) chip?.isChecked = false
-                    }
+                    // Uncheck other date chips
+                    uncheckAllChipsExcept(this)
                 }
             }
         }
         binding.chipGroup.addView(chipAll)
 
+        // === FILTROS DE FECHA ===
+
         // "Hoy" filter
         val chipToday = Chip(this).apply {
-            text = getString(R.string.filter_today)
+            text = "Hoy"
+            isCheckable = true
             setOnCheckedChangeListener { _, isChecked ->
                 if (isChecked) {
-                    viewModel.setFilter("start_date", viewModel.getTodayDateFilter())
-                    chipAll.isChecked = false
+                    val today = viewModel.getTodayDateFilter()
+                    viewModel.setFilter("start_date", today)
+                    viewModel.setFilter("end_date", today)
+                    uncheckAllChipsExcept(this)
                 }
             }
         }
         binding.chipGroup.addView(chipToday)
 
+        // "Ayer" filter
+        val chipYesterday = Chip(this).apply {
+            text = "Ayer"
+            isCheckable = true
+            setOnCheckedChangeListener { _, isChecked ->
+                if (isChecked) {
+                    val yesterday = viewModel.getYesterdayDateFilter()
+                    viewModel.setFilter("start_date", yesterday)
+                    viewModel.setFilter("end_date", yesterday)
+                    uncheckAllChipsExcept(this)
+                }
+            }
+        }
+        binding.chipGroup.addView(chipYesterday)
+
+        // "Últimos 7 días" filter
+        val chipLast7Days = Chip(this).apply {
+            text = "Últimos 7 días"
+            isCheckable = true
+            setOnCheckedChangeListener { _, isChecked ->
+                if (isChecked) {
+                    val (startDate, endDate) = viewModel.getDateRangeFilter(7)
+                    viewModel.setFilter("start_date", startDate)
+                    viewModel.setFilter("end_date", endDate)
+                    uncheckAllChipsExcept(this)
+                }
+            }
+        }
+        binding.chipGroup.addView(chipLast7Days)
+
+        // === FILTROS DE ESTADO ===
+
         // "Pendientes" filter
         val chipPending = Chip(this).apply {
-            text = getString(R.string.filter_pending)
+            text = "Pendientes"
+            isCheckable = true
             setOnCheckedChangeListener { _, isChecked ->
                 if (isChecked) {
                     viewModel.setFilter("status", "pending")
-                    chipAll.isChecked = false
                 } else {
                     viewModel.setFilter("status", null)
                 }
@@ -203,27 +248,51 @@ class AdminPanelActivity : AppCompatActivity() {
         }
         binding.chipGroup.addView(chipPending)
 
-        // "Últimos 7 días" filter
-        val chipLast7Days = Chip(this).apply {
-            text = getString(R.string.filter_last_7_days)
-            setOnCheckedChangeListener { _, isChecked ->
-                if (isChecked) {
-                    val (startDate, endDate) = viewModel.getDateRangeFilter(7)
-                    viewModel.setFilter("start_date", startDate)
-                    viewModel.setFilter("end_date", endDate)
-                    chipAll.isChecked = false
-                } else {
-                    viewModel.setFilter("start_date", null)
-                    viewModel.setFilter("end_date", null)
+        // === FILTROS DE INSTANCIAS ===
+        // Agregar filtros dinámicos por instancia cuando se carguen las notificaciones
+        viewModel.uiState.observe(this) { state ->
+            // Extraer instancias únicas con sus labels
+            val instances = state.notifications
+                .mapNotNull { it.appInstance }
+                .distinctBy { it.id }
+                .sortedBy { it.label }
+
+            // Solo agregar chips de instancias si hay más de una
+            if (instances.size > 1) {
+                // Remover chips de instancias anteriores (mantener los primeros 6 chips: Todos, Hoy, Ayer, 7 días, Pendientes + separador)
+                while (binding.chipGroup.childCount > 5) {
+                    binding.chipGroup.removeViewAt(5)
+                }
+
+                // Agregar chips para cada instancia
+                instances.forEach { instance ->
+                    val chipInstance = Chip(this).apply {
+                        text = instance.label ?: "Instancia ${instance.id}"
+                        isCheckable = true
+                        setOnCheckedChangeListener { _, isChecked ->
+                            if (isChecked) {
+                                viewModel.setFilter("app_instance_id", instance.id)
+                            } else {
+                                viewModel.setFilter("app_instance_id", null)
+                            }
+                        }
+                    }
+                    binding.chipGroup.addView(chipInstance)
                 }
             }
         }
-        binding.chipGroup.addView(chipLast7Days)
+    }
 
-        // Observer para actualizar filtros cuando cambian los datos
-        viewModel.uiState.observe(this) { _ ->
-            // Si hay dispositivos o apps disponibles, se pueden agregar filtros dinámicos
-            // Por ahora, los filtros básicos están implementados
+    /**
+     * Helper para desmarcar todos los chips excepto el especificado
+     * Solo desmarca chips de fecha (Todos, Hoy, Ayer, Últimos 7 días)
+     */
+    private fun uncheckAllChipsExcept(exceptChip: Chip) {
+        for (i in 0 until minOf(4, binding.chipGroup.childCount)) {
+            val chip = binding.chipGroup.getChildAt(i) as? Chip
+            if (chip != null && chip != exceptChip) {
+                chip.isChecked = false
+            }
         }
     }
 
@@ -263,10 +332,10 @@ class AdminPanelActivity : AppCompatActivity() {
             viewModel.markAllAsRead()
             Toast.makeText(this, "Todas las notificaciones marcadas como leídas", Toast.LENGTH_SHORT).show()
         }
-        
-        binding.ivProfile.setOnClickListener {
-            val intent = Intent(this, AdminSettingsActivity::class.java)
-            startActivity(intent)
+
+        binding.btnRefresh.setOnClickListener {
+            viewModel.refresh()
+            Toast.makeText(this, "Actualizando...", Toast.LENGTH_SHORT).show()
         }
     }
 

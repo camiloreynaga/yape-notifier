@@ -44,7 +44,8 @@ class PinLoginViewModel @Inject constructor(
                     preferencesManager.saveUserId(body.user.id.toString())
                     preferencesManager.saveUserName(body.user.name)
                     preferencesManager.saveCommerceId(body.user.commerceId.toString())
-                    
+                    preferencesManager.saveIsAdminMode(false) // Mark as Capturer mode for session persistence
+
                     Timber.d("PIN login successful: ${body.user.name}")
                     _loginState.value = LoginState.Success(body.user.name)
                     

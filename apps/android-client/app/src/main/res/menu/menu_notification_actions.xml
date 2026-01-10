@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/action_mark_validated"
+        android:title="✓ Marcar como Validado"
+        android:icon="@drawable/ic_checkmark" />
+
+    <item
+        android:id="@+id/action_mark_inconsistent"
+        android:title="✗ Marcar como Inconsistente"
+        android:icon="@drawable/ic_error" />
+
+    <item
+        android:id="@+id/action_mark_pending"
+        android:title="⏳ Marcar como Pendiente"
+        android:icon="@drawable/ic_pending" />
+
+    <item
+        android:id="@+id/action_view_details"
+        android:title="👁 Ver Detalles"
+        android:icon="@drawable/ic_eye" />
+</menu>

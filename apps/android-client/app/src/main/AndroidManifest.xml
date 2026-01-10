@@ -21,6 +21,18 @@
         android:theme="@style/Theme.YapeNotifier"
         tools:targetApi="31">
 
+        <!-- Splash Activity - App Entry Point with Session Management -->
+        <activity
+            android:name=".ui.SplashActivity"
+            android:exported="true"
+            android:label="NotiCentral"
+            android:theme="@style/Theme.YapeNotifier.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
         <!-- PIN Login Activity (New authentication method) -->
         <activity
             android:name=".ui.PinLoginActivity"
@@ -89,17 +101,12 @@
             android:theme="@style/Theme.YapeNotifier" />
 
         <!-- Admin Module Activities -->
-        <!-- ModeSelectionActivity - Main Launcher -->
+        <!-- ModeSelectionActivity - Mode chooser (no longer LAUNCHER) -->
         <activity
             android:name=".ui.admin.ModeSelectionActivity"
-            android:exported="true"
-            android:label="NotiCentral"
-            android:theme="@style/Theme.YapeNotifier">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:exported="false"
+            android:label="Seleccionar Modo"
+            android:theme="@style/Theme.YapeNotifier" />
         
         <activity
             android:name=".ui.admin.AdminLoginActivity"

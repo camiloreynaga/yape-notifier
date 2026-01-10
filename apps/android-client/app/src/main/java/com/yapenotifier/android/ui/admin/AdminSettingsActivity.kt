@@ -37,14 +37,42 @@ class AdminSettingsActivity : AppCompatActivity() {
         // Dependencias inyectadas automáticamente por Hilt
 
         setupToolbar()
+        setupBottomNavigation()
         setupClickListeners()
         loadUserInfo()
         loadHeartbeatInterval()
     }
 
     private fun setupToolbar() {
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        supportActionBar?.title = "Configuración"
+        setSupportActionBar(binding.toolbar)
+        supportActionBar?.setDisplayShowTitleEnabled(false)
+        binding.toolbarTitle.text = "Configuración"
+        binding.toolbarSubtitle.text = "Ajustes y preferencias"
+    }
+
+    private fun setupBottomNavigation() {
+        binding.bottomNavigation.selectedItemId = R.id.nav_settings
+        binding.bottomNavigation.setOnItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_notifications -> {
+                    val intent = Intent(this, AdminPanelActivity::class.java)
+                    startActivity(intent)
+                    finish()
+                    true
+                }
+                R.id.nav_devices -> {
+                    val intent = Intent(this, AdminDevicesActivity::class.java)
+                    startActivity(intent)
+                    finish()
+                    true
+                }
+                R.id.nav_settings -> {
+                    // Already on settings tab
+                    true
+                }
+                else -> false
+            }
+        }
     }
 
     private fun setupClickListeners() {
@@ -189,17 +217,13 @@ class AdminSettingsActivity : AppCompatActivity() {
             // Clear local preferences
             preferencesManager.clearAuthToken()
             preferencesManager.clearUserEmail()
+            preferencesManager.clearIsAdminMode()
 
-            // Navigate to login
-            val intent = Intent(this@AdminSettingsActivity, LoginActivity::class.java)
+            // Navigate to ModeSelectionActivity (splash will handle routing)
+            val intent = Intent(this@AdminSettingsActivity, ModeSelectionActivity::class.java)
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             startActivity(intent)
             finish()
         }
-    }
-
-    override fun onSupportNavigateUp(): Boolean {
-        finish()
-        return true
     }
 }

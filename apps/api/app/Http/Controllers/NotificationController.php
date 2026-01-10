@@ -223,6 +223,11 @@ class NotificationController extends Controller
 
     /**
      * Update notification status.
+     *
+     * Professional Architecture Approach:
+     * - Prioritize commerce_id over user_id (supports admin viewing all commerce notifications)
+     * - Admin can update any notification from their commerce
+     * - Ensures proper authorization through commerce ownership
      */
     public function updateStatus(Request $request, int $id): JsonResponse
     {
@@ -230,9 +235,17 @@ class NotificationController extends Controller
             'status' => 'required|in:pending,validated,inconsistent',
         ]);
 
-        $notification = $request->user()
-            ->notifications()
-            ->findOrFail($id);
+        $user = $request->user();
+
+        // Find notification by commerce_id (if user has commerce) or user_id
+        if ($user->commerce_id) {
+            // Admin mode: can update any notification from their commerce
+            $notification = Notification::where('commerce_id', $user->commerce_id)
+                ->findOrFail($id);
+        } else {
+            // User mode: can only update their own notifications
+            $notification = $user->notifications()->findOrFail($id);
+        }
 
         $notification->update(['status' => $request->status]);
 

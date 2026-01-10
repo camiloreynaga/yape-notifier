@@ -28,22 +28,58 @@ class AdminDevicesActivity : AppCompatActivity() {
         // ViewModel inyectado automáticamente por Hilt
 
         setupToolbar()
+        setupBottomNavigation()
         setupFAB()
         setupRecyclerView()
         setupSwipeRefresh()
+        setupClickListeners()
         setupObservers()
         loadDevices()
     }
 
     private fun setupToolbar() {
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        supportActionBar?.title = "Dispositivos"
+        setSupportActionBar(binding.toolbar)
+        supportActionBar?.setDisplayShowTitleEnabled(false)
+        binding.toolbarTitle.text = "Dispositivos"
+        binding.toolbarSubtitle.text = "Gestionar dispositivos vinculados"
+    }
+
+    private fun setupBottomNavigation() {
+        binding.bottomNavigation.selectedItemId = com.yapenotifier.android.R.id.nav_devices
+        binding.bottomNavigation.setOnItemSelectedListener { item ->
+            when (item.itemId) {
+                com.yapenotifier.android.R.id.nav_notifications -> {
+                    val intent = Intent(this, AdminPanelActivity::class.java)
+                    startActivity(intent)
+                    finish()
+                    true
+                }
+                com.yapenotifier.android.R.id.nav_devices -> {
+                    // Already on devices tab
+                    true
+                }
+                com.yapenotifier.android.R.id.nav_settings -> {
+                    val intent = Intent(this, AdminSettingsActivity::class.java)
+                    startActivity(intent)
+                    finish()
+                    true
+                }
+                else -> false
+            }
+        }
     }
 
     private fun setupFAB() {
         binding.fabAddDevice.setOnClickListener {
             val intent = Intent(this, AdminAddDeviceActivity::class.java)
             startActivity(intent)
+        }
+    }
+
+    private fun setupClickListeners() {
+        binding.btnRefresh.setOnClickListener {
+            loadDevices()
+            Toast.makeText(this, "Actualizando...", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -135,11 +171,6 @@ class AdminDevicesActivity : AppCompatActivity() {
         super.onResume()
         // Refresh devices when returning to this activity
         loadDevices()
-    }
-
-    override fun onSupportNavigateUp(): Boolean {
-        finish()
-        return true
     }
 }
 

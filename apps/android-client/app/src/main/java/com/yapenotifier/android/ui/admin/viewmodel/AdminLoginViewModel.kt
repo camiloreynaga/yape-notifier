@@ -75,7 +75,8 @@ class AdminLoginViewModel @Inject constructor(
                     
                     preferencesManager.saveAuthToken(authResponse.token)
                     preferencesManager.saveUserEmail(authResponse.user.email)
-                    
+                    preferencesManager.saveIsAdminMode(true) // Mark as Admin mode for session persistence
+
                     // Check if commerce exists
                     val commerceResult = ApiCallHandler.safeApiCall(getApplication()) {
                         apiService.checkCommerce()

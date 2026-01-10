@@ -14,7 +14,9 @@ import java.util.*
 
 class NotificationAdapter(
     private val onItemClick: (Notification) -> Unit,
-    private val onValidateClick: (Notification) -> Unit
+    private val onValidateClick: (Notification) -> Unit,
+    private val onMarkInconsistent: (Notification) -> Unit,
+    private val onMarkPending: (Notification) -> Unit
 ) : ListAdapter<Notification, NotificationAdapter.NotificationViewHolder>(NotificationDiffCallback()) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): NotificationViewHolder {
@@ -23,7 +25,7 @@ class NotificationAdapter(
             parent,
             false
         )
-        return NotificationViewHolder(binding, onItemClick, onValidateClick)
+        return NotificationViewHolder(binding, onItemClick, onValidateClick, onMarkInconsistent, onMarkPending)
     }
 
     override fun onBindViewHolder(holder: NotificationViewHolder, position: Int) {
@@ -33,7 +35,9 @@ class NotificationAdapter(
     class NotificationViewHolder(
         private val binding: ItemNotificationCardBinding,
         private val onItemClick: (Notification) -> Unit,
-        private val onValidateClick: (Notification) -> Unit
+        private val onValidateClick: (Notification) -> Unit,
+        private val onMarkInconsistent: (Notification) -> Unit,
+        private val onMarkPending: (Notification) -> Unit
     ) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(notification: Notification) {
@@ -163,7 +167,47 @@ class NotificationAdapter(
                 btnValidate.setOnClickListener {
                     onValidateClick(notification)
                 }
+
+                // Menu click handler - Show popup menu with all actions
+                ivMenu.setOnClickListener { view ->
+                    showPopupMenu(view, notification)
+                }
             }
+        }
+
+        private fun showPopupMenu(view: View, notification: Notification) {
+            val popup = android.widget.PopupMenu(view.context, view)
+            popup.inflate(R.menu.menu_notification_actions)
+
+            // Disable current status option
+            when (notification.status) {
+                "validated" -> popup.menu.findItem(R.id.action_mark_validated)?.isEnabled = false
+                "inconsistent" -> popup.menu.findItem(R.id.action_mark_inconsistent)?.isEnabled = false
+                "pending" -> popup.menu.findItem(R.id.action_mark_pending)?.isEnabled = false
+            }
+
+            popup.setOnMenuItemClickListener { menuItem ->
+                when (menuItem.itemId) {
+                    R.id.action_mark_validated -> {
+                        onValidateClick(notification)
+                        true
+                    }
+                    R.id.action_mark_inconsistent -> {
+                        onMarkInconsistent(notification)
+                        true
+                    }
+                    R.id.action_mark_pending -> {
+                        onMarkPending(notification)
+                        true
+                    }
+                    R.id.action_view_details -> {
+                        onItemClick(notification)
+                        true
+                    }
+                    else -> false
+                }
+            }
+            popup.show()
         }
 
         private fun formatDateTime(dateString: String): String {

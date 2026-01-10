@@ -17,6 +17,8 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 class PreferencesManager(private val context: Context) {
     companion object {
         private val AUTH_TOKEN_KEY = stringPreferencesKey("auth_token")
+        private val IS_ADMIN_MODE_KEY = booleanPreferencesKey("is_admin_mode")
+        private val LAST_ACTIVITY_KEY = stringPreferencesKey("last_activity")
         private val DEVICE_UUID_KEY = stringPreferencesKey("device_uuid")
         private val DEVICE_ID_KEY = stringPreferencesKey("device_id")
         private val USER_ID_KEY = stringPreferencesKey("user_id")
@@ -36,6 +38,14 @@ class PreferencesManager(private val context: Context) {
 
     val authToken: Flow<String?> = context.dataStore.data.map { preferences ->
         preferences[AUTH_TOKEN_KEY]
+    }
+
+    val isAdminMode: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[IS_ADMIN_MODE_KEY] ?: false
+    }
+
+    val lastActivity: Flow<String?> = context.dataStore.data.map { preferences ->
+        preferences[LAST_ACTIVITY_KEY]
     }
 
     val deviceUuid: Flow<String?> = context.dataStore.data.map { preferences ->
@@ -145,9 +155,33 @@ class PreferencesManager(private val context: Context) {
         return true
     }
 
+    suspend fun saveIsAdminMode(isAdmin: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[IS_ADMIN_MODE_KEY] = isAdmin
+        }
+    }
+
+    suspend fun saveLastActivity(activityName: String) {
+        context.dataStore.edit { preferences ->
+            preferences[LAST_ACTIVITY_KEY] = activityName
+        }
+    }
+
     suspend fun clearAuthToken() {
         context.dataStore.edit { preferences ->
             preferences.remove(AUTH_TOKEN_KEY)
+        }
+    }
+
+    suspend fun clearIsAdminMode() {
+        context.dataStore.edit { preferences ->
+            preferences.remove(IS_ADMIN_MODE_KEY)
+        }
+    }
+
+    suspend fun clearLastActivity() {
+        context.dataStore.edit { preferences ->
+            preferences.remove(LAST_ACTIVITY_KEY)
         }
     }
 
