@@ -1,4 +1,4 @@
-declare module 'pusher-js' {
+declare module "pusher-js" {
   interface PusherOptions {
     cluster?: string;
     encrypted?: boolean;
@@ -40,5 +40,3 @@ declare module 'pusher-js' {
 
   export default Pusher;
 }
-
-

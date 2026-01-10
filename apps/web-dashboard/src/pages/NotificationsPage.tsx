@@ -9,7 +9,7 @@ import { useDebouncedValue } from '@/hooks/useDebounce';
 import { logger } from '@/services/logger';
 import type { Notification, NotificationFilters } from '@/types';
 import { format } from 'date-fns';
-import { Download, Filter, Eye, RefreshCw, Calendar, X, Inbox, Search, Grid3x3, List, SlidersHorizontal } from 'lucide-react';
+import { Download, Eye, RefreshCw, Calendar, X, Inbox, Search, Grid3x3, List, SlidersHorizontal } from 'lucide-react';
 import WebSocketStatus from '@/components/WebSocketStatus';
 import EmptyState from '@/components/EmptyState';
 import NotificationCard from '@/components/NotificationCard';
