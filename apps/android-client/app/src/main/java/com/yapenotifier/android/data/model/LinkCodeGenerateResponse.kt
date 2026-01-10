@@ -16,6 +16,6 @@ data class LinkCodeGenerateResponse(
     val expiresAt: String,
 
     @SerializedName("device_alias")
-    val deviceAlias: String
+    val deviceAlias: String? = null  // Nullable porque la web no siempre envía este campo
 )
 

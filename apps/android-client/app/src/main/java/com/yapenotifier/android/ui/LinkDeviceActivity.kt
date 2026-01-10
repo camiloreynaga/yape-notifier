@@ -251,6 +251,10 @@ class LinkDeviceActivity : AppCompatActivity() {
                 Toast.makeText(this, R.string.enter_code_prompt, Toast.LENGTH_SHORT).show()
             }
         }
+
+        binding.btnCancel.setOnClickListener {
+            showCancelDialog()
+        }
     }
 
     private fun checkCameraPermissionAndScan() {
@@ -361,10 +365,23 @@ class LinkDeviceActivity : AppCompatActivity() {
             DeviceHealthWorkerHelper.scheduleDeviceHealthWorker(this)
             // Send immediate health check to update connection status
             DeviceHealthWorkerHelper.sendImmediateHealthCheck(this)
-            val intent = Intent(this, MainActivity::class.java)
-            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            startActivity(intent)
-            finish()
+            
+            lifecycleScope.launch {
+                // Verificar si el usuario está autenticado
+                val authToken = preferencesManager.authToken.first()
+                val isAuthenticated = !authToken.isNullOrBlank()
+                
+                val intent = Intent(this@LinkDeviceActivity, MainActivity::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                
+                // Solo mostrar diálogo de login si NO está autenticado
+                // Si ya tiene sesión, no molestarlo
+                intent.putExtra("SHOW_LOGIN_DIALOG", !isAuthenticated)
+                
+                Timber.d("Navegando a MainActivity - Usuario autenticado: $isAuthenticated")
+                startActivity(intent)
+                finish()
+            }
         } catch (e: Exception) {
             Timber.e(e, "Error crítico al navegar a MainActivity")
             // Si MainActivity no existe o hay error, al menos no crashear
@@ -380,6 +397,38 @@ class LinkDeviceActivity : AppCompatActivity() {
                 navigateToMain()
             } else {
                 finish()
+            }
+        }
+    }
+
+    private fun showCancelDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Cancelar Vinculación")
+            .setMessage("¿Deseas cancelar la vinculación? Se cerrará la sesión actual.")
+            .setPositiveButton("Salir") { _, _ ->
+                logout()
+            }
+            .setNegativeButton("Continuar", null)
+            .show()
+    }
+
+    private fun logout() {
+        lifecycleScope.launch {
+            try {
+                // Limpiar datos de sesión
+                preferencesManager.clearAuthToken()
+                preferencesManager.clearUserEmail()
+                preferencesManager.clearDeviceId()
+                preferencesManager.clearCommerceId()
+                
+                // Limpiar token cache
+                com.yapenotifier.android.data.api.RetrofitClient.clearTokenCache()
+                
+                // Cerrar la app
+                finishAffinity()
+            } catch (e: Exception) {
+                Timber.e(e, "Error al hacer logout")
+                finishAffinity()
             }
         }
     }

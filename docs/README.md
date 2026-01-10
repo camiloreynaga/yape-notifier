@@ -22,10 +22,12 @@ Guías de despliegue y operaciones en diferentes entornos.
 
 - **[DEPLOYMENT.md](02-deployment/DEPLOYMENT.md)** - Guía completa de despliegue en producción
 - **[DEPLOY_GUIDE_PRODUCTION.md](02-deployment/DEPLOY_GUIDE_PRODUCTION.md)** - Guía detallada paso a paso para despliegue en producción
+- **[DEPLOYMENT_CHECKLIST.md](02-deployment/DEPLOYMENT_CHECKLIST.md)** - Checklist de despliegue en DigitalOcean
 - **[DOCKER.md](02-deployment/DOCKER.md)** - Documentación técnica de Docker
 - **[DEVICE_FEATURES.md](02-deployment/DEVICE_FEATURES.md)** - Sistema de vinculación y salud de dispositivos
 - **[DASHBOARD_DEPLOYMENT.md](02-deployment/DASHBOARD_DEPLOYMENT.md)** - Guía de deployment específica del dashboard web
 - **[DASHBOARD_CHECKLIST.md](02-deployment/DASHBOARD_CHECKLIST.md)** - Checklist de producción del dashboard web
+- **[DIGITAL_OCEAN_DEPLOYMENT.md](02-deployment/DIGITAL_OCEAN_DEPLOYMENT.md)** - Guía de despliegue en DigitalOcean
 - **PRODUCTION.md** - Checklist y mejores prácticas de producción (pendiente)
 
 ---
@@ -52,6 +54,7 @@ Guías para desarrolladores.
 
 - **[WORKFLOW.md](04-development/WORKFLOW.md)** - Flujo de trabajo de desarrollo
 - **[TESTING.md](04-development/TESTING.md)** - Guía completa de testing
+- **[TESTING_QR_LINKING.md](04-development/TESTING_QR_LINKING.md)** - Guía de pruebas del sistema de vinculación QR
 - **[ERROR_TRACKING.md](04-development/ERROR_TRACKING.md)** - Guía de implementación de error tracking
 - **[DEPENDENCIES.md](04-development/DEPENDENCIES.md)** - Gestión profesional de dependencias (composer)
 - **[PROMPTS_DESARROLLO.md](04-development/PROMPTS_DESARROLLO.md)** - Prompts listos para desarrollo con IA
@@ -67,7 +70,9 @@ Documentación de funcionalidades y features del sistema.
 - **[WEBSOCKETS.md](05-features/WEBSOCKETS.md)** - WebSockets para notificaciones en tiempo real (configuración disponible)
 - **[DEVICE_LINKING.md](05-features/DEVICE_LINKING.md)** - Vinculación de dispositivos mediante QR/código (implementado)
 - **[DEVICE_LINKING_GUIDE.md](05-features/DEVICE_LINKING_GUIDE.md)** - Guía profesional: Cómo vincular adecuadamente los dispositivos
-- **[DEVICE_LINKING_ARCHITECTURE.md](05-features/DEVICE_LINKING_ARCHITECTURE.md)** - Arquitectura profesional de vinculación de dispositivos
+- **[DEVICE_LINKING_ARCHITECTURE.md](03-architecture/DEVICE_LINKING_ARCHITECTURE.md)** - Arquitectura profesional de vinculación de dispositivos
+- **[DEVICE_LINKING_FLOW.md](05-features/DEVICE_LINKING_FLOW.md)** - Flujo detallado paso a paso de vinculación de dispositivos
+- **[DEVICE_LINKING_METHODS_COMPARISON.md](05-features/DEVICE_LINKING_METHODS_COMPARISON.md)** - Comparación de métodos de vinculación (QR vs Dashboard)
 - **[ANDROID_ADMIN_MODULE.md](05-features/ANDROID_ADMIN_MODULE.md)** - Módulo Admin móvil - App Android (implementado)
 - **[MONITOR_PACKAGES.md](05-features/MONITOR_PACKAGES.md)** - Sistema de gestión de paquetes monitoreados
 - **[DEVICE_CONNECTION_STATUS_EXPLANATION.md](05-features/DEVICE_CONNECTION_STATUS_EXPLANATION.md)** - Explicación del estado de conexión de dispositivos
@@ -83,6 +88,7 @@ Documentación para operaciones y mantenimiento.
 - **[MONITORING.md](06-operations/MONITORING.md)** - Monitoreo del sistema
 - **[BACKUP.md](06-operations/BACKUP.md)** - Backup y recuperación
 - **[UPDATE_CHECKLIST.md](06-operations/UPDATE_CHECKLIST.md)** - Checklist de actualización del servidor
+- **[TROUBLESHOOTING.md](06-operations/TROUBLESHOOTING.md)** - Diagnóstico y solución de problemas
 - **MAINTENANCE.md** - Mantenimiento y actualizaciones (pendiente)
 
 ---
@@ -143,31 +149,8 @@ Si eres nuevo en el proyecto:
 - **¿Qué falta por hacer?** → [ROADMAP.md](07-reference/ROADMAP.md)
 - **¿Cómo trabajo con el código?** → [WORKFLOW.md](04-development/WORKFLOW.md)
 - **¿Cómo vincular dispositivos correctamente?** → [DEVICE_LINKING_GUIDE.md](05-features/DEVICE_LINKING_GUIDE.md)
-
----
-
-## 📝 Notas
-
-- Los documentos marcados como "(pendiente)" están en proceso de creación o consolidación
-- Los documentos históricos se encuentran en `../ARCHIVE/`
-- Para reportar problemas o sugerir mejoras, consulta la guía de contribución (cuando esté disponible)
-
----
-
-**Última actualización:** 2025-01-21
-
-
----
-
-## 🔍 Búsqueda Rápida
-
-- **¿Cómo inicio el proyecto?** → [QUICKSTART.md](01-getting-started/QUICKSTART.md)
-- **¿Cómo despliego en producción?** → [DEPLOYMENT.md](02-deployment/DEPLOYMENT.md)
-- **¿Qué está implementado?** → [IMPLEMENTATION_STATUS.md](07-reference/IMPLEMENTATION_STATUS.md)
-- **¿Hay bugs conocidos?** → [KNOWN_ISSUES.md](07-reference/KNOWN_ISSUES.md)
-- **¿Qué falta por hacer?** → [ROADMAP.md](07-reference/ROADMAP.md)
-- **¿Cómo trabajo con el código?** → [WORKFLOW.md](04-development/WORKFLOW.md)
-- **¿Cómo vincular dispositivos correctamente?** → [DEVICE_LINKING_GUIDE.md](05-features/DEVICE_LINKING_GUIDE.md)
+- **¿Cómo probar la vinculación QR?** → [TESTING_QR_LINKING.md](04-development/TESTING_QR_LINKING.md)
+- **¿Problemas técnicos?** → [TROUBLESHOOTING.md](06-operations/TROUBLESHOOTING.md)
 
 ---
 

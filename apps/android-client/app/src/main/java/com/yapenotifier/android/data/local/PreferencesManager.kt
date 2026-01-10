@@ -19,6 +19,8 @@ class PreferencesManager(private val context: Context) {
         private val AUTH_TOKEN_KEY = stringPreferencesKey("auth_token")
         private val DEVICE_UUID_KEY = stringPreferencesKey("device_uuid")
         private val DEVICE_ID_KEY = stringPreferencesKey("device_id")
+        private val USER_ID_KEY = stringPreferencesKey("user_id")
+        private val USER_NAME_KEY = stringPreferencesKey("user_name")
         private val USER_EMAIL_KEY = stringPreferencesKey("user_email")
         private val COMMERCE_ID_KEY = stringPreferencesKey("commerce_id")
         private val WIZARD_COMPLETED_KEY = booleanPreferencesKey("wizard_completed")
@@ -38,6 +40,14 @@ class PreferencesManager(private val context: Context) {
 
     val deviceUuid: Flow<String?> = context.dataStore.data.map { preferences ->
         preferences[DEVICE_UUID_KEY]
+    }
+
+    val userId: Flow<String?> = context.dataStore.data.map { preferences ->
+        preferences[USER_ID_KEY]
+    }
+
+    val userName: Flow<String?> = context.dataStore.data.map { preferences ->
+        preferences[USER_NAME_KEY]
     }
 
     val userEmail: Flow<String?> = context.dataStore.data.map { preferences ->
@@ -73,6 +83,18 @@ class PreferencesManager(private val context: Context) {
     suspend fun saveDeviceUuid(uuid: String) {
         context.dataStore.edit { preferences ->
             preferences[DEVICE_UUID_KEY] = uuid
+        }
+    }
+
+    suspend fun saveUserId(userId: String) {
+        context.dataStore.edit { preferences ->
+            preferences[USER_ID_KEY] = userId
+        }
+    }
+
+    suspend fun saveUserName(userName: String) {
+        context.dataStore.edit { preferences ->
+            preferences[USER_NAME_KEY] = userName
         }
     }
 

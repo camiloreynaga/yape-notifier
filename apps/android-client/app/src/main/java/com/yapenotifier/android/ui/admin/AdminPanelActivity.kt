@@ -214,7 +214,7 @@ class AdminPanelActivity : AppCompatActivity() {
         binding.chipGroup.addView(chipLast7Days)
 
         // Observer para actualizar filtros cuando cambian los datos
-        viewModel.uiState.observe(this) { state ->
+        viewModel.uiState.observe(this) { _ ->
             // Si hay dispositivos o apps disponibles, se pueden agregar filtros dinámicos
             // Por ahora, los filtros básicos están implementados
         }

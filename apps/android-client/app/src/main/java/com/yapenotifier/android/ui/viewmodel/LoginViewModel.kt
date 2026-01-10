@@ -10,7 +10,12 @@ import com.yapenotifier.android.data.api.ApiService
 import com.yapenotifier.android.data.local.PreferencesManager
 import com.yapenotifier.android.data.model.ApiResult
 import com.yapenotifier.android.data.model.LoginRequest
+import androidx.work.Constraints
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import com.yapenotifier.android.data.repository.CommerceRepository
+import com.yapenotifier.android.worker.SendNotificationWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -79,6 +84,8 @@ class LoginViewModel @Inject constructor(
                                         needsCommerceCreation = false,
                                         needsDeviceLinking = true
                                     )
+                                    // Disparar Worker para enviar notificaciones pendientes
+                                    triggerPendingNotificationsWorker()
                                 } else {
                                     deviceRegistrationResult.device?.commerceId?.let {
                                         preferencesManager.saveCommerceId(it.toString())
@@ -89,6 +96,8 @@ class LoginViewModel @Inject constructor(
                                         needsCommerceCreation = false,
                                         needsDeviceLinking = false
                                     )
+                                    // Disparar Worker para enviar notificaciones pendientes
+                                    triggerPendingNotificationsWorker()
                                 }
                             }
                             else -> {
@@ -177,5 +186,22 @@ class LoginViewModel @Inject constructor(
             Timber.tag("LoginViewModel").e(e, "Exception during device registration")
             return DeviceRegistrationResult(false, null, "Error de conexión: ${e.message}")
         }
+    }
+
+    /**
+     * Dispara el Worker para enviar notificaciones pendientes después del login exitoso
+     */
+    private fun triggerPendingNotificationsWorker() {
+        val workManager = WorkManager.getInstance(getApplication())
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val sendWorkRequest = OneTimeWorkRequestBuilder<SendNotificationWorker>()
+            .setConstraints(constraints)
+            .build()
+
+        workManager.enqueue(sendWorkRequest)
+        Timber.tag("LoginViewModel").d("Worker para enviar notificaciones pendientes disparado después del login")
     }
 }

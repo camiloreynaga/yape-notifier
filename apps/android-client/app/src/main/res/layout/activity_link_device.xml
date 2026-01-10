@@ -74,10 +74,22 @@
         android:layout_marginTop="16dp"
         android:enabled="false"
         android:text="Vincular"
-        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintBottom_toTopOf="@+id/btnCancel"
         app:layout_constraintEnd_toEndOf="@+id/til_code"
         app:layout_constraintStart_toStartOf="@+id/til_code"
         app:layout_constraintTop_toBottomOf="@+id/tvError" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnCancel"
+        style="@style/Widget.MaterialComponents.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Cancelar"
+        android:textColor="@color/gray_600"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginBottom="16dp" />
 
     <ProgressBar
         android:id="@+id/progress_bar"

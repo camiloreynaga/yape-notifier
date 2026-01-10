@@ -14,4 +14,8 @@
     <!-- Console Colors -->
     <color name="console_background">#2B2B2B</color>
     <color name="console_text">#A9B7C6</color>
+    
+    <!-- Gray Colors -->
+    <color name="gray_300">#D1D5DB</color>
+    <color name="gray_600">#4B5563</color>
 </resources>

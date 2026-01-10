@@ -30,5 +30,18 @@
         <item name="colorOnSurface">@android:color/black</item>
         <item name="colorOnSurfaceVariant">@android:color/darker_gray</item>
     </style>
+    
+    <!-- Estilo para botones del PIN -->
+    <style name="PinButton" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="android:layout_width">72dp</item>
+        <item name="android:layout_height">72dp</item>
+        <item name="android:layout_margin">8dp</item>
+        <item name="android:textSize">24sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="cornerRadius">36dp</item>
+        <item name="strokeWidth">2dp</item>
+        <item name="strokeColor">@color/purple_500</item>
+        <item name="android:textColor">@color/purple_500</item>
+    </style>
 </resources>
 

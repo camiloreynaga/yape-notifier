@@ -1,0 +1,70 @@
+# ============================================
+# Pasos para Desplegar en Producción
+# ============================================
+
+# PASO 1: En tu máquina local - Hacer commit y push
+# ============================================
+git add .
+git commit -m "feat: add employee management with PIN generation
+
+- Add UserController with CRUD endpoints
+- Add EmployeesPage in dashboard
+- Auto-generate PIN when creating employees
+- Fix migration detection in deploy/update scripts (detect DONE)
+- Add regenerate PIN functionality"
+
+git push origin tenant-version
+# O la rama que uses: git push origin main
+
+# PASO 2: Conectarse al servidor
+# ============================================
+ssh deploy@tu-servidor
+# O: ssh root@tu-servidor
+
+# PASO 3: Actualizar código en el servidor
+# ============================================
+cd /var/apps/yape-notifier
+git pull origin tenant-version
+# O: git pull origin main
+
+# PASO 4: Ir al directorio de producción
+# ============================================
+cd infra/docker/environments/production
+
+# PASO 5: Ejecutar actualización (con backup automático)
+# ============================================
+chmod +x update.sh
+./update.sh
+
+# El script:
+# - Hace backup automático de la BD
+# - Reconstruye imágenes Docker
+# - Ejecuta migraciones (ahora detecta DONE correctamente)
+# - Reinicia servicios
+# - Verifica healthchecks
+
+# PASO 6: Verificar que todo funciona
+# ============================================
+# Ver estado de servicios
+docker compose --env-file .env ps
+
+# Verificar migraciones
+docker compose --env-file .env exec php-fpm php artisan migrate:status
+
+# Probar API
+curl -f https://api.notificaciones.space/up
+
+# PASO 7: Verificar nueva funcionalidad
+# ============================================
+# Abrir dashboard: https://dashboard.notificaciones.space
+# Ir a la pestaña "Empleados"
+# Crear un empleado y verificar que se genera el PIN
+
+# ============================================
+# Si algo falla - Rollback
+# ============================================
+# El script update.sh genera un script de rollback automático
+# Ubicación: ./backups/rollback_YYYYMMDD_HHMMSS.sh
+# Ejecutar: ./backups/rollback_YYYYMMDD_HHMMSS.sh
+
+

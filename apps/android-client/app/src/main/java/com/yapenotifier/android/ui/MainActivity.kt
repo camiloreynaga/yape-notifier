@@ -218,8 +218,40 @@ class MainActivity : AppCompatActivity() {
     private fun loadUserInfo() {
         lifecycleScope.launch {
             val email = preferencesManager.userEmail.first()
-            binding.tvUserInfo.text = "Usuario: ${email ?: "Modo de Prueba"}"
+            val authToken = preferencesManager.authToken.first()
+            val commerceId = preferencesManager.commerceId.first()
+            
+            // Professional Architecture: Authentication is OPTIONAL
+            // Device linking (commerce_id) is what matters for sending notifications
+            
+            if (commerceId.isNullOrBlank()) {
+                // Device not linked - this is critical
+                binding.tvUserInfo.text = "⚠️ Dispositivo no vinculado - Escanea código QR"
+                binding.tvUserInfo.setTextColor(Color.parseColor("#F44336"))
+            } else if (authToken.isNullOrBlank()) {
+                // Device linked but no user session (capturer mode)
+                binding.tvUserInfo.text = "✅ Modo Capturador (sin usuario)"
+                binding.tvUserInfo.setTextColor(Color.parseColor("#FF9800")) // Orange
+            } else {
+                // Device linked AND user authenticated (full mode)
+                binding.tvUserInfo.text = "✅ Usuario: ${email ?: "Autenticado"}"
+                binding.tvUserInfo.setTextColor(Color.parseColor("#4CAF50")) // Green
+            }
         }
+    }
+
+    private fun showLoginRequiredDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("⚠️ Sesión Requerida")
+            .setMessage("No tienes una sesión activa. Las notificaciones se capturarán localmente pero NO se enviarán a la API hasta que inicies sesión.\n\n¿Deseas iniciar sesión ahora?")
+            .setPositiveButton("Iniciar Sesión") { _, _ ->
+                // Navegar a la pantalla de login
+                val intent = Intent(this, LoginActivity::class.java)
+                startActivity(intent)
+            }
+            .setNegativeButton("Más Tarde", null)
+            .setCancelable(true)
+            .show()
     }
 
     private fun updateAllPermissionStatus() {

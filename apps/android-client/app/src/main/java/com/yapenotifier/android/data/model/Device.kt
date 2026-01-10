@@ -11,7 +11,7 @@ data class Device(
     val id: Long,
 
     @SerializedName("user_id")
-    val userId: Long,
+    val userId: Long? = null,
 
     @SerializedName("uuid")
     val uuid: String,

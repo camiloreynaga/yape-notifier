@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="24dp"
+    android:background="@color/white"
+    tools:context=".ui.PinLoginActivity">
+    
+    <!-- Logo -->
+    <ImageView
+        android:id="@+id/logo"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:src="@mipmap/ic_launcher_foreground"
+        android:contentDescription="@string/app_name"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="48dp"/>
+    
+    <!-- Título -->
+    <TextView
+        android:id="@+id/title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Ingresa tu PIN"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:textColor="@color/black"
+        app:layout_constraintTop_toBottomOf="@id/logo"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="24dp"/>
+    
+    <!-- Subtítulo -->
+    <TextView
+        android:id="@+id/subtitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Ingresa el PIN proporcionado por tu administrador"
+        android:textSize="14sp"
+        android:textColor="@color/gray_600"
+        android:textAlignment="center"
+        app:layout_constraintTop_toBottomOf="@id/title"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="8dp"/>
+    
+    <!-- PIN Dots Container -->
+    <LinearLayout
+        android:id="@+id/pinDotsContainer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintTop_toBottomOf="@id/subtitle"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="32dp">
+        
+        <View
+            android:id="@+id/pinDot1"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:background="@drawable/pin_dot"
+            android:layout_margin="8dp"/>
+        
+        <View
+            android:id="@+id/pinDot2"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:background="@drawable/pin_dot"
+            android:layout_margin="8dp"/>
+        
+        <View
+            android:id="@+id/pinDot3"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:background="@drawable/pin_dot"
+            android:layout_margin="8dp"/>
+        
+        <View
+            android:id="@+id/pinDot4"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:background="@drawable/pin_dot"
+            android:layout_margin="8dp"/>
+    </LinearLayout>
+    
+    <!-- Teclado Numérico -->
+    <GridLayout
+        android:id="@+id/numericKeypad"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:columnCount="3"
+        android:rowCount="4"
+        app:layout_constraintTop_toBottomOf="@id/pinDotsContainer"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="48dp">
+        
+        <!-- Fila 1 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn1"
+            style="@style/PinButton"
+            android:text="1"/>
+        
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn2"
+            style="@style/PinButton"
+            android:text="2"/>
+        
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn3"
+            style="@style/PinButton"
+            android:text="3"/>
+        
+        <!-- Fila 2 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn4"
+            style="@style/PinButton"
+            android:text="4"/>
+        
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn5"
+            style="@style/PinButton"
+            android:text="5"/>
+        
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn6"
+            style="@style/PinButton"
+            android:text="6"/>
+        
+        <!-- Fila 3 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn7"
+            style="@style/PinButton"
+            android:text="7"/>
+        
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn8"
+            style="@style/PinButton"
+            android:text="8"/>
+        
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn9"
+            style="@style/PinButton"
+            android:text="9"/>
+        
+        <!-- Fila 4 -->
+        <View
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:visibility="invisible"/>
+        
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn0"
+            style="@style/PinButton"
+            android:text="0"/>
+        
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnBackspace"
+            style="@style/PinButton"
+            android:text="⌫"/>
+    </GridLayout>
+    
+    <!-- Progress Bar -->
+    <ProgressBar
+        android:id="@+id/progressBar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/numericKeypad"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="24dp"/>
+    
+    <!-- Texto de ayuda -->
+    <TextView
+        android:id="@+id/tvHelp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="¿Olvidaste tu PIN?\nContacta a tu administrador"
+        android:textSize="12sp"
+        android:textAlignment="center"
+        android:textColor="@color/gray_600"
+        android:alpha="0.6"
+        app:layout_constraintBottom_toTopOf="@id/btnCancel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginBottom="16dp"/>
+    
+    <!-- Botón Cancelar -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnCancel"
+        style="@style/Widget.MaterialComponents.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Cancelar"
+        android:textColor="@color/gray_600"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginBottom="24dp"/>
+    
+</androidx.constraintlayout.widget.ConstraintLayout>
+

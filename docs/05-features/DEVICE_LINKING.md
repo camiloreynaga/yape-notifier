@@ -18,7 +18,7 @@ El sistema implementa un **enfoque flexible y profesional** para la vinculación
 - La autenticación es **opcional**: el código QR es el mecanismo de autorización principal
 - Un dispositivo puede existir en la base de datos pero **NO estar vinculado a ningún comercio** (`commerce_id = null`). En este caso, la app Android mostrará la pantalla de vinculación.
 
-**Para más detalles sobre la arquitectura, ver:** `docs/05-features/DEVICE_LINKING_ARCHITECTURE.md`
+**Para más detalles sobre la arquitectura, ver:** [DEVICE_LINKING_ARCHITECTURE.md](../03-architecture/DEVICE_LINKING_ARCHITECTURE.md)
 
 ---
 

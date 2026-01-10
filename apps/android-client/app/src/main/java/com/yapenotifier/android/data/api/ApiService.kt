@@ -13,6 +13,8 @@ import com.yapenotifier.android.data.model.LinkCodeValidationResponse
 import com.yapenotifier.android.data.model.LinkDeviceRequest
 import com.yapenotifier.android.data.model.LinkDeviceResponse
 import com.yapenotifier.android.data.model.LoginRequest
+import com.yapenotifier.android.data.model.LoginPinRequest
+import com.yapenotifier.android.data.model.LoginPinResponse
 import com.yapenotifier.android.data.model.MonitoredPackagesResponse
 import com.yapenotifier.android.data.model.NotificationData
 import com.yapenotifier.android.data.model.RegisterRequest
@@ -46,6 +48,9 @@ interface ApiService {
 
     @POST("api/login")
     suspend fun login(@Body request: LoginRequest): Response<AuthResponse>
+
+    @POST("api/auth/login-pin")
+    suspend fun loginWithPin(@Body request: LoginPinRequest): Response<LoginPinResponse>
 
     @POST("api/logout")
     suspend fun logout(): Response<Unit>

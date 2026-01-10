@@ -9,6 +9,7 @@ import com.yapenotifier.android.databinding.ActivityModeSelectionBinding
 import com.yapenotifier.android.data.local.PreferencesManager
 import com.yapenotifier.android.ui.LinkDeviceActivity
 import com.yapenotifier.android.ui.MainActivity
+import com.yapenotifier.android.ui.PinLoginActivity
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -58,27 +59,41 @@ class ModeSelectionActivity : AppCompatActivity() {
     private fun checkDeviceStatusAndNavigate() {
         lifecycleScope.launch {
             try {
+                // Verificar si el usuario tiene token de autenticación (PIN login)
+                val authToken = preferencesManager.authToken.first()
+                Timber.d("ModeSelection: Verificando token de autenticación")
+                
+                if (authToken.isNullOrBlank()) {
+                    // Sin token → Usuario debe hacer login con PIN
+                    Timber.d("ModeSelection: Sin token, navegando a PinLoginActivity")
+                    val intent = Intent(this@ModeSelectionActivity, PinLoginActivity::class.java)
+                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    startActivity(intent)
+                    return@launch
+                }
+                
+                // Con token → Verificar si dispositivo está vinculado
                 val deviceId = preferencesManager.deviceId.first()
-                Timber.d("ModeSelection: Verificando estado del dispositivo - deviceId=$deviceId")
+                Timber.d("ModeSelection: Token encontrado, verificando deviceId=$deviceId")
                 
                 if (deviceId != null && deviceId.isNotBlank()) {
-                    // DeviceId local existe, ir directo a MainActivity
-                    // LinkDeviceActivity verificará en backend si realmente está vinculado
-                    Timber.d("ModeSelection: DeviceId local encontrado, navegando a MainActivity")
+                    // Token + DeviceId → Ir a MainActivity
+                    Timber.d("ModeSelection: Token y DeviceId encontrados, navegando a MainActivity")
                     val intent = Intent(this@ModeSelectionActivity, MainActivity::class.java)
                     intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                     startActivity(intent)
                 } else {
-                    // Device no está vinculado localmente, ir a LinkDeviceActivity
-                    // LinkDeviceActivity verificará en backend también
-                    Timber.d("ModeSelection: Dispositivo no vinculado localmente, navegando a LinkDeviceActivity")
+                    // Token pero sin DeviceId → Ir a LinkDeviceActivity
+                    Timber.d("ModeSelection: Token encontrado pero sin DeviceId, navegando a LinkDeviceActivity")
                     val intent = Intent(this@ModeSelectionActivity, LinkDeviceActivity::class.java)
+                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                     startActivity(intent)
                 }
             } catch (e: Exception) {
-                Timber.e(e, "ModeSelection: Error al verificar estado del dispositivo")
-                // En caso de error, ir a LinkDeviceActivity para que el usuario pueda vincular
-                val intent = Intent(this@ModeSelectionActivity, LinkDeviceActivity::class.java)
+                Timber.e(e, "ModeSelection: Error al verificar estado")
+                // En caso de error, ir a PinLoginActivity para que el usuario se autentique
+                val intent = Intent(this@ModeSelectionActivity, PinLoginActivity::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                 startActivity(intent)
             }
         }

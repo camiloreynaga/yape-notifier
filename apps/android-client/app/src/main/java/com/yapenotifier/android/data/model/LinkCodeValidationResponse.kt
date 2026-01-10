@@ -4,7 +4,7 @@ import com.google.gson.annotations.SerializedName
 
 data class LinkCodeValidationResponse(
     val valid: Boolean,
-    val message: String,
+    val message: Any,
     val commerce: CommerceInfo?
 )
 

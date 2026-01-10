@@ -1,16 +1,19 @@
 package com.yapenotifier.android.worker
 
 import android.content.Context
-import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.yapenotifier.android.data.local.PreferencesManager
 import com.yapenotifier.android.data.local.db.AppDatabase
 import com.yapenotifier.android.data.model.NotificationData
+import com.yapenotifier.android.data.repository.AuthStatus
 import com.yapenotifier.android.data.repository.NotificationRepository
+import com.yapenotifier.android.data.repository.SendResult
 import com.yapenotifier.android.util.PaymentNotificationParser
+import com.yapenotifier.android.util.ServiceStatusManager
 import com.yapenotifier.android.util.SourceAppMapper
 import kotlinx.coroutines.flow.first
+import timber.log.Timber
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -28,23 +31,41 @@ class SendNotificationWorker(appContext: Context, workerParams: WorkerParameters
     }
 
     override suspend fun doWork(): Result {
-        Log.d(TAG, "Starting worker to send pending notifications...")
+        Timber.d("Starting worker to send pending notifications...")
+
+        // Professional Architecture: Authentication is OPTIONAL
+        // Device linking via QR is the authorization mechanism
+        // If device has commerce_id (from QR), it can send notifications without user authentication
+        
+        // Verify device is linked (has commerce_id)
+        val commerceId = preferencesManager.commerceId.first()
+        if (commerceId.isNullOrBlank()) {
+            Timber.w("Dispositivo no vinculado. Por favor, escanea el código QR.")
+            ServiceStatusManager.updateStatus("⚠️ Dispositivo no vinculado - Escanea QR")
+            return Result.failure()
+        }
+        
+        // Authentication status (optional - for logging only)
+        val authStatus = repository.getAuthStatus()
+        val isAuthenticated = authStatus == AuthStatus.AUTHENTICATED
+        Timber.d("Device linked to commerce: $commerceId, User authenticated: $isAuthenticated")
 
         val pendingNotifications = notificationDao.getPendingNotifications()
         if (pendingNotifications.isEmpty()) {
-            Log.d(TAG, "No pending notifications to send.")
+            Timber.d("No pending notifications to send.")
             return Result.success()
         }
         
         // Fetch deviceId once for all notifications in this batch
         val deviceId = preferencesManager.deviceUuid.first() ?: ""
         if (deviceId.isEmpty()) {
-            Log.e(TAG, "DeviceID is not set. Cannot send notifications.")
+            Timber.e("DeviceID is not set. Cannot send notifications.")
             return Result.failure() // Fail fast if no deviceId
         }
 
-        Log.d(TAG, "Found ${pendingNotifications.size} pending notifications for deviceId: $deviceId")
+        Timber.d("Found ${pendingNotifications.size} pending notifications for deviceId: $deviceId")
         var allSucceeded = true
+        var authFailed = false
 
         for (notification in pendingNotifications) {
             // Parse payment details to extract amount, currency, and payer name
@@ -56,13 +77,13 @@ class SendNotificationWorker(appContext: Context, workerParams: WorkerParameters
             // If package mapping failed, try to infer from notification content
             // This handles cases where the package is our own app (com.yapenotifier.android)
             if (sourceApp == null) {
-                Log.d(TAG, "Package mapping failed for '${notification.packageName}', attempting to infer from content")
+                Timber.d("Package mapping failed for '${notification.packageName}', attempting to infer from content")
                 sourceApp = SourceAppMapper.inferSourceAppFromContent(notification.title, notification.body)
             }
             
             // If still null, we cannot determine source_app - mark as failed
             if (sourceApp == null) {
-                Log.w(TAG, "Could not determine source_app for notification ID: ${notification.id}, package: ${notification.packageName}, title: '${notification.title}'. Marking as FAILED.")
+                Timber.w("Could not determine source_app for notification ID: ${notification.id}, package: ${notification.packageName}, title: '${notification.title}'. Marking as FAILED.")
                 notificationDao.updateStatus(notification.id, "FAILED")
                 continue
             }
@@ -111,17 +132,39 @@ class SendNotificationWorker(appContext: Context, workerParams: WorkerParameters
                 status = "pending"
             )
 
-            Log.d(TAG, "Sending notification ID: ${notification.id}, sourceApp: $sourceApp, packageName: ${notification.packageName}")
+            Timber.d("Sending notification ID: ${notification.id}, sourceApp: $sourceApp, packageName: ${notification.packageName}")
 
-            val success = repository.sendNotification(notificationData)
+            val sendResult = repository.sendNotification(notificationData)
 
-            if (success) {
-                notificationDao.updateStatus(notification.id, "SENT")
-                Log.i(TAG, "Successfully sent notification ID: ${notification.id}")
-            } else {
-                Log.e(TAG, "Failed to send notification ID: ${notification.id}. Will retry later.")
-                allSucceeded = false
+            when (sendResult) {
+                is SendResult.Success -> {
+                    notificationDao.updateStatus(notification.id, "SENT")
+                    Timber.i("Successfully sent notification ID: ${notification.id}")
+                }
+                is SendResult.Error -> {
+                    // Si es error de autenticación, detener el batch
+                    if (sendResult.isAuthError) {
+                        Timber.e("Error de autenticación (${sendResult.httpCode}) al enviar notificación ID: ${notification.id}. Token puede haber expirado. Deteniendo batch.")
+                        ServiceStatusManager.updateStatus("⚠️ Token expirado - Inicia sesión nuevamente")
+                        authFailed = true
+                        // No marcar como SENT, se reintentará después del login
+                        break
+                    } else {
+                        Timber.e("Failed to send notification ID: ${notification.id}. Error: ${sendResult.message}. Will retry later.")
+                        allSucceeded = false
+                    }
+                }
+                is SendResult.NetworkError -> {
+                    Timber.e("Network error while sending notification ID: ${notification.id}. Exception: ${sendResult.exception.message}. Will retry later.")
+                    allSucceeded = false
+                }
             }
+        }
+
+        // Si falló la autenticación durante el procesamiento, retornar success para evitar reintentos
+        if (authFailed) {
+            Timber.w("Batch detenido por error de autenticación. Las notificaciones pendientes se enviarán después del login.")
+            return Result.success()
         }
 
         return if (allSucceeded) Result.success() else Result.retry()

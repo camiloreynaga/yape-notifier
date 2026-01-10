@@ -144,4 +144,5 @@ Contactar Soporte</string>
     <string name="instance_label_updated">Nombre actualizado exitosamente</string>
     <string name="package_name">Paquete: %1$s</string>
     <string name="no_label">Sin nombre</string>
+    <string name="device_linked_successfully">Dispositivo vinculado exitosamente</string>
 </resources>

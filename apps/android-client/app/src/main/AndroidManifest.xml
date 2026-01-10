@@ -21,6 +21,13 @@
         android:theme="@style/Theme.YapeNotifier"
         tools:targetApi="31">
 
+        <!-- PIN Login Activity (New authentication method) -->
+        <activity
+            android:name=".ui.PinLoginActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.YapeNotifier.NoActionBar" />
+
         <!-- Login Activity (No longer the launcher) -->
         <activity
             android:name=".ui.LoginActivity"

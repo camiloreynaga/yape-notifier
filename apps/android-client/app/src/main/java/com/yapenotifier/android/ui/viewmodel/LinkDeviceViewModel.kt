@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
+import com.google.gson.Gson
 import com.yapenotifier.android.data.api.ApiCallHandler
 import com.yapenotifier.android.data.api.ApiService
 import com.yapenotifier.android.data.local.PreferencesManager
@@ -57,39 +58,31 @@ class LinkDeviceViewModel @Inject constructor(
                 val normalizedCode = code.trim().uppercase()
                 apiService.validateLinkCode(normalizedCode)
             }
-            
+
             when (result) {
                 is ApiResult.Success -> {
                     val body = result.data
                     if (body.valid && body.commerce != null) {
-                        _validationState.postValue(ValidationState.Valid(body.commerce))
+                        _validationState.value = ValidationState.Valid(body.commerce)
                     } else {
-                        _validationState.postValue(
-                            ValidationState.Invalid(body.message ?: "Código inválido")
-                        )
+                        _validationState.value = ValidationState.Invalid(body.message.toMessageString() ?: "Código inválido")
                     }
                 }
                 is ApiResult.NetworkError -> {
                     Timber.e(result.throwable, "Error validating code")
-                    _validationState.postValue(
-                        ValidationState.Invalid(
-                            result.getErrorMessage(getApplication()) ?: "Error de conexión"
-                        )
+                    _validationState.value = ValidationState.Invalid(
+                        result.getErrorMessage(getApplication()) ?: "Error de conexión"
                     )
                 }
                 is ApiResult.HttpError -> {
-                    _validationState.postValue(
-                        ValidationState.Invalid(
-                            result.getErrorMessage(getApplication()) ?: "Error al validar código"
-                        )
+                    _validationState.value = ValidationState.Invalid(
+                        result.getErrorMessage(getApplication()) ?: "Error al validar código"
                     )
                 }
                 is ApiResult.UnknownError -> {
                     Timber.e(result.throwable, "Error validating code")
-                    _validationState.postValue(
-                        ValidationState.Invalid(
-                            result.getErrorMessage(getApplication()) ?: "Error desconocido"
-                        )
+                    _validationState.value = ValidationState.Invalid(
+                        result.getErrorMessage(getApplication()) ?: "Error desconocido"
                     )
                 }
                 is ApiResult.Loading -> {
@@ -101,7 +94,7 @@ class LinkDeviceViewModel @Inject constructor(
 
     /**
      * Link device to commerce using a link code.
-     * 
+     *
      * Professional Architecture Approach:
      * - Authentication is optional (flexible UX for capturer mode)
      * - Backend automatically creates device if it doesn't exist
@@ -119,7 +112,7 @@ class LinkDeviceViewModel @Inject constructor(
                     Timber.d("LinkDeviceViewModel: Generado nuevo device UUID: $uuid")
                     uuid
                 }
-                
+
                 if (deviceUuid.isBlank()) {
                     throw IllegalStateException("No se pudo generar Device UUID")
                 }
@@ -127,12 +120,12 @@ class LinkDeviceViewModel @Inject constructor(
                 // Check if user is authenticated (optional - for traceability)
                 val authToken = preferencesManager.authToken.first()
                 val isAuthenticated = !authToken.isNullOrBlank()
-                
+
                 Timber.d("LinkDeviceViewModel: Intentando vincular dispositivo. UUID: $deviceUuid, Autenticado: $isAuthenticated")
 
                 val normalizedCode = code.trim().uppercase()
                 val deviceName = android.os.Build.MODEL ?: "Android Device"
-                
+
                 // Professional approach: Use ApiCallHandler for type-safe error handling
                 val result = ApiCallHandler.safeApiCall(getApplication()) {
                     // Note: Backend will automatically create device if it doesn't exist
@@ -147,41 +140,38 @@ class LinkDeviceViewModel @Inject constructor(
                 when (result) {
                     is ApiResult.Success -> {
                         val body = result.data
-                        if (body != null) {
-                            // Save device_id and commerce_id if available in device response
-                            body.device?.let { device ->
-                                // CRITICAL: Save device ID first
-                                preferencesManager.saveDeviceId(device.id.toString())
-                                Timber.d("LinkDeviceViewModel: Device ID saved: ${device.id}")
-                                
-                                device.commerceId?.let { commerceId ->
-                                    preferencesManager.saveCommerceId(commerceId.toString())
-                                    Timber.d("LinkDeviceViewModel: Device linked successfully: ${device.id}, Commerce ID: $commerceId")
-                                } ?: run {
-                                    Timber.w("LinkDeviceViewModel: Device linked but no commerce_id")
-                                }
+                        // Save device_id and commerce_id if available in device response
+                        body.device?.let { device ->
+                            // CRITICAL: Save device ID first
+                            preferencesManager.saveDeviceId(device.id.toString())
+                            Timber.d("LinkDeviceViewModel: Device ID saved: ${device.id}")
+
+                            device.commerceId?.let { commerceId ->
+                                preferencesManager.saveCommerceId(commerceId.toString())
+                                Timber.d("LinkDeviceViewModel: Device linked successfully: ${device.id}, Commerce ID: $commerceId")
                             } ?: run {
-                                Timber.w("LinkDeviceViewModel: Device linked but no device object in response")
+                                Timber.w("LinkDeviceViewModel: Device linked but no commerce_id")
                             }
-                            _linkState.postValue(LinkState.Success(body.message))
-                        } else {
-                            _linkState.postValue(LinkState.Error("Respuesta vacía del servidor"))
+                        } ?: run {
+                            Timber.w("LinkDeviceViewModel: Device linked but no device object in response")
                         }
+                        _linkState.value = LinkState.Success(body.message)
+
                     }
                     is ApiResult.HttpError -> {
                         val errorMessage = result.getErrorMessage(getApplication()) ?: "Error al vincular dispositivo"
                         Timber.e("LinkDeviceViewModel: Error linking device: code=${result.code}, message=$errorMessage")
-                        _linkState.postValue(LinkState.Error(errorMessage))
+                        _linkState.value = LinkState.Error(errorMessage)
                     }
                     is ApiResult.NetworkError -> {
                         val errorMessage = result.getErrorMessage(getApplication()) ?: "Error de conexión"
                         Timber.e(result.throwable, "LinkDeviceViewModel: Network error linking device")
-                        _linkState.postValue(LinkState.Error(errorMessage))
+                        _linkState.value = LinkState.Error(errorMessage)
                     }
                     is ApiResult.UnknownError -> {
                         val errorMessage = result.getErrorMessage(getApplication()) ?: "Error desconocido"
                         Timber.e(result.throwable, "LinkDeviceViewModel: Unknown error linking device")
-                        _linkState.postValue(LinkState.Error(errorMessage))
+                        _linkState.value = LinkState.Error(errorMessage)
                     }
                     is ApiResult.Loading -> {
                         // Already in Linking state
@@ -189,7 +179,7 @@ class LinkDeviceViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 Timber.e(e, "LinkDeviceViewModel: Exception linking device")
-                _linkState.postValue(LinkState.Error("Error de conexión: ${e.message}"))
+                _linkState.value = LinkState.Error("Error de conexión: ${e.message}")
             }
         }
     }
@@ -200,5 +190,16 @@ class LinkDeviceViewModel @Inject constructor(
 
     fun resetLinkState() {
         _linkState.value = LinkState.Idle
+    }
+
+    private fun Any.toMessageString(): String? {
+        if (this is String) {
+            return this
+        }
+        return try {
+            Gson().toJson(this)
+        } catch (e: Exception) {
+            this.toString()
+        }
     }
 }
