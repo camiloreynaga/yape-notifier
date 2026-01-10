@@ -37,7 +37,7 @@ export function useInfiniteNotifications(options: UseInfiniteNotificationsOption
         per_page: pageSize,
       });
     },
-    getNextPageParam: (lastPage) => {
+    getNextPageParam: (lastPage: PaginatedResponse<Notification>) => {
       // Si hay más páginas, retornar el número de la siguiente página
       if (lastPage.current_page < lastPage.last_page) {
         return lastPage.current_page + 1;
@@ -66,7 +66,7 @@ export function useInfiniteNotifications(options: UseInfiniteNotificationsOption
       queryClient.setQueryData<{
         pages: PaginatedResponse<Notification>[];
         pageParams: unknown[];
-      }>(['notifications', 'infinite', filters], (oldData) => {
+      }>(['notifications', 'infinite', filters], (oldData: { pages: PaginatedResponse<Notification>[]; pageParams: unknown[] } | undefined) => {
         if (!oldData) {
           // Si no hay datos, hacer refetch
           queryClient.invalidateQueries({
@@ -123,7 +123,7 @@ export function useInfiniteNotifications(options: UseInfiniteNotificationsOption
   });
 
   // Flatten de todas las notificaciones de todas las páginas
-  const notifications = query.data?.pages.flatMap((page) => page.data) ?? [];
+  const notifications = query.data?.pages.flatMap((page: PaginatedResponse<Notification>) => page.data) ?? [];
 
   // Metadata
   const totalCount = query.data?.pages[0]?.total ?? 0;

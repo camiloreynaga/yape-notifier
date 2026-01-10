@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react';
 import { useDevices } from '@/hooks/useDevices';
 import { useAppInstances } from '@/hooks/useAppInstances';
 import { useDebouncedValue } from '@/hooks/useDebounce';
-import type { AppInstance } from '@/types';
 import AppInstanceCard from '@/components/AppInstanceCard';
 import { Smartphone, Filter, Search, Package } from 'lucide-react';
 
@@ -37,7 +36,7 @@ export default function AppInstancesPage() {
   // Filtrar instancias usando useMemo para optimización
   // Usa debouncedSearchTerm en lugar de searchTerm para evitar filtrados innecesarios
   const filteredInstances = useMemo(() => {
-    return instances.filter((instance) => {
+    return instances.filter((instance: typeof instances[0]) => {
       const matchesDevice = !selectedDeviceId || instance.device_id === selectedDeviceId;
       const matchesSearch =
         !debouncedSearchTerm ||
@@ -51,11 +50,11 @@ export default function AppInstancesPage() {
 
   // Separar instancias asignadas y sin asignar
   const assignedInstances = useMemo(() =>
-    filteredInstances.filter((i) => i.instance_label),
+    filteredInstances.filter((i: typeof filteredInstances[0]) => i.instance_label),
     [filteredInstances]
   );
   const unassignedInstances = useMemo(() =>
-    filteredInstances.filter((i) => !i.instance_label),
+    filteredInstances.filter((i: typeof filteredInstances[0]) => !i.instance_label),
     [filteredInstances]
   );
 
@@ -114,7 +113,7 @@ export default function AppInstancesPage() {
               className="input w-full"
             >
               <option value="">Todos los dispositivos</option>
-              {devices.map((device) => (
+              {devices.map((device: typeof devices[0]) => (
                 <option key={device.id} value={device.id}>
                   {device.name}
                 </option>
@@ -185,7 +184,7 @@ export default function AppInstancesPage() {
             Instancias Asignadas ({assignedInstances.length})
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {assignedInstances.map((instance) => (
+            {assignedInstances.map((instance: typeof assignedInstances[0]) => (
               <AppInstanceCard
                 key={instance.id}
                 instance={instance}
@@ -209,7 +208,7 @@ export default function AppInstancesPage() {
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {unassignedInstances.map((instance) => (
+            {unassignedInstances.map((instance: typeof unassignedInstances[0]) => (
               <AppInstanceCard
                 key={instance.id}
                 instance={instance}

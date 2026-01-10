@@ -322,7 +322,7 @@ export default function NotificationsPage() {
                 disabled={devicesLoading}
               >
                 <option value="">Todos</option>
-                {devices.map((device) => (
+                {devices.map((device: typeof devices[0]) => (
                   <option key={device.id} value={device.id}>
                     {device.name}
                   </option>
@@ -362,7 +362,7 @@ export default function NotificationsPage() {
                 disabled={appInstancesLoading}
               >
                 <option value="">Todas</option>
-                {appInstances.map((instance) => (
+                {appInstances.map((instance: typeof appInstances[0]) => (
                   <option key={instance.id} value={instance.id}>
                     {instance.instance_label || `${instance.package_name} (User ${instance.android_user_id})`}
                   </option>

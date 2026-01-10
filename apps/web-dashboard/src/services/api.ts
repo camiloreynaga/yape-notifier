@@ -2,7 +2,6 @@ import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig, AxiosResp
 import { API_BASE_URL, API_ENDPOINTS } from '@/config/api';
 import { logger } from './logger';
 import { apiCircuitBreaker, devicesCircuitBreaker, appInstancesCircuitBreaker } from './circuitBreaker';
-import { requestQueue } from './requestQueue';
 import type { AuthResponse, User, Device, Notification, NotificationFilters, NotificationStatistics, PaginatedResponse, ApiError, Commerce, AppInstance, MonitorPackage } from '@/types';
 
 class ApiService {
@@ -129,36 +128,6 @@ class ApiService {
     return breaker.execute(fn);
   }
 
-  /**
-   * Wrapper para requests críticos que deben reintentar en cola si fallan
-   */
-  private async executeWithQueue<T>(
-    fn: () => Promise<T>,
-    options: {
-      name: string;
-      priority?: number;
-      maxRetries?: number;
-    }
-  ): Promise<T> {
-    try {
-      return await fn();
-    } catch (error) {
-      // Si es error de red, agregar a la cola para reintentar
-      if (error instanceof AxiosError && !error.response) {
-        logger.warn(`Adding failed request to queue: ${options.name}`);
-
-        return new Promise((resolve, reject) => {
-          requestQueue.enqueue(fn, {
-            ...options,
-            onSuccess: (result) => resolve(result as T),
-            onError: (err) => reject(err),
-          });
-        });
-      }
-
-      throw error;
-    }
-  }
 
   // Auth methods
   async register(name: string, email: string, password: string): Promise<AuthResponse> {
