@@ -21,13 +21,16 @@ Documentación para nuevos usuarios y desarrolladores que se inician en el proye
 Guías de despliegue y operaciones en diferentes entornos.
 
 - **[DEPLOYMENT.md](02-deployment/DEPLOYMENT.md)** - Guía completa de despliegue en producción
-- **[DEPLOY_GUIDE_PRODUCTION.md](02-deployment/DEPLOY_GUIDE_PRODUCTION.md)** - Guía detallada paso a paso para despliegue en producción
+- **[GUIA_PRODUCCION_PASO_A_PASO.md](02-deployment/GUIA_PRODUCCION_PASO_A_PASO.md)** - Guía detallada paso a paso para despliegue en producción
+- **[DEPLOYMENT_COMMANDS.md](02-deployment/DEPLOYMENT_COMMANDS.md)** - Comandos rápidos de despliegue
 - **[DEPLOYMENT_CHECKLIST.md](02-deployment/DEPLOYMENT_CHECKLIST.md)** - Checklist de despliegue en DigitalOcean
+- **[DEPLOY_GUIDE_PRODUCTION.md](02-deployment/DEPLOY_GUIDE_PRODUCTION.md)** - Guía detallada paso a paso para despliegue en producción
 - **[DOCKER.md](02-deployment/DOCKER.md)** - Documentación técnica de Docker
 - **[DEVICE_FEATURES.md](02-deployment/DEVICE_FEATURES.md)** - Sistema de vinculación y salud de dispositivos
 - **[DASHBOARD_DEPLOYMENT.md](02-deployment/DASHBOARD_DEPLOYMENT.md)** - Guía de deployment específica del dashboard web
 - **[DASHBOARD_CHECKLIST.md](02-deployment/DASHBOARD_CHECKLIST.md)** - Checklist de producción del dashboard web
 - **[DIGITAL_OCEAN_DEPLOYMENT.md](02-deployment/DIGITAL_OCEAN_DEPLOYMENT.md)** - Guía de despliegue en DigitalOcean
+- **[RESUMEN_RAPIDO_PRODUCCION.md](02-deployment/RESUMEN_RAPIDO_PRODUCCION.md)** - Resumen rápido de producción
 - **PRODUCTION.md** - Checklist y mejores prácticas de producción (pendiente)
 
 ---
@@ -38,6 +41,7 @@ Documentación técnica de la arquitectura del sistema.
 
 - **[DUAL_APPS.md](03-architecture/DUAL_APPS.md)** - Sistema de apps duales
 - **[MULTI_TENANT.md](03-architecture/MULTI_TENANT.md)** - Sistema multi-tenant
+- **[TRACEABILITY_ARCHITECTURE.md](03-architecture/TRACEABILITY_ARCHITECTURE.md)** - Arquitectura de trazabilidad y login
 - **[ANDROID_USER_ID.md](03-architecture/ANDROID_USER_ID.md)** - Análisis técnico: Identificador de usuario Android
 - **[ANDROID_IMPLEMENTATION.md](03-architecture/ANDROID_IMPLEMENTATION.md)** - Análisis completo de implementación de la app Android
 - **[ANDROID_HILT.md](03-architecture/ANDROID_HILT.md)** - Dependency Injection con Hilt en Android
@@ -53,12 +57,22 @@ Documentación técnica de la arquitectura del sistema.
 Guías para desarrolladores.
 
 - **[WORKFLOW.md](04-development/WORKFLOW.md)** - Flujo de trabajo de desarrollo
+- **[DOCUMENTATION_PROCESS.md](04-development/DOCUMENTATION_PROCESS.md)** - Proceso de documentación (comando "documentar")
 - **[TESTING.md](04-development/TESTING.md)** - Guía completa de testing
 - **[TESTING_QR_LINKING.md](04-development/TESTING_QR_LINKING.md)** - Guía de pruebas del sistema de vinculación QR
 - **[ERROR_TRACKING.md](04-development/ERROR_TRACKING.md)** - Guía de implementación de error tracking
 - **[DEPENDENCIES.md](04-development/DEPENDENCIES.md)** - Gestión profesional de dependencias (composer)
 - **[PROMPTS_DESARROLLO.md](04-development/PROMPTS_DESARROLLO.md)** - Prompts listos para desarrollo con IA
 - **CONTRIBUTING.md** - Guía de contribución (pendiente)
+
+---
+
+### 04. Security
+
+Documentación de seguridad y multi-tenancy.
+
+- **[MULTI_TENANT_SECURITY.md](04-security/MULTI_TENANT_SECURITY.md)** - Seguridad multi-tenant
+- **[AUDIT_DEVICE_LINKING.md](04-security/AUDIT_DEVICE_LINKING.md)** - Auditoría de vinculación de dispositivos sin autenticación
 
 ---
 
@@ -73,6 +87,12 @@ Documentación de funcionalidades y features del sistema.
 - **[DEVICE_LINKING_ARCHITECTURE.md](03-architecture/DEVICE_LINKING_ARCHITECTURE.md)** - Arquitectura profesional de vinculación de dispositivos
 - **[DEVICE_LINKING_FLOW.md](05-features/DEVICE_LINKING_FLOW.md)** - Flujo detallado paso a paso de vinculación de dispositivos
 - **[DEVICE_LINKING_METHODS_COMPARISON.md](05-features/DEVICE_LINKING_METHODS_COMPARISON.md)** - Comparación de métodos de vinculación (QR vs Dashboard)
+- **[CAPTURER_MODE_EXPLANATION.md](05-features/CAPTURER_MODE_EXPLANATION.md)** - Explicación del modo capturer (sin login)
+- **[PIN_SYSTEM_HOW_IT_WORKS.md](05-features/PIN_SYSTEM_HOW_IT_WORKS.md)** - Cómo funciona el sistema con PIN
+- **[PIN_SYSTEM_IMPLEMENTATION_SUMMARY.md](05-features/PIN_SYSTEM_IMPLEMENTATION_SUMMARY.md)** - Resumen de implementación del sistema PIN
+- **[PIN_SYSTEM_FINAL_IMPLEMENTATION.md](05-features/PIN_SYSTEM_FINAL_IMPLEMENTATION.md)** - Implementación completa del sistema PIN
+- **[PIN_SYSTEM_IMPLEMENTATION_PLAN.md](05-features/PIN_SYSTEM_IMPLEMENTATION_PLAN.md)** - Plan de implementación del sistema PIN
+- **[PIN_SYSTEM_UX_IMPACT.md](05-features/PIN_SYSTEM_UX_IMPACT.md)** - Impacto UX del sistema PIN en Android
 - **[ANDROID_ADMIN_MODULE.md](05-features/ANDROID_ADMIN_MODULE.md)** - Módulo Admin móvil - App Android (implementado)
 - **[MONITOR_PACKAGES.md](05-features/MONITOR_PACKAGES.md)** - Sistema de gestión de paquetes monitoreados
 - **[DEVICE_CONNECTION_STATUS_EXPLANATION.md](05-features/DEVICE_CONNECTION_STATUS_EXPLANATION.md)** - Explicación del estado de conexión de dispositivos
@@ -89,6 +109,7 @@ Documentación para operaciones y mantenimiento.
 - **[BACKUP.md](06-operations/BACKUP.md)** - Backup y recuperación
 - **[UPDATE_CHECKLIST.md](06-operations/UPDATE_CHECKLIST.md)** - Checklist de actualización del servidor
 - **[TROUBLESHOOTING.md](06-operations/TROUBLESHOOTING.md)** - Diagnóstico y solución de problemas
+- **[TROUBLESHOOTING_NOTIFICATIONS.md](06-operations/TROUBLESHOOTING_NOTIFICATIONS.md)** - Solución: Notificaciones no capturadas
 - **MAINTENANCE.md** - Mantenimiento y actualizaciones (pendiente)
 
 ---
@@ -101,6 +122,8 @@ Referencia técnica: bugs, estado de implementación, roadmap, changelog.
 - **[IMPLEMENTATION_STATUS.md](07-reference/IMPLEMENTATION_STATUS.md)** - Estado actual de implementación
 - **[ROADMAP.md](07-reference/ROADMAP.md)** - Pendientes y mejoras planificadas
 - **[CHANGELOG.md](07-reference/CHANGELOG.md)** - Historial de cambios y mejoras implementadas
+- **[ARCHITECTURE_REVIEW.md](07-reference/ARCHITECTURE_REVIEW.md)** - Revisión arquitectónica senior completa
+- **[ARCHITECTURE_REVIEW_SUMMARY.md](07-reference/ARCHITECTURE_REVIEW_SUMMARY.md)** - Resumen ejecutivo de revisión arquitectónica
 - **[CODE_QUALITY_API.md](07-reference/CODE_QUALITY_API.md)** - Análisis de buenas prácticas y calidad de código (API Laravel)
 - **[CODE_QUALITY_ANDROID.md](07-reference/CODE_QUALITY_ANDROID.md)** - Revisión de código y calidad (App Android)
 - **API_REFERENCE.md** - Referencia completa de API (pendiente)
@@ -163,3 +186,17 @@ Si eres nuevo en el proyecto:
 ---
 
 **Última actualización:** 2025-01-21
+
+---
+
+## 📋 Proceso de Documentación
+
+Para mantener la documentación actualizada, ejecuta el comando **"documentar"** que:
+
+1. Identifica nuevos archivos `.md` en la raíz
+2. Clasifica y mueve archivos a ubicaciones correctas
+3. Consolida contenido duplicado
+4. Actualiza referencias cruzadas
+5. Mantiene `docs/README.md` actualizado
+
+Ver **[DOCUMENTATION_PROCESS.md](04-development/DOCUMENTATION_PROCESS.md)** para detalles del proceso.
