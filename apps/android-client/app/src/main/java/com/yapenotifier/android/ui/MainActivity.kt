@@ -84,7 +84,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupUI() {
         binding.tvServiceLog.movementMethod = ScrollingMovementMethod()
-        updateCaptureStatus("Verificando...", Color.parseColor("#757575"))
+        // Initialize with warning state (verifying)
+        updateCaptureStatus("Verificando...", Color.parseColor("#FF9800"))
     }
 
 
@@ -151,9 +152,15 @@ class MainActivity : AppCompatActivity() {
     private fun updateCaptureStatus(statusText: String, color: Int) {
         binding.tvCaptureStatus.text = statusText
         binding.tvCaptureStatus.setTextColor(color)
-        // Update card stroke color dynamically
-        binding.cardCaptureStatus.strokeColor = color
-        binding.cardCaptureStatus.strokeWidth = if (color != Color.parseColor("#757575")) 3 else 0
+        
+        // Update status indicator drawable based on color
+        val indicatorDrawable = when (color) {
+            Color.parseColor("#4CAF50") -> R.drawable.bg_status_active  // Green - Active
+            Color.parseColor("#FF9800") -> R.drawable.bg_status_warning // Orange - Warning
+            Color.parseColor("#F44336") -> R.drawable.bg_status_error   // Red - Error
+            else -> R.drawable.bg_status_warning // Default to warning (blue/processing)
+        }
+        binding.viewStatusIndicator.setBackgroundResource(indicatorDrawable)
     }
 
     private fun updateStatistics(state: StatisticsState) {
@@ -270,20 +277,30 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateNotificationPermissionStatus(isGranted: Boolean) {
         if (isGranted) {
-            binding.tvStatus.text = "✅ Permiso de Notificación: Activado"
-            binding.btnEnableNotifications.isEnabled = false
+            binding.tvStatus.text = "Permiso de Notificación: Activado"
+            binding.tvStatus.setTextColor(Color.parseColor("#374151"))
+            binding.ivNotificationStatus.setImageResource(R.drawable.ic_check_circle_filled)
+            binding.btnEnableNotifications.visibility = android.view.View.GONE
         } else {
-            binding.tvStatus.text = "❌ Permiso de Notificación: Desactivado"
+            binding.tvStatus.text = "Permiso de Notificación: Desactivado"
+            binding.tvStatus.setTextColor(Color.parseColor("#EF4444"))
+            binding.ivNotificationStatus.setImageResource(R.drawable.ic_warning_filled)
+            binding.btnEnableNotifications.visibility = android.view.View.VISIBLE
             binding.btnEnableNotifications.isEnabled = true
         }
     }
 
     private fun updateBatteryOptimizationStatus(isIgnoring: Boolean) {
         if (isIgnoring) {
-            binding.tvBatteryStatus.text = "✅ Ahorro de Batería: Desactivado"
-            binding.btnBatteryOptimization.isEnabled = false
+            binding.tvBatteryStatus.text = "Ahorro de Batería: Desactivado"
+            binding.tvBatteryStatus.setTextColor(Color.parseColor("#374151"))
+            binding.ivBatteryStatus.setImageResource(R.drawable.ic_check_circle_filled)
+            binding.btnBatteryOptimization.visibility = android.view.View.GONE
         } else {
-            binding.tvBatteryStatus.text = "❌ Ahorro de Batería: Activado (puede detener el servicio)"
+            binding.tvBatteryStatus.text = "Ahorro de Batería: Activo ⚠️"
+            binding.tvBatteryStatus.setTextColor(Color.parseColor("#F59E0B"))
+            binding.ivBatteryStatus.setImageResource(R.drawable.ic_warning_filled)
+            binding.btnBatteryOptimization.visibility = android.view.View.VISIBLE
             binding.btnBatteryOptimization.isEnabled = true
         }
     }
