@@ -167,10 +167,19 @@ class DeviceService
 
     /**
      * Get devices for a user.
+     *
+     * If user has commerce_id, returns all devices for that commerce (admin view).
+     * Otherwise, returns only devices belonging to the user.
      */
     public function getUserDevices(User $user, bool $activeOnly = false)
     {
-        $query = Device::where('user_id', $user->id);
+        // If user has commerce_id, show all devices for that commerce
+        if ($user->commerce_id) {
+            $query = Device::where('commerce_id', $user->commerce_id);
+        } else {
+            // Fallback: show only user's own devices
+            $query = Device::where('user_id', $user->id);
+        }
 
         if ($activeOnly) {
             $query->where('is_active', true);
