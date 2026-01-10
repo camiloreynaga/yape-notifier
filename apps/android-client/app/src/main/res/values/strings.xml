@@ -146,4 +146,8 @@ Contactar Soporte</string>
     <string name="package_name">Paquete: %1$s</string>
     <string name="no_label">Sin nombre</string>
     <string name="device_linked_successfully">Dispositivo vinculado exitosamente</string>
+
+    <!-- Admin Devices -->
+    <string name="admin_devices_title">Dispositivos</string>
+    <string name="admin_devices_subtitle">Gestionar dispositivos vinculados</string>
 </resources>

@@ -8,6 +8,7 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.yapenotifier.android.R
 import com.yapenotifier.android.databinding.ActivityAdminDevicesBinding
 import com.yapenotifier.android.data.model.Device
 import com.yapenotifier.android.ui.admin.adapter.DeviceAdapter
@@ -40,8 +41,8 @@ class AdminDevicesActivity : AppCompatActivity() {
     private fun setupToolbar() {
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayShowTitleEnabled(false)
-        binding.toolbarTitle.text = "Dispositivos"
-        binding.toolbarSubtitle.text = "Gestionar dispositivos vinculados"
+        binding.toolbarTitle.text = getString(R.string.admin_devices_title)
+        binding.toolbarSubtitle.text = getString(R.string.admin_devices_subtitle)
     }
 
     private fun setupBottomNavigation() {
@@ -173,4 +174,3 @@ class AdminDevicesActivity : AppCompatActivity() {
         loadDevices()
     }
 }
-
