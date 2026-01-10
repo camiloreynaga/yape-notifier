@@ -64,12 +64,19 @@ class AdminPanelActivity : AppCompatActivity() {
     }
 
     private fun setupRecyclerView() {
-        adapter = NotificationAdapter { notification ->
-            // Navigate to detail
-            val intent = Intent(this, AdminNotificationDetailActivity::class.java)
-            intent.putExtra("notification_id", notification.id)
-            startActivity(intent)
-        }
+        adapter = NotificationAdapter(
+            onItemClick = { notification ->
+                // Navigate to detail
+                val intent = Intent(this, AdminNotificationDetailActivity::class.java)
+                intent.putExtra("notification_id", notification.id)
+                startActivity(intent)
+            },
+            onValidateClick = { notification ->
+                // Validate notification (quick action)
+                viewModel.validateNotification(notification.id)
+                Toast.makeText(this, "Notificación validada", Toast.LENGTH_SHORT).show()
+            }
+        )
 
         binding.rvNotifications.layoutManager = LinearLayoutManager(this)
         binding.rvNotifications.adapter = adapter

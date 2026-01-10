@@ -9,9 +9,10 @@ import { useDebouncedValue } from '@/hooks/useDebounce';
 import { logger } from '@/services/logger';
 import type { Notification, NotificationFilters } from '@/types';
 import { format } from 'date-fns';
-import { Download, Filter, Eye, RefreshCw, Calendar, X, Inbox, Search } from 'lucide-react';
+import { Download, Filter, Eye, RefreshCw, Calendar, X, Inbox, Search, Grid3x3, List, SlidersHorizontal } from 'lucide-react';
 import WebSocketStatus from '@/components/WebSocketStatus';
 import EmptyState from '@/components/EmptyState';
+import NotificationCard from '@/components/NotificationCard';
 
 export default function NotificationsPage() {
   const navigate = useNavigate();
@@ -22,6 +23,7 @@ export default function NotificationsPage() {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   // Debounced search query (espera 300ms después de que el usuario deja de escribir)
   const { debouncedValue: debouncedSearchQuery, isDebouncing } = useDebouncedValue(searchQuery, 300);
@@ -199,37 +201,114 @@ export default function NotificationsPage() {
     filters.status === 'pending' ? 'pending' : ''
   , [filters.status, filters.start_date]);
 
+  // Calcular estadísticas para el header
+  const stats = useMemo(() => {
+    const data = filteredNotifications;
+    return {
+      total: data.length,
+      pending: data.filter((n: Notification) => n.status === 'pending').length,
+      validated: data.filter((n: Notification) => n.status === 'validated').length,
+      inconsistent: data.filter((n: Notification) => n.status === 'inconsistent').length,
+    };
+  }, [filteredNotifications]);
+
   return (
-    <div className="space-y-4">
-      {/* Header compacto y responsive */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Notificaciones</h1>
-          <WebSocketStatus />
-        </div>
-        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-          <button
-            onClick={() => refetch()}
-            className="btn btn-secondary flex items-center gap-2 text-sm"
-            title="Actualizar manualmente"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Actualizar</span>
-          </button>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`btn btn-secondary flex items-center gap-2 text-sm ${showFilters ? 'bg-primary-100 text-primary-700' : ''}`}
-          >
-            <Filter className="h-4 w-4" />
-            <span className="hidden sm:inline">Filtros</span>
-          </button>
-          <button
-            onClick={exportToCSV}
-            className="btn btn-primary flex items-center gap-2 text-sm"
-          >
-            <Download className="h-4 w-4" />
-            <span className="hidden sm:inline">Exportar</span>
-          </button>
+    <div className="space-y-6">
+      {/* Header moderno con estadísticas */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary-500 via-primary-600 to-indigo-600 p-6 shadow-xl">
+        {/* Patrón decorativo de fondo */}
+        <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))]" />
+        <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10 blur-2xl" />
+        <div className="absolute -left-4 -bottom-4 h-32 w-32 rounded-full bg-white/10 blur-3xl" />
+
+        <div className="relative z-10">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+            {/* Título y estadísticas */}
+            <div className="space-y-4 flex-1">
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-bold text-white">Notificaciones</h1>
+                <WebSocketStatus />
+              </div>
+
+              {/* Estadísticas rápidas */}
+              <div className="flex flex-wrap gap-3">
+                <div className="px-4 py-2 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20">
+                  <div className="text-xs text-primary-100 font-medium">Total</div>
+                  <div className="text-2xl font-bold text-white">{stats.total}</div>
+                </div>
+                <div className="px-4 py-2 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20">
+                  <div className="text-xs text-primary-100 font-medium">Pendientes</div>
+                  <div className="text-2xl font-bold text-yellow-200">{stats.pending}</div>
+                </div>
+                <div className="px-4 py-2 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20">
+                  <div className="text-xs text-primary-100 font-medium">Validadas</div>
+                  <div className="text-2xl font-bold text-green-200">{stats.validated}</div>
+                </div>
+                <div className="px-4 py-2 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20">
+                  <div className="text-xs text-primary-100 font-medium">Inconsistentes</div>
+                  <div className="text-2xl font-bold text-red-200">{stats.inconsistent}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Acciones y controles */}
+            <div className="flex flex-wrap gap-2">
+              {/* Toggle de vista */}
+              <div className="flex gap-1 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`px-3 py-2 rounded-md flex items-center gap-2 text-sm font-medium transition-all duration-200 ${
+                    viewMode === 'grid'
+                      ? 'bg-white text-primary-600 shadow-sm'
+                      : 'text-white hover:bg-white/10'
+                  }`}
+                  title="Vista de cuadrícula"
+                >
+                  <Grid3x3 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Grid</span>
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`px-3 py-2 rounded-md flex items-center gap-2 text-sm font-medium transition-all duration-200 ${
+                    viewMode === 'list'
+                      ? 'bg-white text-primary-600 shadow-sm'
+                      : 'text-white hover:bg-white/10'
+                  }`}
+                  title="Vista de lista"
+                >
+                  <List className="h-4 w-4" />
+                  <span className="hidden sm:inline">Lista</span>
+                </button>
+              </div>
+
+              <button
+                onClick={() => refetch()}
+                className="px-4 py-2 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 transition-all duration-200 flex items-center gap-2 text-sm font-medium"
+                title="Actualizar manualmente"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Actualizar</span>
+              </button>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`px-4 py-2 rounded-lg backdrop-blur-sm border text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                  showFilters
+                    ? 'bg-white text-primary-600 border-white shadow-sm'
+                    : 'bg-white/10 border-white/20 text-white hover:bg-white/20'
+                }`}
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                <span className="hidden sm:inline">Filtros</span>
+              </button>
+              <button
+                onClick={exportToCSV}
+                className="px-4 py-2 rounded-lg bg-white text-primary-600 hover:bg-white/90 transition-all duration-200 flex items-center gap-2 text-sm font-medium shadow-sm"
+              >
+                <Download className="h-4 w-4" />
+                <span className="hidden sm:inline">Exportar</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -289,15 +368,21 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters - Mejorado */}
       {showFilters && (
-        <div className="card">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">Filtros</h2>
+        <div className="card bg-gradient-to-br from-white via-white to-gray-50/50 border-2 border-primary-100 shadow-lg">
+          <div className="flex justify-between items-center mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary-100">
+                <SlidersHorizontal className="h-5 w-5 text-primary-600" />
+              </div>
+              <h2 className="text-xl font-bold text-gray-900">Filtros Avanzados</h2>
+            </div>
             <button
               onClick={clearFilters}
-              className="text-sm text-primary-600 hover:text-primary-700"
+              className="px-4 py-2 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-all duration-200 flex items-center gap-2"
             >
+              <X className="h-4 w-4" />
               Limpiar filtros
             </button>
           </div>
@@ -442,15 +527,29 @@ export default function NotificationsPage() {
         </div>
       )}
 
-      {/* Notifications Table - Mejorado */}
-      <div className="card p-0 overflow-hidden">
-        {loading && !notifications ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-          </div>
-        ) : filteredNotifications.length > 0 ? (
-          <>
-            <div className="overflow-x-auto">
+      {/* Notifications - Grid o Lista */}
+      {loading && !notifications ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        </div>
+      ) : filteredNotifications.length > 0 ? (
+        <>
+          {/* Vista de Grid */}
+          {viewMode === 'grid' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
+              {filteredNotifications.map((notification: Notification) => (
+                <NotificationCard
+                  key={notification.id}
+                  notification={notification}
+                  onStatusChange={handleStatusChange}
+                  onClick={() => navigate(`/notifications/${notification.id}`)}
+                />
+              ))}
+            </div>
+          ) : (
+            /* Vista de Lista (tabla) */
+            <div className="card p-0 overflow-hidden">
+              <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
@@ -474,6 +573,9 @@ export default function NotificationsPage() {
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider hidden xl:table-cell">
                       Pagador
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider hidden 2xl:table-cell">
+                      Código
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Estado
@@ -535,6 +637,15 @@ export default function NotificationsPage() {
                           {notification.payer_name || 'N/A'}
                         </div>
                       </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-center hidden 2xl:table-cell">
+                        {notification.security_code ? (
+                          <span className="inline-flex items-center px-3 py-1 rounded-lg text-sm font-bold bg-gradient-to-br from-purple-100 to-indigo-100 text-purple-700 border border-purple-200">
+                            {notification.security_code}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">-</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 whitespace-nowrap text-center">
                         <div className="flex flex-col items-center gap-1">
                           {getStatusBadge(notification.status)}
@@ -573,11 +684,11 @@ export default function NotificationsPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+              </div>
 
-            {/* Pagination - Mejorado */}
-            {notifications && notifications.last_page > 1 && (
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+              {/* Pagination - Mejorado */}
+              {notifications && notifications.last_page > 1 && (
+                <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="text-sm text-gray-700">
                   {debouncedSearchQuery ? (
                     <>
@@ -613,31 +724,73 @@ export default function NotificationsPage() {
                     Siguiente
                   </button>
                 </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Paginación para vista de Grid */}
+          {viewMode === 'grid' && notifications && notifications.last_page > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 p-6 bg-white rounded-xl shadow-sm border border-gray-100">
+              <div className="text-sm text-gray-700">
+                {debouncedSearchQuery ? (
+                  <>
+                    Mostrando <span className="font-medium">{filteredNotifications.length}</span> de{' '}
+                    <span className="font-medium">{notifications.total}</span> resultados
+                    <span className="text-primary-600 ml-1">(búsqueda activa)</span>
+                  </>
+                ) : (
+                  <>
+                    Mostrando <span className="font-medium">{notifications.from}</span> a{' '}
+                    <span className="font-medium">{notifications.to}</span> de{' '}
+                    <span className="font-medium">{notifications.total}</span> resultados
+                  </>
+                )}
               </div>
-            )}
-          </>
-        ) : (
-          <EmptyState
-            icon={<Inbox className="w-16 h-16 text-gray-400" />}
-            title="No se encontraron notificaciones"
-            message={
-              debouncedSearchQuery
-                ? `No hay notificaciones que coincidan con "${debouncedSearchQuery}". Intenta con otro término de búsqueda.`
-                : Object.keys(filters).length > 2
-                ? "No hay notificaciones que coincidan con los filtros seleccionados. Intenta ajustar los filtros."
-                : "Aún no has recibido notificaciones. Las notificaciones aparecerán aquí cuando lleguen."
-            }
-            action={
-              debouncedSearchQuery || Object.keys(filters).length > 2
-                ? {
-                    label: debouncedSearchQuery ? "Limpiar búsqueda" : "Limpiar filtros",
-                    onClick: clearFilters,
-                  }
-                : undefined
-            }
-          />
-        )}
-      </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleFilterChange('page', notifications.current_page - 1)}
+                  disabled={notifications.current_page === 1}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
+                >
+                  Anterior
+                </button>
+                <span className="px-4 py-2 text-sm text-gray-700">
+                  Página <span className="font-semibold">{notifications.current_page}</span> de{' '}
+                  <span className="font-semibold">{notifications.last_page}</span>
+                </span>
+                <button
+                  onClick={() => handleFilterChange('page', notifications.current_page + 1)}
+                  disabled={notifications.current_page === notifications.last_page}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
+                >
+                  Siguiente
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <EmptyState
+          icon={<Inbox className="w-16 h-16 text-gray-400" />}
+          title="No se encontraron notificaciones"
+          message={
+            debouncedSearchQuery
+              ? `No hay notificaciones que coincidan con "${debouncedSearchQuery}". Intenta con otro término de búsqueda.`
+              : Object.keys(filters).length > 2
+              ? "No hay notificaciones que coincidan con los filtros seleccionados. Intenta ajustar los filtros."
+              : "Aún no has recibido notificaciones. Las notificaciones aparecerán aquí cuando lleguen."
+          }
+          action={
+            debouncedSearchQuery || Object.keys(filters).length > 2
+              ? {
+                  label: debouncedSearchQuery ? "Limpiar búsqueda" : "Limpiar filtros",
+                  onClick: clearFilters,
+                }
+              : undefined
+          }
+        />
+      )}
     </div>
   );
 }

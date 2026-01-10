@@ -19,6 +19,8 @@ data class NotificationData(
     val currency: String? = "PEN",
     @SerializedName("payer_name")
     val payerName: String?,
+    @SerializedName("security_code")
+    val securityCode: String? = null,
     @SerializedName("posted_at")
     val postedAt: String? = null,
     @SerializedName("received_at")

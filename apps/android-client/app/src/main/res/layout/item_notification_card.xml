@@ -2,172 +2,240 @@
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/cardRoot"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginHorizontal="8dp"
+    android:layout_marginHorizontal="12dp"
     android:layout_marginVertical="4dp"
-    app:cardCornerRadius="12dp"
+    app:cardCornerRadius="16dp"
     app:cardElevation="2dp"
     app:strokeWidth="0dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="16dp"
-        android:gravity="center_vertical">
+        android:orientation="vertical"
+        android:padding="12dp">
 
-        <!-- App Icon -->
-        <ImageView
-            android:id="@+id/ivAppIcon"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="@drawable/bg_app_icon_yape"
-            android:padding="12dp"
-            android:contentDescription="App Icon"
-            tools:src="@drawable/ic_bell_notification" />
-
-        <!-- Content -->
+        <!-- FILA 1: App Badge + Instance Badge + Hora + Menu -->
         <LinearLayout
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="12dp"
-            android:orientation="vertical">
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
-            <!-- Header: App Info and Time -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
-
-                <TextView
-                    android:id="@+id/tvAppInfo"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Yape • Caja Principal • iPhone 13"
-                    android:textSize="12sp"
-                    android:textColor="#757575"
-                    tools:text="Yape • Caja Principal • iPhone 13" />
-
-                <TextView
-                    android:id="@+id/tvTime"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="35 min"
-                    android:textSize="12sp"
-                    android:textColor="#757575"
-                    tools:text="35 min" />
-            </LinearLayout>
-
-            <!-- Title -->
+            <!-- App Badge -->
             <TextView
-                android:id="@+id/tvTitle"
+                android:id="@+id/tvAppBadge"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Confirmación de Pago"
-                android:textSize="16sp"
+                android:text="Yape"
+                android:textSize="11sp"
                 android:textStyle="bold"
-                android:textColor="@android:color/black"
-                tools:text="Confirmación de Pago" />
+                android:textColor="#FFFFFF"
+                android:background="@drawable/bg_app_badge_yape"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="3dp"
+                tools:text="Yape" />
 
-            <!-- Body with Amount Highlighted -->
+            <!-- Instance Badge (Color-coded) -->
             <TextView
-                android:id="@+id/tvBody"
-                android:layout_width="match_parent"
+                android:id="@+id/tvInstanceBadge"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="SEGUNDINO RICSE DE LA CRUZ te envió un pago por S/70.00"
+                android:layout_marginStart="6dp"
+                android:text="Katty"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:textColor="#7C3B92"
+                android:background="@drawable/bg_instance_badge_katty"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="3dp"
+                android:visibility="gone"
+                tools:visibility="visible"
+                tools:text="Katty" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <!-- Time -->
+            <TextView
+                android:id="@+id/tvTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="10 Ene • 02:55"
+                android:textSize="11sp"
+                android:textColor="#757575"
+                android:layout_marginEnd="4dp"
+                tools:text="10 Ene • 02:55" />
+
+            <!-- Menu Icon -->
+            <ImageView
+                android:id="@+id/ivMenu"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_more_vert"
+                android:contentDescription="Opciones"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackgroundBorderless" />
+        </LinearLayout>
+
+        <!-- FILA 2: Payer Name + Amount -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvPayerName"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="William Esp*"
                 android:textSize="14sp"
-                android:textColor="#424242"
-                tools:text="SEGUNDINO RICSE DE LA CRUZ te envió un pago por S/70.00" />
+                android:textStyle="bold"
+                android:textColor="#212121"
+                android:maxLines="1"
+                android:ellipsize="end"
+                tools:text="William Esp*" />
 
-            <!-- Footer: Status Badge and Details -->
-            <LinearLayout
-                android:layout_width="match_parent"
+            <TextView
+                android:id="@+id/tvAmount"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
+                android:layout_marginStart="12dp"
+                android:text="S/1.20"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#10B981"
+                tools:text="S/1.20" />
+        </LinearLayout>
 
-                <!-- Amount (if not in body) -->
+        <!-- FILA 3: Security Code + Validate Button (Conditional) -->
+        <LinearLayout
+            android:id="@+id/llSecurityCodeRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <!-- Security Code Badge -->
+            <LinearLayout
+                android:id="@+id/llSecurityCode"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_security_code_badge"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="6dp">
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/ic_shield"
+                    android:contentDescription="Código"
+                    android:tint="#9333EA" />
+
                 <TextView
-                    android:id="@+id/tvAmount"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="S/ 70.00"
+                    android:layout_marginStart="4dp"
+                    android:text="Código:"
+                    android:textSize="11sp"
+                    android:textColor="#9333EA"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvSecurityCode"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:text="693"
                     android:textSize="16sp"
                     android:textStyle="bold"
-                    android:textColor="#4CAF50"
-                    android:visibility="gone"
-                    tools:text="S/ 70.00"
-                    tools:visibility="visible" />
-
-                <!-- Status Badge -->
-                <LinearLayout
-                    android:id="@+id/llStatusBadge"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:background="@drawable/bg_badge_verified"
-                    android:paddingHorizontal="8dp"
-                    android:paddingVertical="4dp"
-                    android:visibility="visible"
-                    tools:visibility="visible">
-
-                    <ImageView
-                        android:id="@+id/ivCheckmark"
-                        android:layout_width="12dp"
-                        android:layout_height="12dp"
-                        android:src="@drawable/ic_checkmark"
-                        android:contentDescription="Verified" />
-
-                    <TextView
-                        android:id="@+id/tvStatus"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp"
-                        android:text="Verificado"
-                        android:textSize="11sp"
-                        android:textColor="@android:color/white"
-                        android:textStyle="bold"
-                        tools:text="Verificado" />
-                </LinearLayout>
-
-                <!-- Code Badge (alternative to status) -->
-                <TextView
-                    android:id="@+id/tvCode"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:text="Cód: 262"
-                    android:textSize="12sp"
-                    android:textColor="#757575"
-                    android:visibility="gone"
-                    tools:text="Cód: 262" />
-
-                <!-- Details Link -->
-                <TextView
-                    android:id="@+id/tvDetails"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="8dp"
-                    android:text="Detalles >"
-                    android:textSize="14sp"
-                    android:textColor="#6200EE"
-                    android:gravity="end"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:foreground="?attr/selectableItemBackground"
-                    tools:text="Detalles >" />
+                    android:textColor="#7C3B92"
+                    android:letterSpacing="0.1"
+                    tools:text="693" />
             </LinearLayout>
+
+            <!-- Validate Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnValidate"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginStart="8dp"
+                android:text="✓ Validar"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="0dp"
+                android:minHeight="0dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:cornerRadius="8dp"
+                app:backgroundTint="#10B981"
+                app:rippleColor="#FFFFFF" />
         </LinearLayout>
+
+        <!-- FILA 3 ALT: Validated Status (cuando está validado) -->
+        <LinearLayout
+            android:id="@+id/llValidatedRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_validated_row"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="6dp"
+            android:visibility="gone"
+            tools:visibility="gone">
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@drawable/ic_checkmark"
+                android:contentDescription="Validado"
+                android:tint="#10B981" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="Pago Validado"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textColor="#10B981" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <!-- Security Code Display (if available) -->
+            <TextView
+                android:id="@+id/tvSecurityCodeValidated"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Cód: 693"
+                android:textSize="11sp"
+                android:textColor="#059669"
+                android:visibility="gone"
+                tools:visibility="visible"
+                tools:text="Cód: 693" />
+        </LinearLayout>
+
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
-
