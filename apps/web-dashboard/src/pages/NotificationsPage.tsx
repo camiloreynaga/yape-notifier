@@ -1,10 +1,13 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '@/services/api';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useDevices } from '@/hooks/useDevices';
+import { useAppInstances } from '@/hooks/useAppInstances';
 import { useToast } from '@/hooks/useToast';
+import { useDebouncedValue } from '@/hooks/useDebounce';
 import { logger } from '@/services/logger';
-import type { Notification, NotificationFilters, Device, AppInstance } from '@/types';
+import type { Notification, NotificationFilters } from '@/types';
 import { format } from 'date-fns';
 import { Download, Filter, Eye, RefreshCw, Calendar, X, Inbox, Search } from 'lucide-react';
 import WebSocketStatus from '@/components/WebSocketStatus';
@@ -18,9 +21,10 @@ export default function NotificationsPage() {
     page: 1,
   });
   const [showFilters, setShowFilters] = useState(false);
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [appInstances, setAppInstances] = useState<AppInstance[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Debounced search query (espera 300ms después de que el usuario deja de escribir)
+  const { debouncedValue: debouncedSearchQuery, isDebouncing } = useDebouncedValue(searchQuery, 300);
 
   // Callback para manejar nuevas notificaciones (ya manejado por WebSocket)
   const handleNewNotification = useCallback((notification: Notification) => {
@@ -40,39 +44,65 @@ export default function NotificationsPage() {
     onNewNotification: handleNewNotification,
   });
 
-  const loadDevices = useCallback(async () => {
-    try {
-      const deviceList = await apiService.getDevices();
-      setDevices(deviceList);
-    } catch (error) {
-      logger.error('Error loading devices', error as Error, { source: 'NotificationsPage' });
-      toast.showError('Error al cargar dispositivos');
-    }
-  }, [toast]);
+  // Usar React Query hooks para devices y app instances
+  // Solo cargar cuando se necesitan (cuando se muestran los filtros)
+  const {
+    data: devices = [],
+    isLoading: devicesLoading,
+    error: devicesError
+  } = useDevices(false, showFilters);
 
-  const loadAppInstances = useCallback(async () => {
-    try {
-      const instances = await apiService.getAppInstances();
-      setAppInstances(instances);
-    } catch (error) {
-      logger.error('Error loading app instances', error as Error, { source: 'NotificationsPage' });
-      // No mostrar toast para errores silenciosos de carga inicial
-    }
+  const {
+    data: appInstances = [],
+    isLoading: appInstancesLoading,
+    error: appInstancesError
+  } = useAppInstances(undefined, showFilters);
+
+  // Mostrar errores de carga de filtros si existen
+  if (devicesError) {
+    logger.error('Error loading devices', devicesError, { source: 'NotificationsPage' });
+  }
+  if (appInstancesError) {
+    logger.error('Error loading app instances', appInstancesError, { source: 'NotificationsPage' });
+  }
+
+  const handleFilterChange = useCallback((key: keyof NotificationFilters, value: string | number | boolean | undefined) => {
+    setFilters((prev) => ({ ...prev, [key]: value, page: 1 }));
   }, []);
 
-  useEffect(() => {
-    loadDevices();
-    loadAppInstances();
-  }, [loadDevices, loadAppInstances]);
-
-  const handleFilterChange = (key: keyof NotificationFilters, value: string | number | boolean | undefined) => {
-    setFilters({ ...filters, [key]: value, page: 1 });
-  };
-
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setFilters({ per_page: 50, page: 1 });
     setSearchQuery('');
-  };
+  }, []);
+
+  // Filtrar notificaciones en cliente usando el search query debounced
+  // Memoizado para no recalcular en cada render
+  const filteredNotifications = useMemo(() => {
+    if (!notifications?.data || !debouncedSearchQuery.trim()) {
+      return notifications?.data || [];
+    }
+
+    const searchLower = debouncedSearchQuery.toLowerCase().trim();
+
+    return notifications.data.filter((notification: Notification) => {
+      // Buscar en título
+      if (notification.title?.toLowerCase().includes(searchLower)) return true;
+
+      // Buscar en monto
+      if (notification.amount?.toString().includes(searchLower)) return true;
+
+      // Buscar en nombre del pagador
+      if (notification.payer_name?.toLowerCase().includes(searchLower)) return true;
+
+      // Buscar en app
+      if (notification.source_app?.toLowerCase().includes(searchLower)) return true;
+
+      // Buscar en dispositivo
+      if (notification.device?.name?.toLowerCase().includes(searchLower)) return true;
+
+      return false;
+    });
+  }, [notifications?.data, debouncedSearchQuery]);
 
   const handleStatusChange = async (id: number, status: 'pending' | 'validated' | 'inconsistent') => {
     try {
@@ -85,7 +115,7 @@ export default function NotificationsPage() {
     }
   };
 
-  const exportToCSV = () => {
+  const exportToCSV = useCallback(() => {
     if (!notifications || notifications.data.length === 0) {
       toast.showWarning('No hay datos para exportar');
       return;
@@ -133,9 +163,9 @@ export default function NotificationsPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
+  }, [notifications, toast]);
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = useCallback((status: string) => {
     switch (status) {
       case 'validated':
         return <span className="badge badge-success">Validado</span>;
@@ -144,7 +174,7 @@ export default function NotificationsPage() {
       default:
         return <span className="badge badge-warning">Pendiente</span>;
     }
-  };
+  }, []);
 
   // Filtros rápidos tipo chips
   const quickFilters = [
@@ -153,20 +183,21 @@ export default function NotificationsPage() {
     { key: 'pending', label: 'Pendientes', value: 'pending' },
   ];
 
-  const handleQuickFilter = (filterKey: string) => {
+  const handleQuickFilter = useCallback((filterKey: string) => {
     if (filterKey === 'all') {
       clearFilters();
     } else if (filterKey === 'today') {
-      setFilters({ ...filters, start_date: format(new Date(), 'yyyy-MM-dd'), page: 1 });
+      setFilters((prev) => ({ ...prev, start_date: format(new Date(), 'yyyy-MM-dd'), page: 1 }));
     } else if (filterKey === 'pending') {
-      setFilters({ ...filters, status: 'pending', page: 1 });
+      setFilters((prev) => ({ ...prev, status: 'pending', page: 1 }));
     }
-  };
+  }, [clearFilters]);
 
-  const activeQuickFilter = 
+  const activeQuickFilter = useMemo(() =>
     !filters.status && !filters.start_date ? 'all' :
     filters.start_date === format(new Date(), 'yyyy-MM-dd') ? 'today' :
-    filters.status === 'pending' ? 'pending' : '';
+    filters.status === 'pending' ? 'pending' : ''
+  , [filters.status, filters.start_date]);
 
   return (
     <div className="space-y-4">
@@ -226,7 +257,7 @@ export default function NotificationsPage() {
           ))}
         </div>
 
-        {/* Búsqueda compacta */}
+        {/* Búsqueda compacta con indicador de debouncing */}
         <div className="relative flex-shrink-0 sm:w-64">
           <input
             type="text"
@@ -237,13 +268,20 @@ export default function NotificationsPage() {
             placeholder="Buscar..."
             className="w-full pl-9 pr-9 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           />
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          {isDebouncing ? (
+            <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary-600 border-t-transparent"></div>
+            </div>
+          ) : (
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          )}
           {searchQuery && (
             <button
               onClick={() => {
                 setSearchQuery('');
               }}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              title="Limpiar búsqueda"
             >
               <X className="w-4 h-4" />
             </button>
@@ -263,6 +301,12 @@ export default function NotificationsPage() {
               Limpiar filtros
             </button>
           </div>
+          {(devicesLoading || appInstancesLoading) && (
+            <div className="mb-4 text-sm text-gray-600 flex items-center gap-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600"></div>
+              Cargando opciones de filtros...
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label htmlFor="filter-device" className="block text-sm font-medium text-gray-700 mb-2">
@@ -275,6 +319,7 @@ export default function NotificationsPage() {
                   handleFilterChange('device_id', e.target.value ? parseInt(e.target.value) : undefined)
                 }
                 className="input"
+                disabled={devicesLoading}
               >
                 <option value="">Todos</option>
                 {devices.map((device) => (
@@ -314,6 +359,7 @@ export default function NotificationsPage() {
                   handleFilterChange('app_instance_id', e.target.value ? parseInt(e.target.value) : undefined)
                 }
                 className="input"
+                disabled={appInstancesLoading}
               >
                 <option value="">Todas</option>
                 {appInstances.map((instance) => (
@@ -402,7 +448,7 @@ export default function NotificationsPage() {
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
           </div>
-        ) : notifications && notifications.data.length > 0 ? (
+        ) : filteredNotifications.length > 0 ? (
           <>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
@@ -438,7 +484,7 @@ export default function NotificationsPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {notifications.data.map((notification: Notification) => (
+                  {filteredNotifications.map((notification: Notification) => (
                     <tr 
                       key={notification.id} 
                       className="hover:bg-gray-50 transition-colors cursor-pointer"
@@ -530,12 +576,22 @@ export default function NotificationsPage() {
             </div>
 
             {/* Pagination - Mejorado */}
-            {notifications.last_page > 1 && (
+            {notifications && notifications.last_page > 1 && (
               <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="text-sm text-gray-700">
-                  Mostrando <span className="font-medium">{notifications.from}</span> a{' '}
-                  <span className="font-medium">{notifications.to}</span> de{' '}
-                  <span className="font-medium">{notifications.total}</span> resultados
+                  {debouncedSearchQuery ? (
+                    <>
+                      Mostrando <span className="font-medium">{filteredNotifications.length}</span> de{' '}
+                      <span className="font-medium">{notifications.total}</span> resultados
+                      <span className="text-primary-600 ml-1">(búsqueda activa)</span>
+                    </>
+                  ) : (
+                    <>
+                      Mostrando <span className="font-medium">{notifications.from}</span> a{' '}
+                      <span className="font-medium">{notifications.to}</span> de{' '}
+                      <span className="font-medium">{notifications.total}</span> resultados
+                    </>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -565,14 +621,16 @@ export default function NotificationsPage() {
             icon={<Inbox className="w-16 h-16 text-gray-400" />}
             title="No se encontraron notificaciones"
             message={
-              Object.keys(filters).length > 2
+              debouncedSearchQuery
+                ? `No hay notificaciones que coincidan con "${debouncedSearchQuery}". Intenta con otro término de búsqueda.`
+                : Object.keys(filters).length > 2
                 ? "No hay notificaciones que coincidan con los filtros seleccionados. Intenta ajustar los filtros."
                 : "Aún no has recibido notificaciones. Las notificaciones aparecerán aquí cuando lleguen."
             }
             action={
-              Object.keys(filters).length > 2
+              debouncedSearchQuery || Object.keys(filters).length > 2
                 ? {
-                    label: "Limpiar filtros",
+                    label: debouncedSearchQuery ? "Limpiar búsqueda" : "Limpiar filtros",
                     onClick: clearFilters,
                   }
                 : undefined

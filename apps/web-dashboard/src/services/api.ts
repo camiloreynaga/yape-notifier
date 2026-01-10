@@ -1,9 +1,13 @@
-import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import { API_BASE_URL, API_ENDPOINTS } from '@/config/api';
+import { logger } from './logger';
+import { apiCircuitBreaker, devicesCircuitBreaker, appInstancesCircuitBreaker } from './circuitBreaker';
+import { requestQueue } from './requestQueue';
 import type { AuthResponse, User, Device, Notification, NotificationFilters, NotificationStatistics, PaginatedResponse, ApiError, Commerce, AppInstance, MonitorPackage } from '@/types';
 
 class ApiService {
   private client: AxiosInstance;
+  private requestCount = 0;
 
   constructor() {
     this.client = axios.create({
@@ -12,33 +16,148 @@ class ApiService {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
+      timeout: 30000, // 30 segundos timeout global
     });
 
-    // Request interceptor to add auth token
+    // Request interceptor to add auth token and logging
     this.client.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
         const token = localStorage.getItem('auth_token');
         if (token && config.headers) {
           config.headers.Authorization = `Bearer ${token}`;
         }
+
+        // Request ID para tracking
+        const requestId = `req-${++this.requestCount}-${Date.now()}`;
+        config.headers['X-Request-ID'] = requestId;
+
+        logger.debug('API Request', {
+          requestId,
+          method: config.method?.toUpperCase(),
+          url: config.url,
+          params: config.params,
+        });
+
         return config;
       },
-      (error) => Promise.reject(error)
-    );
-
-    // Response interceptor to handle errors
-    this.client.interceptors.response.use(
-      (response) => response,
-      (error: AxiosError<ApiError>) => {
-        if (error.response?.status === 401) {
-          // Unauthorized - clear token and redirect to login
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('user');
-          window.location.href = '/login';
-        }
+      (error) => {
+        logger.error('API Request Error', error);
         return Promise.reject(error);
       }
     );
+
+    // Response interceptor to handle errors and logging
+    this.client.interceptors.response.use(
+      (response: AxiosResponse) => {
+        const requestId = response.config.headers['X-Request-ID'];
+        logger.debug('API Response Success', {
+          requestId,
+          status: response.status,
+          url: response.config.url,
+        });
+        return response;
+      },
+      (error: AxiosError<ApiError>) => {
+        const requestId = error.config?.headers?.['X-Request-ID'];
+
+        // Log del error
+        logger.error('API Response Error', error, {
+          requestId,
+          status: error.response?.status,
+          url: error.config?.url,
+          message: error.response?.data?.message || error.message,
+        });
+
+        // Manejo de errores específicos
+        if (error.response?.status === 401) {
+          // Unauthorized - clear token and redirect to login
+          logger.warn('Unauthorized access, redirecting to login');
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('user');
+          window.location.href = '/login';
+          return Promise.reject(error);
+        }
+
+        // Detectar errores de red
+        if (!error.response) {
+          // Error de red (sin respuesta del servidor)
+          this.handleNetworkError(error);
+        }
+
+        return Promise.reject(error);
+      }
+    );
+  }
+
+  /**
+   * Maneja errores de red y notifica al usuario
+   */
+  private handleNetworkError(error: AxiosError) {
+    const message = error.code === 'ECONNABORTED'
+      ? 'La solicitud tardó demasiado tiempo'
+      : 'No se pudo conectar con el servidor. Verifica tu conexión a internet.';
+
+    logger.error('Network error detected', error, {
+      code: error.code,
+      message: error.message,
+    });
+
+    // Emitir evento para notificación
+    window.dispatchEvent(
+      new CustomEvent('network-error', {
+        detail: {
+          message,
+          endpoint: error.config?.url,
+        },
+      })
+    );
+  }
+
+  /**
+   * Wrapper para ejecutar requests con circuit breaker
+   */
+  private async executeWithCircuitBreaker<T>(
+    fn: () => Promise<T>,
+    circuitBreakerName: 'devices' | 'app-instances' | 'general' = 'general'
+  ): Promise<T> {
+    const breaker = {
+      devices: devicesCircuitBreaker,
+      'app-instances': appInstancesCircuitBreaker,
+      general: apiCircuitBreaker,
+    }[circuitBreakerName];
+
+    return breaker.execute(fn);
+  }
+
+  /**
+   * Wrapper para requests críticos que deben reintentar en cola si fallan
+   */
+  private async executeWithQueue<T>(
+    fn: () => Promise<T>,
+    options: {
+      name: string;
+      priority?: number;
+      maxRetries?: number;
+    }
+  ): Promise<T> {
+    try {
+      return await fn();
+    } catch (error) {
+      // Si es error de red, agregar a la cola para reintentar
+      if (error instanceof AxiosError && !error.response) {
+        logger.warn(`Adding failed request to queue: ${options.name}`);
+
+        return new Promise((resolve, reject) => {
+          requestQueue.enqueue(fn, {
+            ...options,
+            onSuccess: (result) => resolve(result as T),
+            onError: (err) => reject(err),
+          });
+        });
+      }
+
+      throw error;
+    }
   }
 
   // Auth methods
@@ -71,10 +190,15 @@ class ApiService {
 
   // Device methods
   async getDevices(activeOnly = false): Promise<Device[]> {
-    const response = await this.client.get<{ devices: Device[] }>(API_ENDPOINTS.devices.list, {
-      params: { active_only: activeOnly },
-    });
-    return response.data.devices;
+    return this.executeWithCircuitBreaker(
+      async () => {
+        const response = await this.client.get<{ devices: Device[] }>(API_ENDPOINTS.devices.list, {
+          params: { active_only: activeOnly },
+        });
+        return response.data.devices;
+      },
+      'devices'
+    );
   }
 
   async createDevice(data: { name: string; platform: string }): Promise<Device> {
@@ -227,11 +351,16 @@ class ApiService {
 
   // App Instance methods
   async getAppInstances(deviceId?: number): Promise<AppInstance[]> {
-    const response = await this.client.get<{ instances: AppInstance[] }>(
-      API_ENDPOINTS.appInstances.list,
-      { params: deviceId ? { device_id: deviceId } : {} }
+    return this.executeWithCircuitBreaker(
+      async () => {
+        const response = await this.client.get<{ instances: AppInstance[] }>(
+          API_ENDPOINTS.appInstances.list,
+          { params: deviceId ? { device_id: deviceId } : {} }
+        );
+        return response.data.instances;
+      },
+      'app-instances'
     );
-    return response.data.instances;
   }
 
   async getDeviceAppInstances(deviceId: number): Promise<AppInstance[]> {

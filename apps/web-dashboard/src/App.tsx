@@ -1,19 +1,24 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import DashboardPage from './pages/DashboardPage';
-import AddDevicePage from './pages/AddDevicePage';
-import AppInstancesPage from './pages/AppInstancesPage';
-import NotificationDetailPage from './pages/NotificationDetailPage';
-import CreateCommercePage from './pages/CreateCommercePage';
 import Layout from './components/Layout';
 import { NotificationToastContainer } from './components/NotificationToast';
+import { ErrorNotificationContainer } from './components/ErrorNotification';
 import ToastContainer from './components/Toast/ToastContainer';
+import { RouteLoadingFallback } from './components/LoadingFallback';
 import { updateAuthToken } from './services/echo';
 import { logger } from './services/logger';
+
+// Lazy loading de páginas para code splitting
+// Esto reduce el bundle inicial y carga cada página solo cuando se necesita
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const RegisterPage = lazy(() => import('./pages/RegisterPage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const AddDevicePage = lazy(() => import('./pages/AddDevicePage'));
+const AppInstancesPage = lazy(() => import('./pages/AppInstancesPage'));
+const NotificationDetailPage = lazy(() => import('./pages/NotificationDetailPage'));
+const CreateCommercePage = lazy(() => import('./pages/CreateCommercePage'));
 
 // Configurar React Query Client
 const queryClient = new QueryClient({
@@ -72,39 +77,41 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 
 function AppRoutes() {
   return (
-    <Routes>
-      <Route path="/login" element={
-        <PublicRoute>
-          <LoginPage />
-        </PublicRoute>
-      } />
-      <Route path="/register" element={
-        <PublicRoute>
-          <RegisterPage />
-        </PublicRoute>
-      } />
-      <Route path="/create-commerce" element={
-        <PrivateRoute requireCommerce={false}>
-          <CreateCommercePage />
-        </PrivateRoute>
-      } />
-      <Route path="/" element={
-        <PrivateRoute requireCommerce={true}>
-          <Layout />
-        </PrivateRoute>
-      }>
-        <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="dashboard" element={<DashboardPage />} />
-        {/* Rutas individuales para deep linking */}
-        <Route path="notifications" element={<Navigate to="/dashboard?tab=notifications" replace />} />
-        <Route path="notifications/:id" element={<NotificationDetailPage />} />
-        <Route path="devices" element={<Navigate to="/dashboard?tab=devices" replace />} />
-        <Route path="devices/add" element={<AddDevicePage />} />
-        <Route path="employees" element={<Navigate to="/dashboard?tab=employees" replace />} />
-        <Route path="app-instances" element={<AppInstancesPage />} />
-        <Route path="settings/monitored-apps" element={<Navigate to="/dashboard?tab=settings" replace />} />
-      </Route>
-    </Routes>
+    <Suspense fallback={<RouteLoadingFallback />}>
+      <Routes>
+        <Route path="/login" element={
+          <PublicRoute>
+            <LoginPage />
+          </PublicRoute>
+        } />
+        <Route path="/register" element={
+          <PublicRoute>
+            <RegisterPage />
+          </PublicRoute>
+        } />
+        <Route path="/create-commerce" element={
+          <PrivateRoute requireCommerce={false}>
+            <CreateCommercePage />
+          </PrivateRoute>
+        } />
+        <Route path="/" element={
+          <PrivateRoute requireCommerce={true}>
+            <Layout />
+          </PrivateRoute>
+        }>
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="dashboard" element={<DashboardPage />} />
+          {/* Rutas individuales para deep linking */}
+          <Route path="notifications" element={<Navigate to="/dashboard?tab=notifications" replace />} />
+          <Route path="notifications/:id" element={<NotificationDetailPage />} />
+          <Route path="devices" element={<Navigate to="/dashboard?tab=devices" replace />} />
+          <Route path="devices/add" element={<AddDevicePage />} />
+          <Route path="employees" element={<Navigate to="/dashboard?tab=employees" replace />} />
+          <Route path="app-instances" element={<AppInstancesPage />} />
+          <Route path="settings/monitored-apps" element={<Navigate to="/dashboard?tab=settings" replace />} />
+        </Route>
+      </Routes>
+    </Suspense>
   );
 }
 
@@ -160,6 +167,7 @@ function App() {
       <Router>
         <AppRoutes />
         <NotificationToastContainer />
+        <ErrorNotificationContainer />
         <ToastContainer />
       </Router>
     </AuthProvider>

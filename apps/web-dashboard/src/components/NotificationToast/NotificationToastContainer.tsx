@@ -1,13 +1,12 @@
 /**
  * Contenedor para gestionar múltiples toasts de notificaciones
- * Actualizado para usar WebSockets directamente
+ * Optimizado con WebSocket Manager centralizado
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import NotificationToast from "./NotificationToast";
 import type { Notification } from "@/types";
-import { echo } from "@/services/echo";
-import { useAuth } from "@/contexts/AuthContext";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import { logger } from "@/services/logger";
 
 interface ToastNotification {
@@ -23,8 +22,6 @@ export default function NotificationToastContainer({
   maxToasts = 5,
 }: NotificationToastContainerProps) {
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
-  const { user } = useAuth();
-  const commerceId = user?.commerce_id;
 
   const addToast = useCallback(
     (notification: Notification) => {
@@ -33,6 +30,11 @@ export default function NotificationToastContainer({
         notification,
         toastId,
       };
+
+      logger.debug("Adding notification toast", {
+        notificationId: notification.id,
+        toastId,
+      });
 
       setToasts((prev) => {
         const updated = [newToast, ...prev].slice(0, maxToasts);
@@ -46,38 +48,10 @@ export default function NotificationToastContainer({
     setToasts((prev) => prev.filter((toast) => toast.toastId !== toastId));
   }, []);
 
-  // Escuchar eventos WebSocket para nuevas notificaciones
-  useEffect(() => {
-    if (!commerceId || !echo) return;
-
-    const channel = echo.private(`commerce.${commerceId}`);
-
-    // Escuchar evento de notificación creada
-    channel.listen(
-      ".notification.created",
-      (data: { notification: Notification }) => {
-        logger.debug("Nueva notificación recibida para toast", { notificationId: data.notification.id });
-        addToast(data.notification);
-      }
-    );
-
-    return () => {
-      channel.stopListening(".notification.created");
-    };
-  }, [commerceId, addToast]);
-
-  // Exponer addToast globalmente (para compatibilidad con código existente)
-  useEffect(() => {
-    (window as Window & {
-      addNotificationToast?: (notification: Notification) => void;
-    }).addNotificationToast = addToast;
-
-    return () => {
-      delete (window as Window & {
-        addNotificationToast?: (notification: Notification) => void;
-      }).addNotificationToast;
-    };
-  }, [addToast]);
+  // Suscribirse a WebSocket usando el manager centralizado
+  useWebSocket(addToast, {
+    listenerId: 'notification-toast-container',
+  });
 
   if (toasts.length === 0) {
     return null;
