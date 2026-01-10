@@ -27,10 +27,11 @@
         android:id="@+id/tvDescription"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="Detecta y nombra las instancias duales de aplicaciones en tu dispositivo. Esto te ayudará a identificar mejor las notificaciones de pago."
+        android:text="Asigna un nombre a cada cuenta para identificarla fácilmente.\n\n🟢 ORIGINAL = App principal\n🔵 CLON = App duplicada (Dual App)"
         android:textSize="14sp"
         android:textColor="?attr/colorOnSurfaceVariant"
         android:padding="16dp"
+        android:lineSpacingExtra="4dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/appBarLayout" />

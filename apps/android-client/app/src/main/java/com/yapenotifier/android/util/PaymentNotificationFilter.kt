@@ -66,16 +66,23 @@ object PaymentNotificationFilter {
     /**
      * Regex patterns that indicate the notification IS a real payment (inclusion patterns).
      * These patterns take precedence over exclusion patterns.
+     * FIXED: Soporte para S/. (con punto) además de S/
      */
     private val inclusionPatterns = listOf(
-        // Patrones que SÍ indican pago real recibido
-        """.*te envió un pago por (S/|\$).*""".toRegex(RegexOption.IGNORE_CASE),
-        """.*te ha plineado (S/|\$).*""".toRegex(RegexOption.IGNORE_CASE),
-        """.*te (envió|transferió) (un pago|dinero) (por|de) (S/|\$).*""".toRegex(RegexOption.IGNORE_CASE),
-        """.*recibiste (un pago|dinero) (de|por) (S/|\$).*""".toRegex(RegexOption.IGNORE_CASE),
-        """.*pago recibido.*(S/|\$).*""".toRegex(RegexOption.IGNORE_CASE),
-        """.*transferencia recibida.*(S/|\$).*""".toRegex(RegexOption.IGNORE_CASE),
-        """.*te (envió|transferió).*(S/|\$).*\d+.*""".toRegex(RegexOption.IGNORE_CASE)
+        // Patrones que SÍ indican pago real recibido - FIXED: S/\.? para soportar S/ y S/.
+        """.*te envió un pago por (S/\.?|\$).*""".toRegex(RegexOption.IGNORE_CASE),
+        """.*te ha plineado (S/\.?|\$).*""".toRegex(RegexOption.IGNORE_CASE),
+        """.*te plineó (S/\.?|\$).*""".toRegex(RegexOption.IGNORE_CASE),
+        """.*te (envió|transferió|envio|transfirio) (un pago|dinero) (por|de) (S/\.?|\$).*""".toRegex(RegexOption.IGNORE_CASE),
+        """.*recibiste (un pago|dinero) (de|por) (S/\.?|\$).*""".toRegex(RegexOption.IGNORE_CASE),
+        """.*pago recibido.*(S/\.?|\$).*""".toRegex(RegexOption.IGNORE_CASE),
+        """.*transferencia recibida.*(S/\.?|\$).*""".toRegex(RegexOption.IGNORE_CASE),
+        """.*te (envió|transferió|envio|transfirio).*(S/\.?|\$).*\d+.*""".toRegex(RegexOption.IGNORE_CASE),
+        // FIXED: Nuevos patrones adicionales
+        """.*te ha enviado (S/\.?|\$).*""".toRegex(RegexOption.IGNORE_CASE),
+        """.*te mandó (S/\.?|\$).*""".toRegex(RegexOption.IGNORE_CASE),
+        // Patrón genérico: Alguien + te + verbo + S/ + monto
+        """.+\s+te\s+\w+.*(S/\.?|\$)\s*\d+.*""".toRegex(RegexOption.IGNORE_CASE)
     )
     
     /**
@@ -185,16 +192,16 @@ object PaymentNotificationFilter {
         }
         */
         
-        // Check for amount pattern (S/ or $ followed by digits)
-        val amountPattern = """(S/|\$)\s*(\d+(?:\.\d+)?)""".toRegex(RegexOption.IGNORE_CASE)
+        // FIXED: Check for amount pattern - ahora soporta S/. (con punto) y comas decimales
+        val amountPattern = """(S/\.?|\$)\s*(\d+(?:[.,]\d+)?)""".toRegex(RegexOption.IGNORE_CASE)
         val amountMatch = amountPattern.find(text)
         
         if (amountMatch == null) {
-            return FilterResult(false, "No valid amount found (S/ or $ followed by digits)")
+            return FilterResult(false, "No valid amount found (S/, S/. or $ followed by digits)")
         }
         
-        // Extract and validate amount
-        val amountStr = amountMatch.groupValues[2]
+        // Extract and validate amount - FIXED: soporte para comas decimales
+        val amountStr = amountMatch.groupValues[2].replace(",", ".")
         val amount = try {
             amountStr.toDouble()
         } catch (e: NumberFormatException) {

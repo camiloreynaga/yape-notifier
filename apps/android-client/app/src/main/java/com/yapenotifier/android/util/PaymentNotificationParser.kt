@@ -13,42 +13,60 @@ object PaymentNotificationParser {
      * Converts currency symbols to ISO 4217 currency codes.
      * The backend requires 3-character currency codes (e.g., "PEN", "USD").
      * 
-     * @param currencySymbol The currency symbol extracted from notification (e.g., "S/", "$")
+     * @param currencySymbol The currency symbol extracted from notification (e.g., "S/", "S/.", "$")
      * @return The ISO currency code (e.g., "PEN", "USD")
      */
     private fun normalizeCurrency(currencySymbol: String): String {
-        return when (currencySymbol.trim().uppercase()) {
-            "S/", "S/.", "SOL", "SOLES" -> "PEN"  // Peruvian Sol
-            "$", "USD", "DOLAR", "DOLARES" -> "USD"  // US Dollar
+        // FIXED: Normalizar removiendo puntos y espacios para manejar S/. y S/
+        val normalized = currencySymbol.trim().uppercase().replace(".", "").replace(" ", "")
+        return when (normalized) {
+            "S/", "S", "SOL", "SOLES", "PEN" -> "PEN"  // Peruvian Sol
+            "$", "USD", "US$", "DOLAR", "DOLARES" -> "USD"  // US Dollar
             else -> {
                 Log.w(TAG, "Unknown currency symbol: '$currencySymbol', defaulting to PEN")
                 "PEN"  // Default to PEN for Peru
             }
         }
     }
+    
+    /**
+     * FIXED: Helper para parsear montos con soporte para comas y puntos decimales
+     */
+    private fun parseAmount(amountStr: String): Double? {
+        return try {
+            // Reemplazar comas por puntos para decimales (formato europeo/latinoamericano)
+            amountStr.replace(",", ".").toDouble()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing amount: '$amountStr'", e)
+            null
+        }
+    }
 
+    // FIXED: Patrones actualizados para soportar S/. (con punto) y variaciones de espacios
     // Yape patterns
-    private val yapePattern = """^(?:Yape! )?(.*?) te envió un pago por (S/|\$) (\d+\.?\d*).*""".toRegex(RegexOption.IGNORE_CASE)
-    private val yapePatternAlt = """(.*?) te envió (?:un pago|S/|\$) (?:por )?(S/|\$) (\d+\.?\d*).*""".toRegex(RegexOption.IGNORE_CASE)
+    private val yapePattern = """^(?:Yape!?\s*)?(.*?)\s+te envió un pago por\s*(S/\.?|\$)\s*(\d+[.,]?\d*).*""".toRegex(RegexOption.IGNORE_CASE)
+    private val yapePatternAlt = """(.*?)\s+te envió\s+(?:un pago\s+)?(?:por\s+)?(S/\.?|\$)\s*(\d+[.,]?\d*).*""".toRegex(RegexOption.IGNORE_CASE)
+    private val yapePatternAlt2 = """(.*?)\s+te ha enviado\s+(S/\.?|\$)\s*(\d+[.,]?\d*).*""".toRegex(RegexOption.IGNORE_CASE)
     
     // Plin patterns
-    private val plinPattern = """(.*?) te ha plineado (S/|\$) (\d+\.?\d*).*""".toRegex(RegexOption.IGNORE_CASE)
-    private val plinPatternAlt = """(.*?) te plineó (S/|\$) (\d+\.?\d*).*""".toRegex(RegexOption.IGNORE_CASE)
+    private val plinPattern = """(.*?)\s+te ha plineado\s+(S/\.?|\$)\s*(\d+[.,]?\d*).*""".toRegex(RegexOption.IGNORE_CASE)
+    private val plinPatternAlt = """(.*?)\s+te plineó\s+(S/\.?|\$)\s*(\d+[.,]?\d*).*""".toRegex(RegexOption.IGNORE_CASE)
+    private val plinPatternAlt2 = """(.*?)\s+te (?:plinó|plineo)\s+(S/\.?|\$)\s*(\d+[.,]?\d*).*""".toRegex(RegexOption.IGNORE_CASE)
     
     // BCP patterns
-    private val bcpPattern = """(.*?) te (?:envió|transferió) (?:un pago|dinero) (?:por )?(?:de )?(S/|\$) (\d+\.?\d*).*""".toRegex(RegexOption.IGNORE_CASE)
+    private val bcpPattern = """(.*?)\s+te (?:envió|transferió|envio|transfirio)\s+(?:un pago|dinero)\s*(?:por\s+)?(?:de\s+)?(S/\.?|\$)\s*(\d+[.,]?\d*).*""".toRegex(RegexOption.IGNORE_CASE)
     
     // Interbank patterns
-    private val interbankPattern = """(.*?) te (?:envió|transferió) (?:un pago|dinero) (?:por )?(?:de )?(S/|\$) (\d+\.?\d*).*""".toRegex(RegexOption.IGNORE_CASE)
+    private val interbankPattern = """(.*?)\s+te (?:envió|transferió|envio|transfirio)\s+(?:un pago|dinero)\s*(?:por\s+)?(?:de\s+)?(S/\.?|\$)\s*(\d+[.,]?\d*).*""".toRegex(RegexOption.IGNORE_CASE)
     
     // BBVA patterns
-    private val bbvaPattern = """(.*?) te (?:envió|transferió) (?:un pago|dinero) (?:por )?(?:de )?(S/|\$) (\d+\.?\d*).*""".toRegex(RegexOption.IGNORE_CASE)
+    private val bbvaPattern = """(.*?)\s+te (?:envió|transferió|envio|transfirio)\s+(?:un pago|dinero)\s*(?:por\s+)?(?:de\s+)?(S/\.?|\$)\s*(\d+[.,]?\d*).*""".toRegex(RegexOption.IGNORE_CASE)
     
     // Scotiabank patterns
-    private val scotiabankPattern = """(.*?) te (?:envió|transferió) (?:un pago|dinero) (?:por )?(?:de )?(S/|\$) (\d+\.?\d*).*""".toRegex(RegexOption.IGNORE_CASE)
+    private val scotiabankPattern = """(.*?)\s+te (?:envió|transferió|envio|transfirio)\s+(?:un pago|dinero)\s*(?:por\s+)?(?:de\s+)?(S/\.?|\$)\s*(\d+[.,]?\d*).*""".toRegex(RegexOption.IGNORE_CASE)
     
-    // Generic pattern for common payment notifications
-    private val genericPattern = """(.*?)(?: te (?:envió|transferió|ha (?:plineado|enviado))| recibiste| recibió) (?:un pago|dinero|pago) (?:por |de )?(S/|\$) (\d+\.?\d*).*""".toRegex(RegexOption.IGNORE_CASE)
+    // FIXED: Generic pattern más flexible para formatos desconocidos
+    private val genericPattern = """(.*?)(?:\s+te\s+(?:envió|transferió|ha\s+(?:plineado|enviado|transferido))|\s+recibiste|\s+recibió)\s*(?:un pago|dinero|pago)?\s*(?:por\s+|de\s+)?(S/\.?|\$)\s*(\d+[.,]?\d*).*""".toRegex(RegexOption.IGNORE_CASE)
 
     /**
      * Parses a notification to extract payment details.
@@ -70,15 +88,15 @@ object PaymentNotificationParser {
         }
 
         // Try Yape patterns first
-        if ("Yape" in title || "Yape" in text || "te envió un pago" in text) {
-            val matchResult = yapePattern.find(text) ?: yapePatternAlt.find(text)
+        if ("Yape" in title || "Yape" in text || "te envió un pago" in text || "te envió" in text) {
+            val matchResult = yapePattern.find(text) ?: yapePatternAlt.find(text) ?: yapePatternAlt2.find(text)
             if (matchResult != null) {
                 return try {
                     val (sender, currencySymbol, amountStr) = matchResult.destructured
-                    val amount = amountStr.toDouble()
+                    val amount = parseAmount(amountStr) ?: return null
                     val cleanedSender = sender.trim()
                     val currency = normalizeCurrency(currencySymbol)
-                    Log.i(TAG, "Successfully parsed Yape payment: Sender='$cleanedSender', Amount=$amount, Currency='$currency' (from '$currencySymbol')")
+                    Log.i(TAG, "✅ Parsed Yape payment: Sender='$cleanedSender', Amount=$amount, Currency='$currency'")
                     PaymentDetails(cleanedSender, amount, currency)
                 } catch (e: Exception) {
                     Log.e(TAG, "Error parsing matched Yape notification", e)
@@ -88,15 +106,15 @@ object PaymentNotificationParser {
         }
 
         // Try Plin patterns
-        if ("Plin" in title || "Plin" in text || "plineado" in text || "plineó" in text) {
-            val matchResult = plinPattern.find(text) ?: plinPatternAlt.find(text)
+        if ("Plin" in title || "Plin" in text || "plineado" in text.lowercase() || "plineó" in text.lowercase() || "plineo" in text.lowercase()) {
+            val matchResult = plinPattern.find(text) ?: plinPatternAlt.find(text) ?: plinPatternAlt2.find(text)
             if (matchResult != null) {
                 return try {
                     val (sender, currencySymbol, amountStr) = matchResult.destructured
-                    val amount = amountStr.toDouble()
+                    val amount = parseAmount(amountStr) ?: return null
                     val cleanedSender = sender.trim()
                     val currency = normalizeCurrency(currencySymbol)
-                    Log.i(TAG, "Successfully parsed Plin payment: Sender='$cleanedSender', Amount=$amount, Currency='$currency' (from '$currencySymbol')")
+                    Log.i(TAG, "✅ Parsed Plin payment: Sender='$cleanedSender', Amount=$amount, Currency='$currency'")
                     PaymentDetails(cleanedSender, amount, currency)
                 } catch (e: Exception) {
                     Log.e(TAG, "Error parsing matched Plin notification", e)
@@ -106,15 +124,15 @@ object PaymentNotificationParser {
         }
 
         // Try BCP patterns
-        if ("BCP" in title || "BCP" in text || "bancadigital" in text.lowercase()) {
+        if ("BCP" in title || "BCP" in text || "bancadigital" in text.lowercase() || "bcp" in text.lowercase()) {
             val matchResult = bcpPattern.find(text)
             if (matchResult != null) {
                 return try {
                     val (sender, currencySymbol, amountStr) = matchResult.destructured
-                    val amount = amountStr.toDouble()
+                    val amount = parseAmount(amountStr) ?: return null
                     val cleanedSender = sender.trim()
                     val currency = normalizeCurrency(currencySymbol)
-                    Log.i(TAG, "Successfully parsed BCP payment: Sender='$cleanedSender', Amount=$amount, Currency='$currency' (from '$currencySymbol')")
+                    Log.i(TAG, "✅ Parsed BCP payment: Sender='$cleanedSender', Amount=$amount, Currency='$currency'")
                     PaymentDetails(cleanedSender, amount, currency)
                 } catch (e: Exception) {
                     Log.e(TAG, "Error parsing matched BCP notification", e)
@@ -124,15 +142,15 @@ object PaymentNotificationParser {
         }
 
         // Try Interbank patterns
-        if ("Interbank" in title || "Interbank" in text) {
+        if ("Interbank" in title || "Interbank" in text || "interbank" in text.lowercase()) {
             val matchResult = interbankPattern.find(text)
             if (matchResult != null) {
                 return try {
                     val (sender, currencySymbol, amountStr) = matchResult.destructured
-                    val amount = amountStr.toDouble()
+                    val amount = parseAmount(amountStr) ?: return null
                     val cleanedSender = sender.trim()
                     val currency = normalizeCurrency(currencySymbol)
-                    Log.i(TAG, "Successfully parsed Interbank payment: Sender='$cleanedSender', Amount=$amount, Currency='$currency' (from '$currencySymbol')")
+                    Log.i(TAG, "✅ Parsed Interbank payment: Sender='$cleanedSender', Amount=$amount, Currency='$currency'")
                     PaymentDetails(cleanedSender, amount, currency)
                 } catch (e: Exception) {
                     Log.e(TAG, "Error parsing matched Interbank notification", e)
@@ -142,15 +160,15 @@ object PaymentNotificationParser {
         }
 
         // Try BBVA patterns
-        if ("BBVA" in title || "BBVA" in text || "bbvacontinental" in text.lowercase()) {
+        if ("BBVA" in title || "BBVA" in text || "bbvacontinental" in text.lowercase() || "bbva" in text.lowercase()) {
             val matchResult = bbvaPattern.find(text)
             if (matchResult != null) {
                 return try {
                     val (sender, currencySymbol, amountStr) = matchResult.destructured
-                    val amount = amountStr.toDouble()
+                    val amount = parseAmount(amountStr) ?: return null
                     val cleanedSender = sender.trim()
                     val currency = normalizeCurrency(currencySymbol)
-                    Log.i(TAG, "Successfully parsed BBVA payment: Sender='$cleanedSender', Amount=$amount, Currency='$currency' (from '$currencySymbol')")
+                    Log.i(TAG, "✅ Parsed BBVA payment: Sender='$cleanedSender', Amount=$amount, Currency='$currency'")
                     PaymentDetails(cleanedSender, amount, currency)
                 } catch (e: Exception) {
                     Log.e(TAG, "Error parsing matched BBVA notification", e)
@@ -160,15 +178,15 @@ object PaymentNotificationParser {
         }
 
         // Try Scotiabank patterns
-        if ("Scotiabank" in title || "Scotiabank" in text) {
+        if ("Scotiabank" in title || "Scotiabank" in text || "scotiabank" in text.lowercase()) {
             val matchResult = scotiabankPattern.find(text)
             if (matchResult != null) {
                 return try {
                     val (sender, currencySymbol, amountStr) = matchResult.destructured
-                    val amount = amountStr.toDouble()
+                    val amount = parseAmount(amountStr) ?: return null
                     val cleanedSender = sender.trim()
                     val currency = normalizeCurrency(currencySymbol)
-                    Log.i(TAG, "Successfully parsed Scotiabank payment: Sender='$cleanedSender', Amount=$amount, Currency='$currency' (from '$currencySymbol')")
+                    Log.i(TAG, "✅ Parsed Scotiabank payment: Sender='$cleanedSender', Amount=$amount, Currency='$currency'")
                     PaymentDetails(cleanedSender, amount, currency)
                 } catch (e: Exception) {
                     Log.e(TAG, "Error parsing matched Scotiabank notification", e)
@@ -183,10 +201,10 @@ object PaymentNotificationParser {
             if (matchResult != null) {
                 return try {
                     val (sender, currencySymbol, amountStr) = matchResult.destructured
-                    val amount = amountStr.toDouble()
+                    val amount = parseAmount(amountStr) ?: return null
                     val cleanedSender = sender.trim()
                     val currency = normalizeCurrency(currencySymbol)
-                    Log.i(TAG, "Successfully parsed generic payment: Sender='$cleanedSender', Amount=$amount, Currency='$currency' (from '$currencySymbol')")
+                    Log.i(TAG, "✅ Parsed generic payment: Sender='$cleanedSender', Amount=$amount, Currency='$currency'")
                     PaymentDetails(cleanedSender, amount, currency)
                 } catch (e: Exception) {
                     Log.e(TAG, "Error parsing matched generic notification", e)
@@ -195,7 +213,7 @@ object PaymentNotificationParser {
             }
         }
 
-        Log.d(TAG, "Notification did not match any known payment patterns.")
+        Log.d(TAG, "⚠️ Notification did not match any known payment patterns.")
         return null
     }
     

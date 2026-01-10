@@ -1,5 +1,6 @@
 package com.yapenotifier.android.service
 
+import android.content.ComponentName
 import android.content.pm.PackageManager
 import android.os.Build
 import android.service.notification.NotificationListenerService
@@ -18,7 +19,10 @@ import com.yapenotifier.android.util.ServiceStatusManager
 import com.yapenotifier.android.worker.SendNotificationWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -28,9 +32,12 @@ class PaymentNotificationListenerService : NotificationListenerService() {
     private lateinit var db: AppDatabase
     private lateinit var settingsRepository: SettingsRepository
 
-    // CRITICAL: Initialize with default packages to avoid race condition
-    // This ensures we can capture notifications even if the API call hasn't completed
-    private var monitoredPackages: Set<String> = setOf("com.bcp.innovacxion.yape.movil")
+    // FIXED: Usar @Volatile para visibilidad entre threads y usar DEFAULT_PACKAGES del repository
+    @Volatile
+    private var monitoredPackages: Set<String> = SettingsRepository.DEFAULT_PACKAGES
+    
+    // FIXED: Job para el collector reactivo de paquetes
+    private var packagesCollectorJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -45,12 +52,37 @@ class PaymentNotificationListenerService : NotificationListenerService() {
                 Log.i(TAG, "✅ Initial monitored packages loaded: $monitoredPackages")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error loading monitored packages, using defaults", e)
-            // Keep default packages if loading fails
+            Log.e(TAG, "❌ Error loading monitored packages, using defaults: ${SettingsRepository.DEFAULT_PACKAGES}", e)
+            monitoredPackages = SettingsRepository.DEFAULT_PACKAGES
         }
+        
+        // FIXED: Iniciar collector reactivo para actualizaciones en tiempo real
+        startPackagesCollector()
 
-        ServiceStatusManager.updateStatus("✅ Servicio Creado")
+        ServiceStatusManager.updateStatus("✅ Servicio Creado - ${monitoredPackages.size} apps")
         Log.i(TAG, "PaymentNotificationListenerService created with ${monitoredPackages.size} monitored packages")
+    }
+    
+    /**
+     * FIXED: Inicia un collector que escucha cambios en los paquetes monitoreados.
+     * Esto permite actualizar la lista sin reiniciar el servicio.
+     */
+    private fun startPackagesCollector() {
+        packagesCollectorJob?.cancel()
+        packagesCollectorJob = serviceScope.launch {
+            try {
+                settingsRepository.monitoredPackagesFlow.collectLatest { packages ->
+                    val oldCount = monitoredPackages.size
+                    monitoredPackages = packages
+                    if (packages.size != oldCount) {
+                        Log.i(TAG, "🔄 Monitored packages updated: ${packages.size} apps (was $oldCount)")
+                        ServiceStatusManager.updateStatus("🔄 ${packages.size} apps monitoreadas")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error in packages collector", e)
+            }
+        }
     }
 
     override fun onListenerConnected() {
@@ -187,13 +219,34 @@ class PaymentNotificationListenerService : NotificationListenerService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        // FIXED: Cancelar el collector job para evitar memory leaks
+        packagesCollectorJob?.cancel()
+        packagesCollectorJob = null
         ServiceStatusManager.updateStatus("❌ Servicio Destruido")
-        Log.w(TAG, "PaymentNotificationListenerService destroyed.")
+        Log.w(TAG, "PaymentNotificationListenerService destroyed. Collector job cancelled.")
     }
 
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
-        ServiceStatusManager.updateStatus("🔌 Servicio Desconectado")
+        ServiceStatusManager.updateStatus("🔌 Desconectado - Reconectando...")
+        Log.w(TAG, "⚠️ Notification listener disconnected. Attempting auto-reconnect...")
+        
+        // FIXED: Intentar reconectar automáticamente
+        serviceScope.launch {
+            try {
+                // Esperar un poco antes de intentar reconectar
+                delay(2000)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    val componentName = ComponentName(applicationContext, PaymentNotificationListenerService::class.java)
+                    requestRebind(componentName)
+                    Log.i(TAG, "🔄 Rebind requested automatically")
+                    ServiceStatusManager.updateStatus("🔄 Reconexión solicitada...")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error requesting rebind", e)
+                ServiceStatusManager.updateStatus("❌ Error al reconectar")
+            }
+        }
     }
 
     companion object {

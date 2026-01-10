@@ -21,7 +21,27 @@ class SettingsRepository(private val context: Context) {
     companion object {
         private val MONITORED_PACKAGES_KEY = stringSetPreferencesKey("monitored_packages")
         private const val TAG = "SettingsRepository"
-        private val DEFAULT_PACKAGES = setOf("com.bcp.innovacxion.yape.movil")
+        
+        // FIXED: Incluir más paquetes por defecto para cubrir las apps principales de pago en Perú
+        // Esto asegura que el servicio capture notificaciones incluso si el API falla
+        val DEFAULT_PACKAGES = setOf(
+            // Yape (BCP)
+            "com.bcp.innovacxion.yape.movil",
+            // Plin (Interbank)
+            "pe.interbank.plin",
+            "com.interbank.mobilebanking",
+            "pe.com.interbank.mobilebanking",
+            // BCP Banca Móvil
+            "com.bcp.bank.bcp",
+            // BBVA
+            "com.bbva.pe.movil",
+            "com.bbva.bbvacontigo",
+            // Scotiabank
+            "com.scotiabank.mobile.pe",
+            "com.scotiabank.mobile.android.pe",
+            // BanBif
+            "com.banbif.pe"
+        )
     }
 
     val monitoredPackagesFlow: Flow<Set<String>> = context.dataStore.data
