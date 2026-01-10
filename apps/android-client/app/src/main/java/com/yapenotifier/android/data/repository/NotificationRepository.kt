@@ -67,7 +67,11 @@ class NotificationRepository(private val context: Context) {
      * Envía una notificación a la API con manejo detallado de errores
      */
     suspend fun sendNotification(notificationData: NotificationData): SendResult {
-        Log.d(TAG, "Preparing to send notification data: ${Gson().toJson(notificationData)}")
+        val jsonData = Gson().toJson(notificationData)
+        Log.d(TAG, "Preparing to send notification data: $jsonData")
+        Log.d(TAG, "API URL: ${BuildConfig.API_BASE_URL}")
+        Log.d(TAG, "Device UUID: ${notificationData.deviceId}")
+        Log.d(TAG, "Source App: ${notificationData.sourceApp}")
         ServiceStatusManager.updateStatus("📤 Enviando a la API: ${notificationData.sourceApp}")
 
         return try {
@@ -98,10 +102,15 @@ class NotificationRepository(private val context: Context) {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Exception while sending notification", e)
-            
+            Log.e(TAG, "Exception class: ${e.javaClass.name}")
+            Log.e(TAG, "Exception message: ${e.message}")
+            e.cause?.let {
+                Log.e(TAG, "Root cause: ${it.javaClass.name} - ${it.message}")
+            }
+
             // Mejorar mensaje de error con más detalles
             val errorMessage = when {
-                e is javax.net.ssl.SSLHandshakeException || 
+                e is javax.net.ssl.SSLHandshakeException ||
                 e.message?.contains("SSL", ignoreCase = true) == true ||
                 e.message?.contains("certificate", ignoreCase = true) == true -> {
                     "Error SSL: Verifica certificado del servidor"
@@ -116,13 +125,15 @@ class NotificationRepository(private val context: Context) {
                     "Timeout: El servidor no responde. Intenta más tarde."
                 }
                 e is java.io.IOException -> {
-                    "Error de red: ${e.message ?: "Verifica tu conexión a internet"}"
+                    val rootCause = e.cause?.message ?: e.message ?: "Verifica tu conexión a internet"
+                    "Error de red: $rootCause"
                 }
                 else -> {
-                    "Error de red: ${e.javaClass.simpleName} - ${e.message ?: "Error desconocido"}"
+                    val rootCause = e.cause?.let { " (Causa: ${it.message})" } ?: ""
+                    "Error de red: ${e.javaClass.simpleName} - ${e.message ?: "Error desconocido"}$rootCause"
                 }
             }
-            
+
             ServiceStatusManager.updateStatus("🔥 $errorMessage")
             SendResult.NetworkError(e)
         }

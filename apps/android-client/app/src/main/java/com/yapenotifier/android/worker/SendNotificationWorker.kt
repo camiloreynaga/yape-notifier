@@ -134,7 +134,16 @@ class SendNotificationWorker(appContext: Context, workerParams: WorkerParameters
                 status = "pending"
             )
 
-            Timber.d("Sending notification ID: ${notification.id}, sourceApp: $sourceApp, packageName: ${notification.packageName}")
+            Timber.d("Sending notification ID: ${notification.id}")
+            Timber.d("  deviceId: $deviceId")
+            Timber.d("  sourceApp: $sourceApp")
+            Timber.d("  packageName: ${notification.packageName}")
+            Timber.d("  amount: $amount")
+            Timber.d("  currency: $currency")
+            Timber.d("  payerName: $payerName")
+            Timber.d("  securityCode: $securityCode")
+            Timber.d("  receivedAt: $receivedAt")
+            Timber.d("  body length: ${notification.body.length} chars")
 
             val sendResult = repository.sendNotification(notificationData)
 
