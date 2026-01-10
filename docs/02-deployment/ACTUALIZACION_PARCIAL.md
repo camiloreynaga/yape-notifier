@@ -1,5 +1,10 @@
 # 🔄 Actualización Parcial - Solo Dashboard o Solo API
 
+> **Referencias relacionadas:**
+> - [GUIA_ACTUALIZACION.md](GUIA_ACTUALIZACION.md) - Guía completa de actualización
+> - [DEPLOYMENT.md](DEPLOYMENT.md) - Guía completa de despliegue
+> - [DEPLOYMENT_COMMANDS.md](DEPLOYMENT_COMMANDS.md) - Comandos rápidos de despliegue
+
 Guía para actualizar solo un servicio específico sin reconstruir todo el proyecto.
 
 ---
@@ -230,4 +235,5 @@ docker compose --env-file .env build --progress=plain dashboard
 - **Guía completa de actualización**: `docs/02-deployment/GUIA_ACTUALIZACION.md`
 - **Script de actualización completo**: `infra/docker/environments/production/update.sh`
 - **Docker Compose**: `infra/docker/environments/production/docker-compose.yml`
+
 

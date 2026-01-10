@@ -22,7 +22,10 @@ Guías de despliegue y operaciones en diferentes entornos.
 
 - **[DEPLOYMENT.md](02-deployment/DEPLOYMENT.md)** - Guía completa de despliegue en producción
 - **[GUIA_PRODUCCION_PASO_A_PASO.md](02-deployment/GUIA_PRODUCCION_PASO_A_PASO.md)** - Guía detallada paso a paso para despliegue en producción
+- **[GUIA_ACTUALIZACION.md](02-deployment/GUIA_ACTUALIZACION.md)** - Guía de actualización de API y Dashboard
+- **[ACTUALIZACION_PARCIAL.md](02-deployment/ACTUALIZACION_PARCIAL.md)** - Actualización parcial (solo Dashboard o solo API)
 - **[DEPLOYMENT_COMMANDS.md](02-deployment/DEPLOYMENT_COMMANDS.md)** - Comandos rápidos de despliegue
+- **[SERVER_COMMANDS.md](02-deployment/SERVER_COMMANDS.md)** - Comandos para ejecutar en el servidor
 - **[DEPLOYMENT_CHECKLIST.md](02-deployment/DEPLOYMENT_CHECKLIST.md)** - Checklist de despliegue en DigitalOcean
 - **[DEPLOY_GUIDE_PRODUCTION.md](02-deployment/DEPLOY_GUIDE_PRODUCTION.md)** - Guía detallada paso a paso para despliegue en producción
 - **[DOCKER.md](02-deployment/DOCKER.md)** - Documentación técnica de Docker
@@ -93,6 +96,11 @@ Documentación de funcionalidades y features del sistema.
 - **[PIN_SYSTEM_FINAL_IMPLEMENTATION.md](05-features/PIN_SYSTEM_FINAL_IMPLEMENTATION.md)** - Implementación completa del sistema PIN
 - **[PIN_SYSTEM_IMPLEMENTATION_PLAN.md](05-features/PIN_SYSTEM_IMPLEMENTATION_PLAN.md)** - Plan de implementación del sistema PIN
 - **[PIN_SYSTEM_UX_IMPACT.md](05-features/PIN_SYSTEM_UX_IMPACT.md)** - Impacto UX del sistema PIN en Android
+- **[DASHBOARD_OPTIMIZATION_PHASE_1.md](05-features/DASHBOARD_OPTIMIZATION_PHASE_1.md)** - Optimización Fase 1: React Query
+- **[DASHBOARD_OPTIMIZATION_PHASE_2.md](05-features/DASHBOARD_OPTIMIZATION_PHASE_2.md)** - Optimización Fase 2: Error Handling y Circuit Breaker
+- **[DASHBOARD_OPTIMIZATION_PHASE_3.md](05-features/DASHBOARD_OPTIMIZATION_PHASE_3.md)** - Optimización Fase 3: WebSocket Optimization
+- **[DASHBOARD_OPTIMIZATION_PHASE_4.md](05-features/DASHBOARD_OPTIMIZATION_PHASE_4.md)** - Optimización Fase 4: Lazy Loading y Code Splitting
+- **[DASHBOARD_OPTIMIZATION_PHASE_5.md](05-features/DASHBOARD_OPTIMIZATION_PHASE_5.md)** - Optimización Fase 5: Debouncing y Optimizaciones Finales
 - **[ANDROID_ADMIN_MODULE.md](05-features/ANDROID_ADMIN_MODULE.md)** - Módulo Admin móvil - App Android (implementado)
 - **[MONITOR_PACKAGES.md](05-features/MONITOR_PACKAGES.md)** - Sistema de gestión de paquetes monitoreados
 - **[DEVICE_CONNECTION_STATUS_EXPLANATION.md](05-features/DEVICE_CONNECTION_STATUS_EXPLANATION.md)** - Explicación del estado de conexión de dispositivos
@@ -110,6 +118,9 @@ Documentación para operaciones y mantenimiento.
 - **[UPDATE_CHECKLIST.md](06-operations/UPDATE_CHECKLIST.md)** - Checklist de actualización del servidor
 - **[TROUBLESHOOTING.md](06-operations/TROUBLESHOOTING.md)** - Diagnóstico y solución de problemas
 - **[TROUBLESHOOTING_NOTIFICATIONS.md](06-operations/TROUBLESHOOTING_NOTIFICATIONS.md)** - Solución: Notificaciones no capturadas
+- **[TROUBLESHOOTING_ERROR_IS_ACTIVE_CAUSE.md](06-operations/TROUBLESHOOTING_ERROR_IS_ACTIVE_CAUSE.md)** - Causa raíz: Error is_active column does not exist
+- **[TROUBLESHOOTING_ERROR_IS_ACTIVE_SOLUTION.md](06-operations/TROUBLESHOOTING_ERROR_IS_ACTIVE_SOLUTION.md)** - Solución: Error is_active column does not exist
+- **[TROUBLESHOOTING_ERROR_IS_ACTIVE_FIXED.md](06-operations/TROUBLESHOOTING_ERROR_IS_ACTIVE_FIXED.md)** - Solución corregida: Error is_active column does not exist
 - **MAINTENANCE.md** - Mantenimiento y actualizaciones (pendiente)
 
 ---
@@ -186,6 +197,14 @@ Si eres nuevo en el proyecto:
 ---
 
 **Última actualización:** 2025-01-21
+
+---
+
+## 📊 Estadísticas de Documentación
+
+- **Total de documentos:** 80+
+- **Categorías:** 7 (Getting Started, Deployment, Architecture, Development, Security, Features, Operations, Reference)
+- **Archivos en ARCHIVE:** 30+ (documentación histórica)
 
 ---
 

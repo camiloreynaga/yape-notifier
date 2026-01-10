@@ -1,5 +1,12 @@
 # 🔄 Guía de Actualización - API y Dashboard
 
+> **Referencias relacionadas:**
+>
+> - [ACTUALIZACION_PARCIAL.md](ACTUALIZACION_PARCIAL.md) - Actualización parcial (solo Dashboard o solo API)
+> - [DEPLOYMENT.md](DEPLOYMENT.md) - Guía completa de despliegue
+> - [DEPLOYMENT_COMMANDS.md](DEPLOYMENT_COMMANDS.md) - Comandos rápidos de despliegue
+> - [UPDATE_CHECKLIST.md](../06-operations/UPDATE_CHECKLIST.md) - Checklist de actualización
+
 Guía profesional para actualizar la API (Laravel) y el Dashboard (React) en producción.
 
 ---

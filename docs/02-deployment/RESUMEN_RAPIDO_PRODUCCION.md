@@ -115,3 +115,4 @@ docker compose --env-file .env exec -it db psql -U postgres -d yape_notifier
 
 
 
+
