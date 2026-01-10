@@ -4,7 +4,17 @@
       "Bash(php artisan tinker:*)",
       "Bash(./gradlew assembleDebug:*)",
       "Bash(./gradlew.bat assembleDebug:*)",
-      "Bash(gradle --version:*)"
+      "Bash(gradle --version:*)",
+      "Bash(cmd.exe /c \"gradlew.bat assembleDebug\")",
+      "Bash(chmod:*)",
+      "Bash(JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" ./gradlew.bat clean:*)",
+      "Bash(JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" ./gradlew.bat:*)",
+      "Bash(echo:*)",
+      "Bash(~/.gradle/gradle.properties)",
+      "Bash(JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" ./gradlew.bat assembleDebug:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nFix: Mostrar dispositivos por commerce_id para usuarios admin\n\n- DeviceService::getUserDevices\\(\\) ahora filtra por commerce_id si el usuario tiene uno asignado\n- Esto permite que los admins vean todos los dispositivos de su comercio, no solo los propios\n- Soluciona el problema donde los dispositivos vinculados via QR no aparecían en el dashboard\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)"
     ]
   }
 }
