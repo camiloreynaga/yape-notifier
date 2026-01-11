@@ -175,7 +175,7 @@ class ApiService {
     return response.data.device;
   }
 
-  async updateDevice(id: number, data: { name?: string; platform?: string }): Promise<Device> {
+  async updateDevice(id: number, data: { name?: string; alias?: string; platform?: string }): Promise<Device> {
     const response = await this.client.put<{ device: Device }>(API_ENDPOINTS.devices.update(id), data);
     return response.data.device;
   }

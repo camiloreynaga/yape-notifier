@@ -14,7 +14,7 @@ export default function DevicesPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingDevice, setEditingDevice] = useState<Device | null>(null);
   const [formData, setFormData] = useState({
-    name: '',
+    alias: '',
   });
   const [expandedDevices, setExpandedDevices] = useState<Set<number>>(new Set());
   const [deviceInstances, setDeviceInstances] = useState<Record<number, AppInstance[]>>({});
@@ -66,35 +66,31 @@ export default function DevicesPage() {
 
   const handleCreate = () => {
     setEditingDevice(null);
-    setFormData({ name: '' });
+    setFormData({ alias: '' });
     setShowModal(true);
   };
 
   const handleEdit = (device: Device) => {
     setEditingDevice(device);
-    setFormData({ name: device.name });
+    setFormData({ alias: device.alias || '' });
     setShowModal(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Platform is always 'android' for now
-      const deviceData = {
-        ...formData,
-        platform: 'android',
-      };
-      
       if (editingDevice) {
-        await apiService.updateDevice(editingDevice.id, deviceData);
+        // Solo actualizar alias cuando editamos
+        await apiService.updateDevice(editingDevice.id, { alias: formData.alias });
       } else {
-        await apiService.createDevice(deviceData);
+        // Crear nuevo dispositivo con nombre y plataforma
+        await apiService.createDevice({ name: formData.alias, platform: 'android' });
       }
       setShowModal(false);
       loadDevices();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } };
-      const errorMessage = err.response?.data?.message || 
+      const errorMessage = err.response?.data?.message ||
         Object.values(err.response?.data?.errors || {}).flat().join(', ') ||
         'Error al guardar dispositivo';
       alert(errorMessage);
@@ -223,8 +219,12 @@ export default function DevicesPage() {
                     <Smartphone className="h-6 w-6 text-primary-600" />
                   </div>
                   <div className="ml-4">
-                    <h3 className="text-lg font-semibold text-gray-900">{device.name}</h3>
-                    <p className="text-sm text-gray-500">{device.platform}</p>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {device.alias || device.name}
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      {device.alias ? device.name : device.platform}
+                    </p>
                   </div>
                 </div>
                 <button
@@ -492,19 +492,36 @@ export default function DevicesPage() {
               {editingDevice ? 'Editar Dispositivo' : 'Nuevo Dispositivo'}
             </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {editingDevice && (
+                <div>
+                  <label htmlFor="device-model" className="block text-sm font-medium text-gray-700 mb-2">
+                    Modelo del dispositivo
+                  </label>
+                  <input
+                    id="device-model"
+                    type="text"
+                    value={editingDevice.name}
+                    disabled
+                    className="input bg-gray-100"
+                  />
+                </div>
+              )}
               <div>
-                <label htmlFor="device-name" className="block text-sm font-medium text-gray-700 mb-2">
-                  Nombre
+                <label htmlFor="device-alias" className="block text-sm font-medium text-gray-700 mb-2">
+                  Nombre personalizado
                 </label>
                 <input
-                  id="device-name"
+                  id="device-alias"
                   type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required={!editingDevice}
+                  value={formData.alias}
+                  onChange={(e) => setFormData({ ...formData, alias: e.target.value })}
                   className="input"
                   placeholder="Ej: Caja 1 - Yape"
                 />
+                <p className="mt-1 text-xs text-gray-500">
+                  Este nombre te ayudará a identificar el dispositivo fácilmente
+                </p>
               </div>
               {editingDevice && (
                 <div>
@@ -516,7 +533,7 @@ export default function DevicesPage() {
                     type="text"
                     value={editingDevice.uuid}
                     disabled
-                    className="input"
+                    className="input bg-gray-100 font-mono text-xs"
                   />
                 </div>
               )}

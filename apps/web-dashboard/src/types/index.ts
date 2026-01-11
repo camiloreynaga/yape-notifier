@@ -15,6 +15,7 @@ export interface Device {
   user_id: number;
   uuid: string;
   name: string;
+  alias: string | null;
   platform: string;
   is_active: boolean;
   commerce_id: number | null;

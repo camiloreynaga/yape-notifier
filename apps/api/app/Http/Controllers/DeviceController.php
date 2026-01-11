@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Device\CreateDeviceRequest;
 use App\Http\Requests\Device\UpdateDeviceRequest;
+use App\Models\Device;
 use App\Services\DeviceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class DeviceController extends Controller
 {
@@ -42,10 +44,11 @@ class DeviceController extends Controller
 
     /**
      * Get a specific device.
+     * Allows access to devices in user's commerce (admin view) or user's own devices.
      */
     public function show(Request $request, int $id): JsonResponse
     {
-        $device = $request->user()->devices()->findOrFail($id);
+        $device = $this->findDeviceForUser($request->user(), $id);
 
         return response()->json([
             'device' => $device,
@@ -54,10 +57,11 @@ class DeviceController extends Controller
 
     /**
      * Update a device.
+     * Allows updating devices in user's commerce (admin view) or user's own devices.
      */
     public function update(UpdateDeviceRequest $request, int $id): JsonResponse
     {
-        $device = $request->user()->devices()->findOrFail($id);
+        $device = $this->findDeviceForUser($request->user(), $id);
         $device = $this->deviceService->updateDevice($device, $request->validated());
 
         return response()->json([
@@ -68,10 +72,21 @@ class DeviceController extends Controller
 
     /**
      * Delete a device.
+     * Allows deleting devices in user's commerce (admin view) or user's own devices.
      */
     public function destroy(Request $request, int $id): JsonResponse
     {
-        $device = $request->user()->devices()->findOrFail($id);
+        $user = $request->user();
+        $device = $this->findDeviceForUser($user, $id);
+
+        Log::info('Device deleted', [
+            'device_id' => $device->id,
+            'device_uuid' => $device->uuid,
+            'device_name' => $device->name,
+            'deleted_by_user_id' => $user->id,
+            'commerce_id' => $device->commerce_id,
+        ]);
+
         $device->delete();
 
         return response()->json([
@@ -81,10 +96,11 @@ class DeviceController extends Controller
 
     /**
      * Toggle device active status.
+     * Allows toggling devices in user's commerce (admin view) or user's own devices.
      */
     public function toggleStatus(Request $request, int $id): JsonResponse
     {
-        $device = $request->user()->devices()->findOrFail($id);
+        $device = $this->findDeviceForUser($request->user(), $id);
         $isActive = $request->boolean('is_active', ! $device->is_active);
 
         $device = $this->deviceService->toggleDeviceStatus($device, $isActive);
@@ -93,6 +109,28 @@ class DeviceController extends Controller
             'message' => 'Device status updated',
             'device' => $device,
         ]);
+    }
+
+    /**
+     * Find a device that belongs to user's commerce or directly to the user.
+     * This enables commerce-level device management (admin view).
+     *
+     * @param \App\Models\User $user
+     * @param int $id
+     * @return Device
+     * @throws \Illuminate\Database\Eloquent\ModelNotFoundException
+     */
+    private function findDeviceForUser($user, int $id): Device
+    {
+        // If user has commerce_id, allow access to all devices in that commerce
+        if ($user->commerce_id) {
+            return Device::where('commerce_id', $user->commerce_id)
+                ->findOrFail($id);
+        }
+
+        // Fallback: only user's own devices
+        return Device::where('user_id', $user->id)
+            ->findOrFail($id);
     }
 
     /**

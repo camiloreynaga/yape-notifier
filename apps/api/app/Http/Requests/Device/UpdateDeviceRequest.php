@@ -23,6 +23,7 @@ class UpdateDeviceRequest extends FormRequest
     {
         return [
             'name' => ['sometimes', 'string', 'max:255'],
+            'alias' => ['sometimes', 'nullable', 'string', 'max:255'],
             'platform' => ['sometimes', 'nullable', 'string', 'in:android'],
             'is_active' => ['sometimes', 'boolean'],
         ];
