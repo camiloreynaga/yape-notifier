@@ -463,8 +463,15 @@ fi
 
 # Verificar migraciones finales
 info "Verificando estado final de migraciones..."
-PENDING_COUNT=$(docker compose --env-file .env exec -T php-fpm php artisan migrate:status 2>/dev/null | grep -c "Pending" || echo "0")
-if [ "$PENDING_COUNT" -eq 0 ]; then
+# Limpiar el output y extraer solo el número de migraciones pendientes
+# Usar tr para eliminar espacios y saltos de línea, luego extraer solo dígitos
+PENDING_COUNT=$(docker compose --env-file .env exec -T php-fpm php artisan migrate:status 2>/dev/null | grep -c "Pending" 2>/dev/null | tr -d '[:space:]' || echo "0")
+# Asegurar que PENDING_COUNT sea un número válido
+PENDING_COUNT=${PENDING_COUNT:-0}
+# Convertir a número entero (eliminar cualquier carácter no numérico)
+PENDING_COUNT=$(echo "$PENDING_COUNT" | grep -oE '[0-9]+' | head -1)
+PENDING_COUNT=${PENDING_COUNT:-0}
+if [ "$PENDING_COUNT" -eq 0 ] 2>/dev/null; then
     info "✅ Todas las migraciones están ejecutadas"
 else
     warn "⚠️  Hay $PENDING_COUNT migraciones pendientes"
@@ -476,7 +483,12 @@ fi
 info "Optimizando caches para producción..."
 docker compose --env-file .env exec -T php-fpm php artisan config:cache || warn "config:cache falló"
 docker compose --env-file .env exec -T php-fpm php artisan route:cache || warn "route:cache falló"
-docker compose --env-file .env exec -T php-fpm php artisan view:cache || warn "view:cache falló"
+# Solo ejecutar view:cache si existe el directorio de vistas (Laravel API pura no tiene vistas)
+if docker compose --env-file .env exec -T php-fpm test -d /var/www/resources/views 2>/dev/null; then
+    docker compose --env-file .env exec -T php-fpm php artisan view:cache || warn "view:cache falló"
+else
+    info "⚠️  Directorio resources/views no existe (API pura sin vistas Blade) - omitiendo view:cache"
+fi
 
 # ============================================
 # RESUMEN

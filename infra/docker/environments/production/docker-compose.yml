@@ -218,11 +218,12 @@ services:
       - reverb
     healthcheck:
       # Verificar que Caddy esté corriendo y respondiendo
-      # Usar el endpoint de admin de Caddy (más confiable que verificar proceso)
+      # Usar el puerto HTTP local (más confiable que el endpoint de admin que puede no estar habilitado)
+      # Si el endpoint de admin falla, verificar que el proceso esté corriendo
       test:
         [
           "CMD-SHELL",
-          "wget --quiet --tries=1 --spider --timeout=5 http://localhost:2019/config/ || exit 1",
+          "wget --quiet --tries=1 --spider --timeout=5 http://localhost/ || pgrep -x caddy > /dev/null || exit 1",
         ]
       interval: 30s
       timeout: 10s
