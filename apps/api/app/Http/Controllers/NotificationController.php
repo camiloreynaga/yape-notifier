@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Notification\CreateNotificationRequest;
 use App\Http\Requests\Notification\ListNotificationsRequest;
+use App\Models\Notification;
 use App\Services\AppInstanceService;
 use App\Services\DeviceService;
 use App\Services\NotificationService;

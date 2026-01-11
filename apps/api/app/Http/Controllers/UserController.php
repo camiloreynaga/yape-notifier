@@ -195,15 +195,11 @@ class UserController extends Controller
 
             // Generar nuevo PIN único
             $newPin = User::generateUniquePin(4);
-            $oldPin = $user->pin;
-
             $user->pin = $newPin;
             $user->save();
 
             Log::info('PIN regenerated', [
                 'user_id' => $user->id,
-                'old_pin' => $oldPin,
-                'new_pin' => $newPin,
                 'regenerated_by' => $adminUser->id,
             ]);
 
