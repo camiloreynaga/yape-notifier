@@ -150,4 +150,23 @@ Contactar Soporte</string>
     <!-- Admin Devices -->
     <string name="admin_devices_title">Dispositivos</string>
     <string name="admin_devices_subtitle">Gestionar dispositivos vinculados</string>
+
+    <!-- Empty States -->
+    <string name="empty_state_icon">Icono de estado vacío</string>
+    <string name="empty_state_title">Sin datos</string>
+    <string name="empty_state_description">No hay información disponible en este momento.</string>
+    <string name="empty_state_action">Agregar</string>
+    <string name="empty_notifications_title">Sin notificaciones</string>
+    <string name="empty_notifications_description">Aún no has recibido notificaciones de pago. Las notificaciones aparecerán aquí cuando lleguen.</string>
+    <string name="empty_devices_title">Sin dispositivos</string>
+    <string name="empty_devices_description">No hay dispositivos vinculados. Agrega un dispositivo para comenzar a recibir notificaciones.</string>
+    <string name="empty_devices_action">Agregar Dispositivo</string>
+
+    <!-- Snackbar/Feedback Messages -->
+    <string name="action_completed">Acción completada</string>
+    <string name="device_deleted">Dispositivo eliminado</string>
+    <string name="device_updated">Dispositivo actualizado</string>
+    <string name="notification_status_updated">Estado actualizado</string>
+    <string name="undo">Deshacer</string>
+    <string name="retry">Reintentar</string>
 </resources>

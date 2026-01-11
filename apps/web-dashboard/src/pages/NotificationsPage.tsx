@@ -9,7 +9,7 @@ import { useDebouncedValue } from '@/hooks/useDebounce';
 import { logger } from '@/services/logger';
 import type { Notification, NotificationFilters } from '@/types';
 import { format } from 'date-fns';
-import { Download, Eye, RefreshCw, Calendar, X, Inbox, Search, Grid3x3, List, SlidersHorizontal } from 'lucide-react';
+import { Download, Eye, RefreshCw, Calendar, X, Inbox, Search, Grid3x3, List, SlidersHorizontal, Loader2 } from 'lucide-react';
 import WebSocketStatus from '@/components/WebSocketStatus';
 import EmptyState from '@/components/EmptyState';
 import NotificationCard from '@/components/NotificationCard';
@@ -24,6 +24,8 @@ export default function NotificationsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [updatingStatus, setUpdatingStatus] = useState<number | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   // Debounced search query (espera 300ms después de que el usuario deja de escribir)
   const { debouncedValue: debouncedSearchQuery, isDebouncing } = useDebouncedValue(searchQuery, 300);
@@ -107,13 +109,17 @@ export default function NotificationsPage() {
   }, [notifications?.data, debouncedSearchQuery]);
 
   const handleStatusChange = async (id: number, status: 'pending' | 'validated' | 'inconsistent') => {
+    setUpdatingStatus(id);
     try {
       await apiService.updateNotificationStatus(id, status);
       refetch();
-      toast.showSuccess('Estado actualizado correctamente');
+      const statusLabels = { pending: 'pendiente', validated: 'validado', inconsistent: 'inconsistente' };
+      toast.showSuccess(`Estado actualizado a "${statusLabels[status]}"`);
     } catch (error: unknown) {
       logger.error('Error updating notification status', error as Error, { notificationId: id, status });
       toast.showError('Error al actualizar el estado');
+    } finally {
+      setUpdatingStatus(null);
     }
   };
 
@@ -123,48 +129,60 @@ export default function NotificationsPage() {
       return;
     }
 
-    const headers = [
-      'ID',
-      'Fecha',
-      'Aplicación',
-      'Instancia',
-      'Dispositivo',
-      'Título',
-      'Monto',
-      'Moneda',
-      'Pagador',
-      'Estado',
-      'Duplicado',
-    ];
+    setExporting(true);
 
-    const rows = notifications.data.map((n: Notification) => [
-      n.id,
-      format(new Date(n.received_at), 'yyyy-MM-dd HH:mm:ss'),
-      n.source_app || 'N/A',
-      n.app_instance?.instance_label || (n.android_user_id ? `${n.package_name} (User ${n.android_user_id})` : 'N/A'),
-      n.device?.name || 'N/A',
-      n.title,
-      n.amount || '0',
-      n.currency || 'PEN',
-      n.payer_name || 'N/A',
-      n.status,
-      n.is_duplicate ? 'Sí' : 'No',
-    ]);
+    // Use setTimeout to allow UI to update before processing
+    setTimeout(() => {
+      try {
+        const headers = [
+          'ID',
+          'Fecha',
+          'Aplicación',
+          'Instancia',
+          'Dispositivo',
+          'Título',
+          'Monto',
+          'Moneda',
+          'Pagador',
+          'Estado',
+          'Duplicado',
+        ];
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map((row: (string | number)[]) => row.map((cell: string | number) => `"${cell}"`).join(',')),
-    ].join('\n');
+        const rows = notifications.data.map((n: Notification) => [
+          n.id,
+          format(new Date(n.received_at), 'yyyy-MM-dd HH:mm:ss'),
+          n.source_app || 'N/A',
+          n.app_instance?.instance_label || (n.android_user_id ? `${n.package_name} (User ${n.android_user_id})` : 'N/A'),
+          n.device?.name || 'N/A',
+          n.title,
+          n.amount || '0',
+          n.currency || 'PEN',
+          n.payer_name || 'N/A',
+          n.status,
+          n.is_duplicate ? 'Sí' : 'No',
+        ]);
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `notificaciones_${format(new Date(), 'yyyy-MM-dd')}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+        const csvContent = [
+          headers.join(','),
+          ...rows.map((row: (string | number)[]) => row.map((cell: string | number) => `"${cell}"`).join(',')),
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `notificaciones_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.showSuccess(`Exportadas ${notifications.data.length} notificaciones`);
+      } catch {
+        toast.showError('Error al exportar los datos');
+      } finally {
+        setExporting(false);
+      }
+    }, 100);
   }, [notifications, toast]);
 
   const getStatusBadge = useCallback((status: string) => {
@@ -302,10 +320,15 @@ export default function NotificationsPage() {
               </button>
               <button
                 onClick={exportToCSV}
-                className="px-4 py-2 rounded-lg bg-white text-primary-600 hover:bg-white/90 transition-all duration-200 flex items-center gap-2 text-sm font-medium shadow-sm"
+                disabled={exporting}
+                className="px-4 py-2 rounded-lg bg-white text-primary-600 hover:bg-white/90 transition-all duration-200 flex items-center gap-2 text-sm font-medium shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                <Download className="h-4 w-4" />
-                <span className="hidden sm:inline">Exportar</span>
+                {exporting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                <span className="hidden sm:inline">{exporting ? 'Exportando...' : 'Exportar'}</span>
               </button>
             </div>
           </div>
@@ -543,6 +566,7 @@ export default function NotificationsPage() {
                   notification={notification}
                   onStatusChange={handleStatusChange}
                   onClick={() => navigate(`/notifications/${notification.id}`)}
+                  isUpdating={updatingStatus === notification.id}
                 />
               ))}
             </div>

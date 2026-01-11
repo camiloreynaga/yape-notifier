@@ -5,7 +5,7 @@
 
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Eye, Copy, Check, X, AlertCircle, DollarSign, Shield } from 'lucide-react';
+import { Eye, Copy, Check, X, AlertCircle, DollarSign, Shield, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 import type { Notification } from '@/types';
 
@@ -13,6 +13,7 @@ interface NotificationCardProps {
   notification: Notification;
   onStatusChange: (id: number, status: 'pending' | 'validated' | 'inconsistent') => void;
   onClick: () => void;
+  isUpdating?: boolean;
 }
 
 // Colores por app
@@ -29,6 +30,7 @@ export default function NotificationCard({
   notification,
   onStatusChange,
   onClick,
+  isUpdating = false,
 }: NotificationCardProps) {
   const appColor = appColors[notification.source_app as keyof typeof appColors] || 'from-gray-500 to-gray-600';
 
@@ -179,23 +181,31 @@ export default function NotificationCard({
               <Eye className="h-4 w-4" />
             </button>
 
-            {/* Selector de estado compacto */}
-            <select
-              value={notification.status}
-              onChange={(e) => {
-                e.stopPropagation();
-                onStatusChange(
-                  notification.id,
-                  e.target.value as 'pending' | 'validated' | 'inconsistent'
-                );
-              }}
-              className="text-xs px-2 py-1.5 rounded-lg border border-gray-200 bg-white hover:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all font-medium text-gray-700"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <option value="pending">Pendiente</option>
-              <option value="validated">Validar</option>
-              <option value="inconsistent">Inconsistente</option>
-            </select>
+            {/* Selector de estado compacto con indicador de carga */}
+            <div className="relative">
+              {isUpdating && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-lg z-10">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary-600" />
+                </div>
+              )}
+              <select
+                value={notification.status}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  onStatusChange(
+                    notification.id,
+                    e.target.value as 'pending' | 'validated' | 'inconsistent'
+                  );
+                }}
+                disabled={isUpdating}
+                className="text-xs px-2 py-1.5 rounded-lg border border-gray-200 bg-white hover:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all font-medium text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <option value="pending">Pendiente</option>
+                <option value="validated">Validar</option>
+                <option value="inconsistent">Inconsistente</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>

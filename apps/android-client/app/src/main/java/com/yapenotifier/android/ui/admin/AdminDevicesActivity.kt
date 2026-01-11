@@ -8,6 +8,7 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.android.material.snackbar.Snackbar
 import com.yapenotifier.android.R
 import com.yapenotifier.android.databinding.ActivityAdminDevicesBinding
 import com.yapenotifier.android.data.model.Device
@@ -111,25 +112,38 @@ class AdminDevicesActivity : AppCompatActivity() {
         viewModel.uiState.observe(this) { state ->
             binding.swipeRefresh.isRefreshing = state.loading
 
+            // Show skeleton while loading and no data yet
             if (state.loading && state.devices.isEmpty()) {
-                binding.progressBar.visibility = View.VISIBLE
+                binding.skeletonContainer.visibility = View.VISIBLE
+                binding.emptyStateContainer.visibility = View.GONE
+                binding.rvDevices.visibility = View.GONE
             } else {
-                binding.progressBar.visibility = View.GONE
+                binding.skeletonContainer.visibility = View.GONE
             }
 
             adapter.submitList(state.devices)
 
+            // Show empty state when no data and not loading
             if (state.devices.isEmpty() && !state.loading) {
-                binding.tvEmpty.visibility = View.VISIBLE
+                binding.emptyStateContainer.visibility = View.VISIBLE
                 binding.rvDevices.visibility = View.GONE
-            } else {
-                binding.tvEmpty.visibility = View.GONE
+            } else if (state.devices.isNotEmpty()) {
+                binding.emptyStateContainer.visibility = View.GONE
                 binding.rvDevices.visibility = View.VISIBLE
             }
 
+            // Show error with Snackbar
             state.error?.let { error ->
-                Toast.makeText(this, error, Toast.LENGTH_LONG).show()
+                Snackbar.make(binding.root, error, Snackbar.LENGTH_LONG)
+                    .setAction(R.string.retry) { loadDevices() }
+                    .show()
             }
+        }
+
+        // Setup empty state action button
+        binding.btnEmptyAction.setOnClickListener {
+            val intent = Intent(this, AdminAddDeviceActivity::class.java)
+            startActivity(intent)
         }
     }
 
@@ -149,8 +163,9 @@ class AdminDevicesActivity : AppCompatActivity() {
                 val newName = input.text.toString().trim()
                 if (newName.isNotEmpty()) {
                     viewModel.updateDeviceAlias(device.id, newName)
+                    Snackbar.make(binding.root, R.string.device_updated, Snackbar.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(this, "El nombre no puede estar vacío", Toast.LENGTH_SHORT).show()
+                    Snackbar.make(binding.root, "El nombre no puede estar vacío", Snackbar.LENGTH_SHORT).show()
                 }
             }
             .setNegativeButton("Cancelar", null)
@@ -163,6 +178,7 @@ class AdminDevicesActivity : AppCompatActivity() {
             .setMessage("¿Estás seguro de que deseas eliminar el dispositivo \"${device.name}\"?")
             .setPositiveButton("Eliminar") { _, _ ->
                 viewModel.deleteDevice(device.id)
+                Snackbar.make(binding.root, R.string.device_deleted, Snackbar.LENGTH_SHORT).show()
             }
             .setNegativeButton("Cancelar", null)
             .show()

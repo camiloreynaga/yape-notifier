@@ -14,6 +14,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.chip.Chip
+import com.google.android.material.snackbar.Snackbar
 import com.yapenotifier.android.R
 import com.yapenotifier.android.databinding.ActivityAdminPanelBinding
 import com.yapenotifier.android.ui.admin.adapter.NotificationAdapter
@@ -74,17 +75,24 @@ class AdminPanelActivity : AppCompatActivity() {
             onValidateClick = { notification ->
                 // Validate notification (quick action)
                 viewModel.validateNotification(notification.id)
-                Toast.makeText(this, "Notificación validada ✓", Toast.LENGTH_SHORT).show()
+                Snackbar.make(binding.root, "Notificación validada", Snackbar.LENGTH_SHORT)
+                    .setBackgroundTint(getColor(R.color.badge_original_bg))
+                    .setTextColor(getColor(R.color.badge_original_text))
+                    .show()
             },
             onMarkInconsistent = { notification ->
                 // Mark as inconsistent
                 viewModel.updateNotificationStatus(notification.id, "inconsistent")
-                Toast.makeText(this, "Marcado como inconsistente", Toast.LENGTH_SHORT).show()
+                Snackbar.make(binding.root, "Marcado como inconsistente", Snackbar.LENGTH_SHORT)
+                    .setAction(R.string.undo) {
+                        viewModel.updateNotificationStatus(notification.id, "pending")
+                    }
+                    .show()
             },
             onMarkPending = { notification ->
                 // Mark as pending
                 viewModel.updateNotificationStatus(notification.id, "pending")
-                Toast.makeText(this, "Marcado como pendiente", Toast.LENGTH_SHORT).show()
+                Snackbar.make(binding.root, "Marcado como pendiente", Snackbar.LENGTH_SHORT).show()
             }
         )
 
@@ -139,29 +147,39 @@ class AdminPanelActivity : AppCompatActivity() {
             Timber.d("AdminPanelActivity UI State actualizado: loading=${state.loading}, notifications=${state.notifications.size}, error=${state.error}, total=${state.total}")
             binding.swipeRefresh.isRefreshing = state.loading
 
+            // Show skeleton while loading and no data yet
             if (state.loading && state.notifications.isEmpty()) {
-                binding.progressBar.visibility = View.VISIBLE
+                binding.skeletonContainer.visibility = View.VISIBLE
+                binding.emptyStateContainer.visibility = View.GONE
+                binding.rvNotifications.visibility = View.GONE
+                binding.sectionHeader.visibility = View.GONE
             } else {
-                binding.progressBar.visibility = View.GONE
+                binding.skeletonContainer.visibility = View.GONE
             }
 
             adapter.submitList(state.notifications)
 
+            // Show empty state when no data and not loading
             if (state.notifications.isEmpty() && !state.loading) {
-                binding.tvEmpty.visibility = View.VISIBLE
+                binding.emptyStateContainer.visibility = View.VISIBLE
                 binding.rvNotifications.visibility = View.GONE
-                Timber.d("AdminPanelActivity: Mostrando mensaje vacío")
-            } else {
-                binding.tvEmpty.visibility = View.GONE
+                binding.sectionHeader.visibility = View.GONE
+                Timber.d("AdminPanelActivity: Mostrando empty state")
+            } else if (state.notifications.isNotEmpty()) {
+                binding.emptyStateContainer.visibility = View.GONE
                 binding.rvNotifications.visibility = View.VISIBLE
+                binding.sectionHeader.visibility = View.VISIBLE
             }
 
+            // Show error with Snackbar for better UX
             state.error?.let { error ->
                 Timber.e("AdminPanelActivity Error: $error")
-                Toast.makeText(this, error, Toast.LENGTH_LONG).show()
+                Snackbar.make(binding.root, error, Snackbar.LENGTH_LONG)
+                    .setAction(R.string.retry) { viewModel.refresh() }
+                    .show()
             }
         }
-        
+
         viewModel.pollingState.observe(this) { state ->
             Timber.d("AdminPanelActivity Polling State: $state")
         }
