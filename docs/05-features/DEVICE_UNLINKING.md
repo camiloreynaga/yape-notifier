@@ -1,5 +1,10 @@
 # 🔓 Desvinculación de Dispositivos
 
+> **Referencias relacionadas:**
+> - [DEVICE_LIFECYCLE.md](DEVICE_LIFECYCLE.md) - Ciclo de vida completo de dispositivos
+> - [DEVICE_LINKING_GUIDE.md](DEVICE_LINKING_GUIDE.md) - Guía de vinculación de dispositivos
+> - [CLEAN_DEVICES.md](../06-operations/CLEAN_DEVICES.md) - Limpieza completa de dispositivos (operación avanzada)
+
 Guía completa para desvincular dispositivos de comercios y permitir re-vinculación a otros comercios.
 
 ---

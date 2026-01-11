@@ -121,6 +121,8 @@ Documentación para operaciones y mantenimiento.
 - **[TROUBLESHOOTING_ERROR_IS_ACTIVE_CAUSE.md](06-operations/TROUBLESHOOTING_ERROR_IS_ACTIVE_CAUSE.md)** - Causa raíz: Error is_active column does not exist
 - **[TROUBLESHOOTING_ERROR_IS_ACTIVE_SOLUTION.md](06-operations/TROUBLESHOOTING_ERROR_IS_ACTIVE_SOLUTION.md)** - Solución: Error is_active column does not exist
 - **[TROUBLESHOOTING_ERROR_IS_ACTIVE_FIXED.md](06-operations/TROUBLESHOOTING_ERROR_IS_ACTIVE_FIXED.md)** - Solución corregida: Error is_active column does not exist
+- **[CLEAN_DEVICES.md](06-operations/CLEAN_DEVICES.md)** - Guía profesional: Limpieza de dispositivos en base de datos
+- **[DEPLOY_CLEAN_DEVICES_COMMAND.md](06-operations/DEPLOY_CLEAN_DEVICES_COMMAND.md)** - Comando de despliegue para limpiar dispositivos
 - **MAINTENANCE.md** - Mantenimiento y actualizaciones (pendiente)
 
 ---
@@ -196,13 +198,13 @@ Si eres nuevo en el proyecto:
 
 ---
 
-**Última actualización:** 2025-01-21
+**Última actualización:** 2025-01-27
 
 ---
 
 ## 📊 Estadísticas de Documentación
 
-- **Total de documentos:** 80+
+- **Total de documentos:** 85+
 - **Categorías:** 7 (Getting Started, Deployment, Architecture, Development, Security, Features, Operations, Reference)
 - **Archivos en ARCHIVE:** 30+ (documentación histórica)
 

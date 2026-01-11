@@ -1,5 +1,10 @@
 # 🔄 Ciclo de Vida de Dispositivos
 
+> **Referencias relacionadas:**
+> - [DEVICE_UNLINKING.md](DEVICE_UNLINKING.md) - Desvinculación de dispositivos
+> - [CLEAN_DEVICES.md](../06-operations/CLEAN_DEVICES.md) - Limpieza completa de dispositivos (operación avanzada)
+> - [DEVICE_LINKING_GUIDE.md](DEVICE_LINKING_GUIDE.md) - Guía de vinculación de dispositivos
+
 Documentación completa del ciclo de vida de un dispositivo, desde su vinculación hasta su desvinculación y re-vinculación.
 
 ---
