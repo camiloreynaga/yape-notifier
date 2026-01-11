@@ -84,7 +84,7 @@
             android:name=".ui.AppInstancesActivity"
             android:exported="false"
             android:label="Instancias de Aplicaciones"
-            android:theme="@style/Theme.YapeNotifier" />
+            android:theme="@style/Theme.YapeNotifier.NoActionBar" />
 
         <!-- Monitored Apps Selection Activity -->
         <activity
@@ -98,7 +98,7 @@
             android:name=".ui.PermissionsWizardActivity"
             android:exported="false"
             android:label="Configuración Inicial"
-            android:theme="@style/Theme.YapeNotifier" />
+            android:theme="@style/Theme.YapeNotifier.NoActionBar" />
 
         <!-- Admin Module Activities -->
         <!-- ModeSelectionActivity - Mode chooser (no longer LAUNCHER) -->
@@ -130,7 +130,7 @@
             android:name=".ui.admin.AdminDevicesActivity"
             android:exported="false"
             android:label="Dispositivos"
-            android:theme="@style/Theme.YapeNotifier" />
+            android:theme="@style/Theme.YapeNotifier.NoActionBar" />
         
         <activity
             android:name=".ui.admin.AdminNotificationDetailActivity"
@@ -142,7 +142,7 @@
             android:name=".ui.admin.AdminSettingsActivity"
             android:exported="false"
             android:label="Configuración"
-            android:theme="@style/Theme.YapeNotifier" />
+            android:theme="@style/Theme.YapeNotifier.NoActionBar" />
 
         <!-- Notification Listener Service -->
         <service

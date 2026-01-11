@@ -32,8 +32,9 @@ class PermissionsWizardActivity : AppCompatActivity() {
         binding = ActivityPermissionsWizardBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Dependencias inyectadas automáticamente por Hilt
-        
+        // Set up the toolbar
+        setSupportActionBar(binding.toolbar)
+
         setupViewPager()
         setupClickListeners()
     }
