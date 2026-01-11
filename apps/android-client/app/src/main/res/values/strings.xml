@@ -169,4 +169,15 @@ Contactar Soporte</string>
     <string name="notification_status_updated">Estado actualizado</string>
     <string name="undo">Deshacer</string>
     <string name="retry">Reintentar</string>
+
+    <!-- Form Validation Messages -->
+    <string name="email_required">El email es requerido</string>
+    <string name="password_required">La contraseña es requerida</string>
+    <string name="invalid_email">Ingresa un email válido</string>
+    <string name="invalid_phone">Ingresa un teléfono válido</string>
+    <string name="email_or_phone_required">Email o teléfono requerido</string>
+    <string name="invalid_email_or_phone">Ingresa un email o teléfono válido</string>
+    <string name="password_too_short">La contraseña debe tener al menos 6 caracteres</string>
+    <string name="login_error">Error al iniciar sesión</string>
+    <string name="login_success">Inicio de sesión exitoso</string>
 </resources>

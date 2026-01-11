@@ -13,6 +13,7 @@ import { Download, Eye, RefreshCw, Calendar, X, Inbox, Search, Grid3x3, List, Sl
 import WebSocketStatus from '@/components/WebSocketStatus';
 import EmptyState from '@/components/EmptyState';
 import NotificationCard from '@/components/NotificationCard';
+import Pagination from '@/components/Pagination';
 
 export default function NotificationsPage() {
   const navigate = useNavigate();
@@ -272,7 +273,7 @@ export default function NotificationsPage() {
             {/* Acciones y controles */}
             <div className="flex flex-wrap gap-2">
               {/* Toggle de vista */}
-              <div className="flex gap-1 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-1">
+              <div className="flex gap-1 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-1" role="group" aria-label="Cambiar vista de notificaciones">
                 <button
                   onClick={() => setViewMode('grid')}
                   className={`px-3 py-2 rounded-md flex items-center gap-2 text-sm font-medium transition-all duration-200 ${
@@ -281,8 +282,10 @@ export default function NotificationsPage() {
                       : 'text-white hover:bg-white/10'
                   }`}
                   title="Vista de cuadrícula"
+                  aria-label="Vista de cuadrícula"
+                  aria-pressed={viewMode === 'grid'}
                 >
-                  <Grid3x3 className="h-4 w-4" />
+                  <Grid3x3 className="h-4 w-4" aria-hidden="true" />
                   <span className="hidden sm:inline">Grid</span>
                 </button>
                 <button
@@ -293,8 +296,10 @@ export default function NotificationsPage() {
                       : 'text-white hover:bg-white/10'
                   }`}
                   title="Vista de lista"
+                  aria-label="Vista de lista"
+                  aria-pressed={viewMode === 'list'}
                 >
-                  <List className="h-4 w-4" />
+                  <List className="h-4 w-4" aria-hidden="true" />
                   <span className="hidden sm:inline">Lista</span>
                 </button>
               </div>
@@ -303,8 +308,9 @@ export default function NotificationsPage() {
                 onClick={() => refetch()}
                 className="px-4 py-2 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 transition-all duration-200 flex items-center gap-2 text-sm font-medium"
                 title="Actualizar manualmente"
+                aria-label="Actualizar lista de notificaciones"
               >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
                 <span className="hidden sm:inline">Actualizar</span>
               </button>
               <button
@@ -314,19 +320,24 @@ export default function NotificationsPage() {
                     ? 'bg-white text-primary-600 border-white shadow-sm'
                     : 'bg-white/10 border-white/20 text-white hover:bg-white/20'
                 }`}
+                aria-label={showFilters ? 'Ocultar filtros avanzados' : 'Mostrar filtros avanzados'}
+                aria-expanded={showFilters}
+                aria-controls="advanced-filters"
               >
-                <SlidersHorizontal className="h-4 w-4" />
+                <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
                 <span className="hidden sm:inline">Filtros</span>
               </button>
               <button
                 onClick={exportToCSV}
                 disabled={exporting}
                 className="px-4 py-2 rounded-lg bg-white text-primary-600 hover:bg-white/90 transition-all duration-200 flex items-center gap-2 text-sm font-medium shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
+                aria-label={exporting ? 'Exportando notificaciones' : 'Exportar notificaciones a CSV'}
+                aria-busy={exporting}
               >
                 {exporting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 ) : (
-                  <Download className="h-4 w-4" />
+                  <Download className="h-4 w-4" aria-hidden="true" />
                 )}
                 <span className="hidden sm:inline">{exporting ? 'Exportando...' : 'Exportar'}</span>
               </button>
@@ -338,7 +349,7 @@ export default function NotificationsPage() {
       {/* Filtros rápidos y búsqueda en una sola fila */}
       <div className="flex flex-col sm:flex-row gap-3">
         {/* Filtros rápidos tipo chips */}
-        <div className="flex gap-2 overflow-x-auto pb-2 flex-1">
+        <div className="flex gap-2 overflow-x-auto pb-2 flex-1" role="group" aria-label="Filtros rápidos">
           {quickFilters.map((filter) => (
             <button
               key={filter.key}
@@ -352,31 +363,37 @@ export default function NotificationsPage() {
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }
               `}
+              aria-pressed={activeQuickFilter === filter.key}
+              aria-label={`Filtrar por ${filter.label}`}
             >
-              {filter.key === 'today' && <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+              {filter.key === 'today' && <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" aria-hidden="true" />}
               {filter.label}
             </button>
           ))}
         </div>
 
         {/* Búsqueda compacta con indicador de debouncing */}
-        <div className="relative flex-shrink-0 sm:w-64">
+        <div className="relative flex-shrink-0 sm:w-64" role="search">
+          <label htmlFor="search-notifications" className="sr-only">Buscar notificaciones</label>
           <input
-            type="text"
+            id="search-notifications"
+            type="search"
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
             }}
             placeholder="Buscar..."
             className="w-full pl-9 pr-9 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            aria-describedby={isDebouncing ? 'search-status' : undefined}
           />
           {isDebouncing ? (
-            <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+            <div className="absolute left-3 top-1/2 transform -translate-y-1/2" aria-hidden="true">
               <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary-600 border-t-transparent"></div>
             </div>
           ) : (
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" aria-hidden="true" />
           )}
+          {isDebouncing && <span id="search-status" className="sr-only">Buscando...</span>}
           {searchQuery && (
             <button
               onClick={() => {
@@ -384,8 +401,9 @@ export default function NotificationsPage() {
               }}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
               title="Limpiar búsqueda"
+              aria-label="Limpiar búsqueda"
             >
-              <X className="w-4 h-4" />
+              <X className="w-4 h-4" aria-hidden="true" />
             </button>
           )}
         </div>
@@ -393,7 +411,7 @@ export default function NotificationsPage() {
 
       {/* Filters - Mejorado */}
       {showFilters && (
-        <div className="card bg-gradient-to-br from-white via-white to-gray-50/50 border-2 border-primary-100 shadow-lg">
+        <div id="advanced-filters" className="card bg-gradient-to-br from-white via-white to-gray-50/50 border-2 border-primary-100 shadow-lg" role="region" aria-label="Filtros avanzados">
           <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-primary-100">
@@ -712,86 +730,34 @@ export default function NotificationsPage() {
 
               {/* Pagination - Mejorado */}
               {notifications && notifications.last_page > 1 && (
-                <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="text-sm text-gray-700">
-                  {debouncedSearchQuery ? (
-                    <>
-                      Mostrando <span className="font-medium">{filteredNotifications.length}</span> de{' '}
-                      <span className="font-medium">{notifications.total}</span> resultados
-                      <span className="text-primary-600 ml-1">(búsqueda activa)</span>
-                    </>
-                  ) : (
-                    <>
-                      Mostrando <span className="font-medium">{notifications.from}</span> a{' '}
-                      <span className="font-medium">{notifications.to}</span> de{' '}
-                      <span className="font-medium">{notifications.total}</span> resultados
-                    </>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleFilterChange('page', notifications.current_page - 1)}
-                    disabled={notifications.current_page === 1}
-                    className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Anterior
-                  </button>
-                  <span className="px-4 py-1.5 text-sm text-gray-700">
-                    Página <span className="font-semibold">{notifications.current_page}</span> de{' '}
-                    <span className="font-semibold">{notifications.last_page}</span>
-                  </span>
-                  <button
-                    onClick={() => handleFilterChange('page', notifications.current_page + 1)}
-                    disabled={notifications.current_page === notifications.last_page}
-                    className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Siguiente
-                  </button>
-                </div>
-                </div>
+                <Pagination
+                  currentPage={notifications.current_page}
+                  totalPages={notifications.last_page}
+                  onPageChange={(page) => handleFilterChange('page', page)}
+                  from={notifications.from}
+                  to={notifications.to}
+                  total={notifications.total}
+                  searchActive={!!debouncedSearchQuery}
+                  filteredCount={filteredNotifications.length}
+                  className="border-t border-gray-200 rounded-none rounded-b-xl"
+                />
               )}
             </div>
           )}
 
           {/* Paginación para vista de Grid */}
           {viewMode === 'grid' && notifications && notifications.last_page > 1 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 p-6 bg-white rounded-xl shadow-sm border border-gray-100">
-              <div className="text-sm text-gray-700">
-                {debouncedSearchQuery ? (
-                  <>
-                    Mostrando <span className="font-medium">{filteredNotifications.length}</span> de{' '}
-                    <span className="font-medium">{notifications.total}</span> resultados
-                    <span className="text-primary-600 ml-1">(búsqueda activa)</span>
-                  </>
-                ) : (
-                  <>
-                    Mostrando <span className="font-medium">{notifications.from}</span> a{' '}
-                    <span className="font-medium">{notifications.to}</span> de{' '}
-                    <span className="font-medium">{notifications.total}</span> resultados
-                  </>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleFilterChange('page', notifications.current_page - 1)}
-                  disabled={notifications.current_page === 1}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
-                >
-                  Anterior
-                </button>
-                <span className="px-4 py-2 text-sm text-gray-700">
-                  Página <span className="font-semibold">{notifications.current_page}</span> de{' '}
-                  <span className="font-semibold">{notifications.last_page}</span>
-                </span>
-                <button
-                  onClick={() => handleFilterChange('page', notifications.current_page + 1)}
-                  disabled={notifications.current_page === notifications.last_page}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
-                >
-                  Siguiente
-                </button>
-              </div>
-            </div>
+            <Pagination
+              currentPage={notifications.current_page}
+              totalPages={notifications.last_page}
+              onPageChange={(page) => handleFilterChange('page', page)}
+              from={notifications.from}
+              to={notifications.to}
+              total={notifications.total}
+              searchActive={!!debouncedSearchQuery}
+              filteredCount={filteredNotifications.length}
+              className="mt-6"
+            />
           )}
         </>
       ) : (

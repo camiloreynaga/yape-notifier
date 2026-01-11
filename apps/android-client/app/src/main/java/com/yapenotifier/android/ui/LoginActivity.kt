@@ -2,10 +2,13 @@ package com.yapenotifier.android.ui
 
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Toast
+import android.text.Editable
+import android.text.TextWatcher
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.snackbar.Snackbar
+import com.yapenotifier.android.R
 import com.yapenotifier.android.databinding.ActivityLoginBinding
 import com.yapenotifier.android.ui.viewmodel.LoginViewModel
 import com.yapenotifier.android.util.DeviceHealthWorkerHelper
@@ -25,6 +28,7 @@ class LoginActivity : AppCompatActivity() {
 
         setupObservers()
         setupClickListeners()
+        setupTextWatchers()
     }
 
     private fun setupObservers() {
@@ -42,7 +46,11 @@ class LoginActivity : AppCompatActivity() {
                         navigateToNextScreen()
                     }
                 } else {
-                    Toast.makeText(this, it.message ?: "Error al iniciar sesión", Toast.LENGTH_LONG).show()
+                    Snackbar.make(
+                        binding.root,
+                        it.message ?: getString(R.string.login_error),
+                        Snackbar.LENGTH_LONG
+                    ).show()
                 }
             }
         }
@@ -68,20 +76,51 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupTextWatchers() {
+        // Clear error when user starts typing
+        binding.etEmail.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                binding.tilEmail.error = null
+            }
+            override fun afterTextChanged(s: Editable?) {
+                // Real-time email validation (only show error when invalid and has content)
+                val email = s?.toString()?.trim() ?: ""
+                if (email.isNotEmpty() && !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                    binding.tilEmail.error = getString(R.string.invalid_email)
+                }
+            }
+        })
+
+        binding.etPassword.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                binding.tilPassword.error = null
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+    }
+
     private fun validateInput(email: String, password: String): Boolean {
+        var isValid = true
+
         if (email.isEmpty()) {
-            binding.etEmail.error = "Email requerido"
-            return false
+            binding.tilEmail.error = getString(R.string.email_required)
+            isValid = false
+        } else if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            binding.tilEmail.error = getString(R.string.invalid_email)
+            isValid = false
         }
+
         if (password.isEmpty()) {
-            binding.etPassword.error = "Contraseña requerida"
-            return false
+            binding.tilPassword.error = getString(R.string.password_required)
+            isValid = false
+        } else if (password.length < 6) {
+            binding.tilPassword.error = getString(R.string.password_too_short)
+            isValid = false
         }
-        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-            binding.etEmail.error = "Email inválido"
-            return false
-        }
-        return true
+
+        return isValid
     }
 
     private fun navigateToMain() {

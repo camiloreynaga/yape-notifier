@@ -2,9 +2,12 @@ package com.yapenotifier.android.ui.admin
 
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Toast
+import android.text.Editable
+import android.text.TextWatcher
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.snackbar.Snackbar
+import com.yapenotifier.android.R
 import com.yapenotifier.android.databinding.ActivityAdminLoginBinding
 import com.yapenotifier.android.ui.admin.viewmodel.AdminLoginViewModel
 import com.yapenotifier.android.ui.CreateCommerceActivity
@@ -27,6 +30,7 @@ class AdminLoginActivity : AppCompatActivity() {
             Timber.d("AdminLoginActivity: ViewModel creado")
             setupObservers()
             setupClickListeners()
+            setupTextWatchers()
             Timber.d("AdminLoginActivity: Setup completo")
         } catch (e: Exception) {
             Timber.e(e, "AdminLoginActivity: Error crítico en onCreate")
@@ -55,7 +59,11 @@ class AdminLoginActivity : AppCompatActivity() {
                     }
                 } else {
                     Timber.w("Login fallido: ${it.message}")
-                    Toast.makeText(this, it.message ?: "Error al iniciar sesión", Toast.LENGTH_LONG).show()
+                    Snackbar.make(
+                        binding.root,
+                        it.message ?: getString(R.string.login_error),
+                        Snackbar.LENGTH_LONG
+                    ).show()
                 }
             }
         }
@@ -88,23 +96,60 @@ class AdminLoginActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupTextWatchers() {
+        // Clear error when user starts typing
+        binding.etEmailOrPhone.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                binding.tilEmailOrPhone.error = null
+            }
+            override fun afterTextChanged(s: Editable?) {
+                // Real-time validation
+                val input = s?.toString()?.trim() ?: ""
+                if (input.isNotEmpty()) {
+                    val isEmail = android.util.Patterns.EMAIL_ADDRESS.matcher(input).matches()
+                    val isPhone = input.matches(Regex("^[+]?[0-9]{10,15}$"))
+                    if (!isEmail && !isPhone) {
+                        binding.tilEmailOrPhone.error = getString(R.string.invalid_email_or_phone)
+                    }
+                }
+            }
+        })
+
+        binding.etPassword.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                binding.tilPassword.error = null
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+    }
+
     private fun validateInput(emailOrPhone: String, password: String): Boolean {
+        var isValid = true
+
         if (emailOrPhone.isEmpty()) {
-            binding.etEmailOrPhone.error = "Email o teléfono requerido"
-            return false
+            binding.tilEmailOrPhone.error = getString(R.string.email_or_phone_required)
+            isValid = false
+        } else {
+            // Allow email or phone format
+            val isEmail = android.util.Patterns.EMAIL_ADDRESS.matcher(emailOrPhone).matches()
+            val isPhone = emailOrPhone.matches(Regex("^[+]?[0-9]{10,15}$"))
+            if (!isEmail && !isPhone) {
+                binding.tilEmailOrPhone.error = getString(R.string.invalid_email_or_phone)
+                isValid = false
+            }
         }
+
         if (password.isEmpty()) {
-            binding.etPassword.error = "Contraseña requerida"
-            return false
+            binding.tilPassword.error = getString(R.string.password_required)
+            isValid = false
+        } else if (password.length < 6) {
+            binding.tilPassword.error = getString(R.string.password_too_short)
+            isValid = false
         }
-        // Allow email or phone format
-        val isEmail = android.util.Patterns.EMAIL_ADDRESS.matcher(emailOrPhone).matches()
-        val isPhone = emailOrPhone.matches(Regex("^[+]?[0-9]{10,15}$"))
-        if (!isEmail && !isPhone) {
-            binding.etEmailOrPhone.error = "Email o teléfono inválido"
-            return false
-        }
-        return true
+
+        return isValid
     }
 
     private fun navigateToAdminPanel() {

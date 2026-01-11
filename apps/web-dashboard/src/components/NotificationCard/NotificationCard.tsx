@@ -64,9 +64,18 @@ export default function NotificationCard({
   const StatusIcon = statusConfig.icon;
 
   return (
-    <div
+    <article
       className="group relative bg-white rounded-xl shadow-sm hover:shadow-xl border border-gray-100 hover:border-gray-200 transition-all duration-300 overflow-hidden cursor-pointer hover:-translate-y-1"
       onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      aria-label={`Notificación de ${notification.source_app || 'aplicación'}: ${notification.title}${notification.amount ? `, Monto: ${notification.currency || 'S/'} ${Number(notification.amount).toFixed(2)}` : ''}`}
     >
       {/* Barra de color por app */}
       <div className={clsx('absolute top-0 left-0 right-0 h-1 bg-gradient-to-r', appColor)} />
@@ -74,8 +83,8 @@ export default function NotificationCard({
       {/* Badge de duplicado */}
       {notification.is_duplicate && (
         <div className="absolute top-3 right-3 z-10">
-          <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-orange-50 text-orange-700 ring-1 ring-orange-600/20 text-xs font-semibold">
-            <Copy className="h-3 w-3" />
+          <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-orange-50 text-orange-700 ring-1 ring-orange-600/20 text-xs font-semibold" role="status" aria-label="Esta notificación está marcada como duplicada">
+            <Copy className="h-3 w-3" aria-hidden="true" />
             Duplicado
           </div>
         </div>
@@ -110,9 +119,9 @@ export default function NotificationCard({
 
         {/* Monto */}
         {notification.amount != null && !isNaN(Number(notification.amount)) && (
-          <div className="flex items-center gap-2 mb-4 p-3 rounded-lg bg-gradient-to-br from-green-50 to-emerald-50 border border-green-100">
+          <div className="flex items-center gap-2 mb-4 p-3 rounded-lg bg-gradient-to-br from-green-50 to-emerald-50 border border-green-100" aria-label={`Monto: ${notification.currency || 'S/'} ${Number(notification.amount).toFixed(2)}`}>
             <div className="flex-shrink-0 p-2 rounded-lg bg-green-100">
-              <DollarSign className="h-4 w-4 text-green-600" />
+              <DollarSign className="h-4 w-4 text-green-600" aria-hidden="true" />
             </div>
             <div>
               <p className="text-xs text-green-600 font-medium">Monto</p>
@@ -125,14 +134,14 @@ export default function NotificationCard({
 
         {/* Código de seguridad (solo Yape -> Yape) */}
         {notification.security_code && (
-          <div className="mb-4 p-3 rounded-lg bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200">
+          <div className="mb-4 p-3 rounded-lg bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200" aria-label={`Código de seguridad: ${notification.security_code}`}>
             <div className="flex items-center gap-2">
               <div className="flex-shrink-0 p-2 rounded-lg bg-purple-100">
-                <Shield className="h-4 w-4 text-purple-600" />
+                <Shield className="h-4 w-4 text-purple-600" aria-hidden="true" />
               </div>
               <div>
                 <p className="text-xs text-purple-600 font-medium">Código de Seguridad</p>
-                <p className="text-2xl font-bold text-purple-700 tracking-wider">
+                <p className="text-2xl font-bold text-purple-700 tracking-wider" aria-live="polite">
                   {notification.security_code}
                 </p>
               </div>
@@ -177,18 +186,23 @@ export default function NotificationCard({
               onClick={onClick}
               className="p-2 rounded-lg text-gray-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
               title="Ver detalle"
+              aria-label="Ver detalle de la notificación"
             >
-              <Eye className="h-4 w-4" />
+              <Eye className="h-4 w-4" aria-hidden="true" />
             </button>
 
             {/* Selector de estado compacto con indicador de carga */}
             <div className="relative">
               {isUpdating && (
-                <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-lg z-10">
+                <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-lg z-10" aria-hidden="true">
                   <Loader2 className="h-4 w-4 animate-spin text-primary-600" />
                 </div>
               )}
+              <label htmlFor={`status-select-${notification.id}`} className="sr-only">
+                Cambiar estado de la notificación
+              </label>
               <select
+                id={`status-select-${notification.id}`}
                 value={notification.status}
                 onChange={(e) => {
                   e.stopPropagation();
@@ -200,18 +214,25 @@ export default function NotificationCard({
                 disabled={isUpdating}
                 className="text-xs px-2 py-1.5 rounded-lg border border-gray-200 bg-white hover:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all font-medium text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={(e) => e.stopPropagation()}
+                aria-busy={isUpdating}
+                aria-describedby={isUpdating ? `status-updating-${notification.id}` : undefined}
               >
                 <option value="pending">Pendiente</option>
                 <option value="validated">Validar</option>
                 <option value="inconsistent">Inconsistente</option>
               </select>
+              {isUpdating && (
+                <span id={`status-updating-${notification.id}`} className="sr-only">
+                  Actualizando estado...
+                </span>
+              )}
             </div>
           </div>
         </div>
       </div>
 
       {/* Efecto de hover */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary-500/0 to-primary-500/0 group-hover:from-primary-500/5 group-hover:to-transparent transition-all duration-300 pointer-events-none" />
-    </div>
+      <div className="absolute inset-0 bg-gradient-to-br from-primary-500/0 to-primary-500/0 group-hover:from-primary-500/5 group-hover:to-transparent transition-all duration-300 pointer-events-none" aria-hidden="true" />
+    </article>
   );
 }
