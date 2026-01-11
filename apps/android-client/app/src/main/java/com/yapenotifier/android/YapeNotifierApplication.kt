@@ -1,6 +1,7 @@
 package com.yapenotifier.android
 
 import android.app.Application
+import android.provider.Settings
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
@@ -39,22 +40,54 @@ class YapeNotifierApplication : Application() {
     }
     
     /**
-     * Genera y guarda el UUID del dispositivo UNA VEZ cuando la app se inicia por primera vez.
-     * Este UUID es único por instalación de la app y nunca cambia.
-     * Se usa para identificar el dispositivo en el backend.
+     * Genera y guarda el identificador único del dispositivo.
+     *
+     * Usa ANDROID_ID que es:
+     * - Persistente entre reinstalaciones de la app
+     * - Único por dispositivo físico + usuario Android
+     * - No requiere permisos especiales
+     *
+     * Formato: UUID v5 basado en ANDROID_ID para mantener compatibilidad con backend.
+     *
+     * Nota: ANDROID_ID cambia si se hace factory reset del dispositivo.
      */
     private fun ensureDeviceUuid() {
         applicationScope.launch {
             try {
                 val preferencesManager = PreferencesManager(this@YapeNotifierApplication)
                 val existingUuid = preferencesManager.deviceUuid.first()
-                
-                if (existingUuid == null || existingUuid.isBlank()) {
-                    val uuid = UUID.randomUUID().toString()
-                    preferencesManager.saveDeviceUuid(uuid)
-                    Timber.tag("YapeNotifierApplication").i("Device UUID generado y guardado: $uuid")
+
+                // Obtener ANDROID_ID del dispositivo
+                val androidId = Settings.Secure.getString(
+                    contentResolver,
+                    Settings.Secure.ANDROID_ID
+                )
+
+                if (androidId.isNullOrBlank()) {
+                    // Fallback a UUID aleatorio si ANDROID_ID no está disponible (muy raro)
+                    if (existingUuid == null || existingUuid.isBlank()) {
+                        val uuid = UUID.randomUUID().toString()
+                        preferencesManager.saveDeviceUuid(uuid)
+                        Timber.tag("YapeNotifierApplication").w("ANDROID_ID no disponible, usando UUID aleatorio: $uuid")
+                    }
+                    return@launch
+                }
+
+                // Generar UUID determinístico basado en ANDROID_ID
+                // Esto garantiza que el mismo dispositivo siempre genere el mismo UUID
+                val deviceUuid = UUID.nameUUIDFromBytes(androidId.toByteArray()).toString()
+
+                if (existingUuid != deviceUuid) {
+                    // Guardar o actualizar el UUID basado en ANDROID_ID
+                    preferencesManager.saveDeviceUuid(deviceUuid)
+                    if (existingUuid == null || existingUuid.isBlank()) {
+                        Timber.tag("YapeNotifierApplication").i("Device UUID generado desde ANDROID_ID: $deviceUuid")
+                    } else {
+                        // Migración: actualizar de UUID aleatorio a UUID basado en ANDROID_ID
+                        Timber.tag("YapeNotifierApplication").i("Device UUID migrado de $existingUuid a $deviceUuid (basado en ANDROID_ID)")
+                    }
                 } else {
-                    Timber.tag("YapeNotifierApplication").d("Device UUID existente: $existingUuid")
+                    Timber.tag("YapeNotifierApplication").d("Device UUID existente (ANDROID_ID): $existingUuid")
                 }
             } catch (e: Exception) {
                 Timber.tag("YapeNotifierApplication").e(e, "Error al generar/verificar device UUID")

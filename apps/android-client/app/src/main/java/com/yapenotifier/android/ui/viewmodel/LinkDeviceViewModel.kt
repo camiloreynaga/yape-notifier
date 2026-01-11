@@ -1,6 +1,7 @@
 package com.yapenotifier.android.ui.viewmodel
 
 import android.app.Application
+import android.provider.Settings
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -16,6 +17,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
@@ -106,10 +108,20 @@ class LinkDeviceViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 // Ensure device UUID exists (generated in Application.onCreate)
+                // Uses ANDROID_ID for persistence across reinstalls
                 val deviceUuid = preferencesManager.deviceUuid.first() ?: run {
-                    val uuid = java.util.UUID.randomUUID().toString()
+                    // Fallback: generate UUID from ANDROID_ID if not in preferences
+                    val androidId = Settings.Secure.getString(
+                        getApplication<Application>().contentResolver,
+                        Settings.Secure.ANDROID_ID
+                    )
+                    val uuid = if (!androidId.isNullOrBlank()) {
+                        UUID.nameUUIDFromBytes(androidId.toByteArray()).toString()
+                    } else {
+                        UUID.randomUUID().toString()
+                    }
                     preferencesManager.saveDeviceUuid(uuid)
-                    Timber.d("LinkDeviceViewModel: Generado nuevo device UUID: $uuid")
+                    Timber.d("LinkDeviceViewModel: Generado device UUID desde ANDROID_ID: $uuid")
                     uuid
                 }
 

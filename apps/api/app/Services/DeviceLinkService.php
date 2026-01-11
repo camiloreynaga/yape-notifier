@@ -138,56 +138,86 @@ class DeviceLinkService
         $device = Device::where('uuid', $deviceUuid)->first();
 
         $wasCreated = false;
-        
-        if (!$device) {
-            // Device doesn't exist - create it WITH user_id (REQUIRED)
-            Log::info('Device not found, creating with authenticated user', [
-                'device_uuid' => $deviceUuid,
-                'user_id' => $user->id,
-                'user_name' => $user->name,
-                'commerce_id' => $linkCode->commerce_id,
-                'code' => $code,
-            ]);
+        $wasReconciled = false;
 
-            try {
-                $device = Device::create([
+        if (!$device) {
+            // Device not found by UUID - try to reconcile with existing device
+            // This handles the case where a device was reinstalled and now has a new UUID
+            // (for devices created before ANDROID_ID migration)
+            $existingDevice = $this->findExistingDeviceForReconciliation(
+                $user,
+                $deviceName,
+                $linkCode->commerce_id
+            );
+
+            if ($existingDevice) {
+                // Found existing device - update its UUID instead of creating new one
+                Log::info('Device reconciliation: updating existing device with new UUID', [
+                    'device_id' => $existingDevice->id,
+                    'old_uuid' => $existingDevice->uuid,
+                    'new_uuid' => $deviceUuid,
+                    'user_id' => $user->id,
+                    'device_name' => $deviceName,
+                ]);
+
+                $existingDevice->update([
                     'uuid' => $deviceUuid,
-                    'user_id' => $user->id, // REQUIRED: Every device has an owner
                     'commerce_id' => $linkCode->commerce_id,
-                    'name' => $deviceName ?? 'Android Device',
-                    'alias' => $user->name ? "Teléfono de {$user->name}" : null,
-                    'platform' => 'android',
-                    'is_active' => true,
                     'last_seen_at' => now(),
                 ]);
-            } catch (\Illuminate\Database\QueryException $e) {
-                // Log the specific database error for debugging
-                Log::error('Failed to create device during link', [
+
+                $device = $existingDevice;
+                $wasReconciled = true;
+            } else {
+                // No existing device to reconcile - create new one
+                Log::info('Device not found, creating with authenticated user', [
                     'device_uuid' => $deviceUuid,
                     'user_id' => $user->id,
+                    'user_name' => $user->name,
                     'commerce_id' => $linkCode->commerce_id,
-                    'error' => $e->getMessage(),
-                    'sql_state' => $e->getSqlState() ?? null,
-                    'error_code' => $e->getCode(),
+                    'code' => $code,
                 ]);
-                
-                // Re-throw with a more user-friendly message
-                throw new \RuntimeException(
-                    'Error al crear el dispositivo. Verifica que la base de datos esté correctamente configurada.',
-                    $e->getCode(),
-                    $e
-                );
-            }
-            
-            $wasCreated = true;
 
-            Log::info('Device created with authenticated user', [
-                'device_id' => $device->id,
-                'device_uuid' => $deviceUuid,
-                'commerce_id' => $linkCode->commerce_id,
-                'user_id' => $user->id,
-                'user_name' => $user->name,
-            ]);
+                try {
+                    $device = Device::create([
+                        'uuid' => $deviceUuid,
+                        'user_id' => $user->id, // REQUIRED: Every device has an owner
+                        'commerce_id' => $linkCode->commerce_id,
+                        'name' => $deviceName ?? 'Android Device',
+                        'alias' => $user->name ? "Teléfono de {$user->name}" : null,
+                        'platform' => 'android',
+                        'is_active' => true,
+                        'last_seen_at' => now(),
+                    ]);
+                } catch (\Illuminate\Database\QueryException $e) {
+                    // Log the specific database error for debugging
+                    Log::error('Failed to create device during link', [
+                        'device_uuid' => $deviceUuid,
+                        'user_id' => $user->id,
+                        'commerce_id' => $linkCode->commerce_id,
+                        'error' => $e->getMessage(),
+                        'sql_state' => $e->getSqlState() ?? null,
+                        'error_code' => $e->getCode(),
+                    ]);
+
+                    // Re-throw with a more user-friendly message
+                    throw new \RuntimeException(
+                        'Error al crear el dispositivo. Verifica que la base de datos esté correctamente configurada.',
+                        $e->getCode(),
+                        $e
+                    );
+                }
+
+                $wasCreated = true;
+
+                Log::info('Device created with authenticated user', [
+                    'device_id' => $device->id,
+                    'device_uuid' => $deviceUuid,
+                    'commerce_id' => $linkCode->commerce_id,
+                    'user_id' => $user->id,
+                    'user_name' => $user->name,
+                ]);
+            }
         } else {
             // Device exists - verify ownership and update
             
@@ -240,6 +270,7 @@ class DeviceLinkService
             'user_id' => $user->id,
             'user_name' => $user->name,
             'was_created' => $wasCreated,
+            'was_reconciled' => $wasReconciled,
         ]);
 
         return [
@@ -285,6 +316,60 @@ class DeviceLinkService
         }
 
         return $expiredCount;
+    }
+
+    /**
+     * Find an existing device that could be reconciled with the new UUID.
+     *
+     * This handles the migration scenario where:
+     * - Device was registered with random UUID (before ANDROID_ID migration)
+     * - User reinstalls app, gets new UUID based on ANDROID_ID
+     * - We want to reuse the existing device record instead of creating duplicates
+     *
+     * Matching criteria (all must match):
+     * - Same user_id (ownership)
+     * - Same device name/model (physical device identifier)
+     * - Same or compatible commerce_id
+     * - Device is active
+     *
+     * @param User $user The authenticated user
+     * @param string|null $deviceName The device model name
+     * @param int $commerceId The commerce to link to
+     * @return Device|null The existing device to reconcile, or null if none found
+     */
+    protected function findExistingDeviceForReconciliation(
+        User $user,
+        ?string $deviceName,
+        int $commerceId
+    ): ?Device {
+        if (!$deviceName) {
+            return null;
+        }
+
+        // Find devices belonging to the same user with the same model name
+        // Prioritize devices that are already linked to the same commerce
+        $existingDevice = Device::where('user_id', $user->id)
+            ->where('name', $deviceName)
+            ->where('is_active', true)
+            ->where(function ($query) use ($commerceId) {
+                // Prefer devices already in the same commerce, or unlinked devices
+                $query->where('commerce_id', $commerceId)
+                    ->orWhereNull('commerce_id');
+            })
+            ->orderByRaw('CASE WHEN commerce_id = ? THEN 0 ELSE 1 END', [$commerceId])
+            ->orderBy('last_seen_at', 'desc') // Prefer most recently active
+            ->first();
+
+        if ($existingDevice) {
+            Log::info('Found existing device for reconciliation', [
+                'user_id' => $user->id,
+                'device_name' => $deviceName,
+                'existing_device_id' => $existingDevice->id,
+                'existing_uuid' => $existingDevice->uuid,
+            ]);
+        }
+
+        return $existingDevice;
     }
 }
 
