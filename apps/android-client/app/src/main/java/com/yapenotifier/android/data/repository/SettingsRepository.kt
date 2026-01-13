@@ -27,6 +27,7 @@ class SettingsRepository(private val context: Context) {
         val DEFAULT_PACKAGES = setOf(
             // Yape (BCP)
             "com.bcp.innovacxion.yape.movil",
+            "com.bcp.innovacxion.yapeapp", // Variante de Yape
             // Plin (Interbank)
             "pe.interbank.plin",
             "com.interbank.mobilebanking",
@@ -40,7 +41,9 @@ class SettingsRepository(private val context: Context) {
             "com.scotiabank.mobile.pe",
             "com.scotiabank.mobile.android.pe",
             // BanBif
-            "com.banbif.pe"
+            "com.banbif.pe",
+            // YapeNotifier (para notificaciones de prueba)
+            "com.yapenotifier.android"
         )
     }
 

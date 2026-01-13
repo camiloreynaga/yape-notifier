@@ -19,6 +19,45 @@ class NotificationAdapter(
     private val onMarkPending: (Notification) -> Unit
 ) : ListAdapter<Notification, NotificationAdapter.NotificationViewHolder>(NotificationDiffCallback()) {
 
+    companion object {
+        // Static map to ensure each instance name gets a unique color
+        private val instanceColorMap = mutableMapOf<String, Int>()
+        private var nextColorIndex = 0
+
+        // Color palette (excluding green to avoid confusion with "validated" status)
+        private val colorPalette = listOf(
+            Pair(R.drawable.bg_instance_badge_color_1, "#DC2626"),  // Red
+            Pair(R.drawable.bg_instance_badge_color_2, "#1D4ED8"),  // Blue
+            Pair(R.drawable.bg_instance_badge_color_4, "#D97706"),  // Orange/Amber
+            Pair(R.drawable.bg_instance_badge_color_5, "#7C3AED"),  // Purple
+            Pair(R.drawable.bg_instance_badge_color_6, "#0891B2"),  // Cyan
+            Pair(R.drawable.bg_instance_badge_color_7, "#BE185D"),  // Pink
+            Pair(R.drawable.bg_instance_badge_color_8, "#4B5563"),  // Gray
+        )
+
+        /**
+         * Get a unique color for an instance label.
+         * Each unique name will always get the same color, and no two names share a color
+         * (until we run out of colors in the palette).
+         */
+        fun getInstanceColor(instanceLabel: String): Pair<Int, String> {
+            val normalizedLabel = instanceLabel.lowercase().trim()
+
+            // Check if this label already has an assigned color
+            val existingIndex = instanceColorMap[normalizedLabel]
+            if (existingIndex != null) {
+                return colorPalette[existingIndex]
+            }
+
+            // Assign next available color
+            val colorIndex = nextColorIndex % colorPalette.size
+            instanceColorMap[normalizedLabel] = colorIndex
+            nextColorIndex++
+
+            return colorPalette[colorIndex]
+        }
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): NotificationViewHolder {
         val binding = ItemNotificationCardBinding.inflate(
             LayoutInflater.from(parent.context),
@@ -62,26 +101,16 @@ class NotificationAdapter(
                 }
                 tvAppBadge.setBackgroundResource(appBadgeBg)
 
-                // Instance Badge (Color-coded)
+                // Instance Badge (Color-coded dynamically)
                 val instanceLabel = notification.appInstance?.label
                 if (instanceLabel != null) {
                     tvInstanceBadge.text = instanceLabel
                     tvInstanceBadge.visibility = View.VISIBLE
 
-                    // Color-code based on instance name
-                    val (bgRes, textColor) = when {
-                        instanceLabel.contains("Katty", ignoreCase = true) ->
-                            Pair(R.drawable.bg_instance_badge_katty, "#7C3B92")
-                        instanceLabel.contains("Almendra", ignoreCase = true) ->
-                            Pair(R.drawable.bg_instance_badge_almendra, "#D97706")
-                        instanceLabel.contains("Testing", ignoreCase = true) ||
-                        instanceLabel.contains("Test", ignoreCase = true) ->
-                            Pair(R.drawable.bg_instance_badge_testing, "#0369A1")
-                        else ->
-                            Pair(R.drawable.bg_instance_badge_katty, "#7C3B92")
-                    }
-                    tvInstanceBadge.setBackgroundResource(bgRes)
-                    tvInstanceBadge.setTextColor(android.graphics.Color.parseColor(textColor))
+                    // Get unique color for this instance (sequential assignment ensures no duplicates)
+                    val colorPair = NotificationAdapter.getInstanceColor(instanceLabel)
+                    tvInstanceBadge.setBackgroundResource(colorPair.first)
+                    tvInstanceBadge.setTextColor(android.graphics.Color.parseColor(colorPair.second))
                 } else {
                     tvInstanceBadge.visibility = View.GONE
                 }
@@ -125,15 +154,21 @@ class NotificationAdapter(
                         cardRoot.setCardBackgroundColor(android.graphics.Color.parseColor("#F0FDF4"))
                     }
                     "pending" -> {
-                        // Show security code row if available
-                        if (!notification.securityCode.isNullOrEmpty()) {
-                            llSecurityCodeRow.visibility = View.VISIBLE
-                            tvSecurityCode.text = notification.securityCode
-                            btnValidate.visibility = View.VISIBLE
-                        } else {
-                            llSecurityCodeRow.visibility = View.GONE
-                        }
+                        // Always show the row for pending status to allow validation
+                        llSecurityCodeRow.visibility = View.VISIBLE
                         llValidatedRow.visibility = View.GONE
+
+                        // Show security code if available, otherwise show spacer to push button right
+                        if (!notification.securityCode.isNullOrEmpty()) {
+                            llSecurityCode.visibility = View.VISIBLE
+                            tvSecurityCode.text = notification.securityCode
+                            spacer.visibility = View.GONE
+                        } else {
+                            llSecurityCode.visibility = View.GONE
+                            spacer.visibility = View.VISIBLE
+                        }
+                        // Always show validate button for pending payments
+                        btnValidate.visibility = View.VISIBLE
 
                         // Default white background
                         cardRoot.setCardBackgroundColor(android.graphics.Color.parseColor("#FFFFFF"))

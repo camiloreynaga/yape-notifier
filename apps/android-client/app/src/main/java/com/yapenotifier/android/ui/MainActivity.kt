@@ -33,6 +33,7 @@ import com.yapenotifier.android.util.NotificationAccessChecker
 import com.yapenotifier.android.util.PaymentNotificationParser
 import com.yapenotifier.android.util.ServiceStatusManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -86,6 +87,48 @@ class MainActivity : AppCompatActivity() {
         binding.tvServiceLog.movementMethod = ScrollingMovementMethod()
         // Initialize with warning state (verifying)
         updateCaptureStatus("Verificando...", Color.parseColor("#FF9800"))
+
+        // Check initial service status
+        checkServiceStatus()
+    }
+
+    private fun checkServiceStatus() {
+        lifecycleScope.launch {
+            val notificationAccessEnabled = withContext(Dispatchers.IO) {
+                NotificationAccessChecker.isNotificationAccessEnabled(this@MainActivity)
+            }
+
+            if (!notificationAccessEnabled) {
+                // Permission not granted - service can't work
+                updateCaptureStatus("❌ Sin permiso de notificaciones", Color.parseColor("#F44336"))
+                ServiceStatusManager.updateStatus("❌ Permiso de notificaciones no concedido")
+            } else {
+                // Permission granted - check if we have recent activity
+                val history = ServiceStatusManager.statusHistory.value
+                if (history.isEmpty()) {
+                    // No activity yet - service should be starting
+                    updateCaptureStatus("🔄 Conectando...", Color.parseColor("#2196F3"))
+                    ServiceStatusManager.updateStatus("✅ Permiso concedido - Servicio listo")
+
+                    // Give the service a moment to connect, then update status
+                    delay(2000)
+                    val updatedHistory = ServiceStatusManager.statusHistory.value
+                    if (updatedHistory.isNotEmpty()) {
+                        // Service connected - show positive status
+                        val lastStatus = updatedHistory.first()
+                        updateCaptureStatusFromServiceStatus(lastStatus)
+                    } else {
+                        // Set positive status since permission is granted
+                        ServiceStatusManager.updateStatus("✅ Servicio activo - esperando notificaciones")
+                        updateCaptureStatus("✅ Listo para capturar", Color.parseColor("#4CAF50"))
+                    }
+                } else {
+                    // We have history - update based on last status
+                    val lastStatus = history.first()
+                    updateCaptureStatusFromServiceStatus(lastStatus)
+                }
+            }
+        }
     }
 
 
@@ -129,6 +172,8 @@ class MainActivity : AppCompatActivity() {
         updateAllPermissionStatus()
         // Refresh statistics when returning to activity
         statisticsViewModel.refreshStatistics()
+        // Re-check service status in case permissions changed
+        checkServiceStatus()
     }
 
     private fun updateCaptureStatusFromServiceStatus(status: String) {

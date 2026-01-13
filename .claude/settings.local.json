@@ -17,7 +17,9 @@
       "Bash(git push:*)",
       "Bash(wc:*)",
       "Bash(git -C \"d:\\\\App-lectura\\\\yape-notifier\" log --oneline -15)",
-      "Bash(\"d:/App-lectura/yape-notifier/apps/android-client/gradlew.bat\" assembleDebug)"
+      "Bash(\"d:/App-lectura/yape-notifier/apps/android-client/gradlew.bat\" assembleDebug)",
+      "Bash(cmd //c \"gradlew.bat assembleDebug\")",
+      "Bash(where:*)"
     ]
   }
 }

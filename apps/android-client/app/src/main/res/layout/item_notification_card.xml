@@ -127,7 +127,7 @@
             android:visibility="gone"
             tools:visibility="visible">
 
-            <!-- Security Code Badge -->
+            <!-- Security Code Badge (can be hidden if no code) -->
             <LinearLayout
                 android:id="@+id/llSecurityCode"
                 android:layout_width="0dp"
@@ -137,7 +137,8 @@
                 android:gravity="center_vertical"
                 android:background="@drawable/bg_security_code_badge"
                 android:paddingHorizontal="10dp"
-                android:paddingVertical="6dp">
+                android:paddingVertical="6dp"
+                android:visibility="visible">
 
                 <ImageView
                     android:layout_width="16dp"
@@ -168,14 +169,22 @@
                     tools:text="693" />
             </LinearLayout>
 
-            <!-- Validate Button -->
+            <!-- Spacer when no security code -->
+            <View
+                android:id="@+id/spacer"
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1"
+                android:visibility="gone" />
+
+            <!-- Validate Button - Always visible for pending payments -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnValidate"
                 style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="wrap_content"
                 android:layout_height="36dp"
                 android:layout_marginStart="8dp"
-                android:text="✓ Validar"
+                android:text="VALIDAR"
                 android:textSize="12sp"
                 android:textStyle="bold"
                 android:textColor="#FFFFFF"
@@ -186,6 +195,10 @@
                 android:insetBottom="0dp"
                 app:cornerRadius="8dp"
                 app:backgroundTint="#10B981"
+                app:icon="@drawable/ic_checkmark"
+                app:iconTint="#FFFFFF"
+                app:iconSize="14dp"
+                app:iconPadding="4dp"
                 app:rippleColor="#FFFFFF" />
         </LinearLayout>
 
