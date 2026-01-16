@@ -29,6 +29,7 @@ import com.yapenotifier.android.databinding.ActivityMainBinding
 import com.yapenotifier.android.ui.viewmodel.MainViewModel
 import com.yapenotifier.android.ui.viewmodel.StatisticsState
 import com.yapenotifier.android.ui.viewmodel.StatisticsViewModel
+import android.util.Log
 import com.yapenotifier.android.util.NotificationAccessChecker
 import com.yapenotifier.android.util.PaymentNotificationParser
 import com.yapenotifier.android.util.ServiceStatusManager
@@ -103,31 +104,59 @@ class MainActivity : AppCompatActivity() {
                 updateCaptureStatus("❌ Sin permiso de notificaciones", Color.parseColor("#F44336"))
                 ServiceStatusManager.updateStatus("❌ Permiso de notificaciones no concedido")
             } else {
-                // Permission granted - check if we have recent activity
+                // Permission granted - check if we have recent activity from the actual service
                 val history = ServiceStatusManager.statusHistory.value
-                if (history.isEmpty()) {
-                    // No activity yet - service should be starting
-                    updateCaptureStatus("🔄 Conectando...", Color.parseColor("#2196F3"))
-                    ServiceStatusManager.updateStatus("✅ Permiso concedido - Servicio listo")
+                val hasServiceActivity = history.any {
+                    it.contains("Servicio Creado") ||
+                    it.contains("Conectado") ||
+                    it.contains("Escuchando") ||
+                    it.contains("apps monitoreadas")
+                }
 
-                    // Give the service a moment to connect, then update status
-                    delay(2000)
+                if (!hasServiceActivity) {
+                    // Service not connected yet - try to trigger rebind
+                    updateCaptureStatus("🔄 Conectando servicio...", Color.parseColor("#2196F3"))
+                    ServiceStatusManager.updateStatus("⚠️ Intentando conectar servicio...")
+
+                    // Try to request rebind
+                    tryRebindNotificationService()
+
+                    // Wait for service to connect
+                    delay(3000)
+
                     val updatedHistory = ServiceStatusManager.statusHistory.value
-                    if (updatedHistory.isNotEmpty()) {
-                        // Service connected - show positive status
+                    val nowConnected = updatedHistory.any {
+                        it.contains("Servicio Creado") ||
+                        it.contains("Conectado") ||
+                        it.contains("Escuchando")
+                    }
+
+                    if (nowConnected) {
                         val lastStatus = updatedHistory.first()
                         updateCaptureStatusFromServiceStatus(lastStatus)
                     } else {
-                        // Set positive status since permission is granted
-                        ServiceStatusManager.updateStatus("✅ Servicio activo - esperando notificaciones")
-                        updateCaptureStatus("✅ Listo para capturar", Color.parseColor("#4CAF50"))
+                        // Service still not connected - show warning
+                        ServiceStatusManager.updateStatus("⚠️ Servicio no conectado - Reinicia permisos")
+                        updateCaptureStatus("⚠️ Servicio desconectado", Color.parseColor("#FF9800"))
                     }
                 } else {
-                    // We have history - update based on last status
+                    // Service is active - update based on last status
                     val lastStatus = history.first()
                     updateCaptureStatusFromServiceStatus(lastStatus)
                 }
             }
+        }
+    }
+
+    private fun tryRebindNotificationService() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                val componentName = NotificationAccessChecker.getServiceComponentName(this)
+                android.service.notification.NotificationListenerService.requestRebind(componentName)
+                Log.i("MainActivity", "🔄 Rebind requested for notification service")
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "❌ Error requesting rebind", e)
         }
     }
 
