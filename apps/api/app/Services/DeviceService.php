@@ -340,6 +340,22 @@ class DeviceService
             $updateData['notification_permission_enabled'] = $data['notification_permission_enabled'];
         }
 
+        // NEW: Real service connection state (not just permission)
+        if (isset($data['notification_service_connected'])) {
+            $updateData['notification_service_connected'] = $data['notification_service_connected'];
+        }
+
+        // NEW: Count of pending notifications in local DB
+        if (isset($data['pending_notifications_count'])) {
+            $updateData['pending_notifications_count'] = $data['pending_notifications_count'];
+        }
+
+        // NEW: Timestamp of last captured notification
+        if (isset($data['last_notification_captured_at'])) {
+            // Convert from milliseconds timestamp to Carbon datetime
+            $updateData['last_notification_captured_at'] = \Carbon\Carbon::createFromTimestampMs($data['last_notification_captured_at']);
+        }
+
         // Always update last_heartbeat when health is reported
         $updateData['last_heartbeat'] = now();
 
@@ -350,6 +366,8 @@ class DeviceService
             'battery_level' => $updateData['battery_level'] ?? null,
             'battery_optimization_disabled' => $updateData['battery_optimization_disabled'] ?? null,
             'notification_permission_enabled' => $updateData['notification_permission_enabled'] ?? null,
+            'notification_service_connected' => $updateData['notification_service_connected'] ?? null,
+            'pending_notifications_count' => $updateData['pending_notifications_count'] ?? null,
         ]);
 
         return $device->fresh();

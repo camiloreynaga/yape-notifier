@@ -23,6 +23,12 @@ export interface Device {
   battery_level: number | null;
   battery_optimization_disabled: boolean | null;
   notification_permission_enabled: boolean | null;
+  // NEW: Real service connection state (not just permission)
+  notification_service_connected: boolean | null;
+  // NEW: Count of pending notifications in local DB
+  pending_notifications_count: number | null;
+  // NEW: Timestamp of last captured notification
+  last_notification_captured_at: string | null;
   last_heartbeat: string | null;
   created_at: string;
   updated_at: string;

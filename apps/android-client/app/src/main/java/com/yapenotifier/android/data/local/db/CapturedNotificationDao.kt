@@ -38,4 +38,8 @@ interface CapturedNotificationDao {
 
     @Query("SELECT COUNT(*) FROM captured_notifications WHERE status = 'FAILED'")
     fun getFailedCountFlow(): kotlinx.coroutines.flow.Flow<Int>
+
+    // Direct count for health reporting (not Flow)
+    @Query("SELECT COUNT(*) FROM captured_notifications WHERE status = 'PENDING'")
+    suspend fun getPendingCount(): Int
 }

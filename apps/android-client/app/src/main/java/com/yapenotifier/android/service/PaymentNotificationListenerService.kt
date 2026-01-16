@@ -87,9 +87,11 @@ class PaymentNotificationListenerService : NotificationListenerService() {
 
     override fun onListenerConnected() {
         super.onListenerConnected()
+        // Mark service as CONNECTED - this is the REAL state
+        ServiceStatusManager.setServiceConnected(true)
         ServiceStatusManager.updateStatus("🚀 ¡Conectado! Escuchando notificaciones.")
         Log.i(TAG, "✅ Notification listener connected successfully")
-        
+
         // Refresh monitored packages in background
         serviceScope.launch {
             try {
@@ -193,6 +195,8 @@ class PaymentNotificationListenerService : NotificationListenerService() {
                 )
                 db.capturedNotificationDao().insert(capturedNotification)
                 Log.i(TAG, "💾 Payment notification saved locally. Package: $packageName, UserId: $androidUserId, Uid: $androidUid, Title: '$finalTitle', Body: '$finalText'")
+                // Mark that we successfully captured a notification
+                ServiceStatusManager.notificationCaptured()
                 ServiceStatusManager.updateStatus("💾 Guardado localmente.")
 
                 scheduleSendNotificationWorker()
@@ -219,6 +223,8 @@ class PaymentNotificationListenerService : NotificationListenerService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        // Mark service as DISCONNECTED
+        ServiceStatusManager.setServiceConnected(false)
         // FIXED: Cancelar el collector job para evitar memory leaks
         packagesCollectorJob?.cancel()
         packagesCollectorJob = null
@@ -228,6 +234,8 @@ class PaymentNotificationListenerService : NotificationListenerService() {
 
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
+        // Mark service as DISCONNECTED
+        ServiceStatusManager.setServiceConnected(false)
         ServiceStatusManager.updateStatus("🔌 Desconectado - Reconectando...")
         Log.w(TAG, "⚠️ Notification listener disconnected. Attempting auto-reconnect...")
         

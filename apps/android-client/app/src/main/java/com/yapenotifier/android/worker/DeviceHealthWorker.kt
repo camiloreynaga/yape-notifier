@@ -7,9 +7,11 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.yapenotifier.android.data.local.PreferencesManager
+import com.yapenotifier.android.data.local.db.AppDatabase
 import com.yapenotifier.android.data.model.DeviceHealthData
 import com.yapenotifier.android.data.repository.DeviceHealthRepository
 import com.yapenotifier.android.util.NotificationAccessChecker
+import com.yapenotifier.android.util.ServiceStatusManager
 import kotlinx.coroutines.flow.first
 
 class DeviceHealthWorker(appContext: Context, workerParams: WorkerParameters) :
@@ -17,6 +19,7 @@ class DeviceHealthWorker(appContext: Context, workerParams: WorkerParameters) :
 
     private val preferencesManager = PreferencesManager(appContext)
     private val repository = DeviceHealthRepository(appContext)
+    private val database = AppDatabase.getDatabase(appContext)
 
     override suspend fun doWork(): Result {
         Log.d(TAG, "Starting device health worker...")
@@ -33,7 +36,9 @@ class DeviceHealthWorker(appContext: Context, workerParams: WorkerParameters) :
 
         Log.d(TAG, "Sending device health data: batteryLevel=${healthData.batteryLevel}, " +
                 "batteryOptimizationDisabled=${healthData.batteryOptimizationDisabled}, " +
-                "notificationPermissionEnabled=${healthData.notificationPermissionEnabled}")
+                "notificationPermissionEnabled=${healthData.notificationPermissionEnabled}, " +
+                "notificationServiceConnected=${healthData.notificationServiceConnected}, " +
+                "pendingNotificationsCount=${healthData.pendingNotificationsCount}")
 
         // Send to backend
         val success = repository.sendDeviceHealth(deviceId, healthData)
@@ -47,7 +52,7 @@ class DeviceHealthWorker(appContext: Context, workerParams: WorkerParameters) :
         }
     }
 
-    private fun collectDeviceHealthData(): DeviceHealthData {
+    private suspend fun collectDeviceHealthData(): DeviceHealthData {
         // Get battery level
         val batteryLevel = getBatteryLevel()
 
@@ -57,10 +62,27 @@ class DeviceHealthWorker(appContext: Context, workerParams: WorkerParameters) :
         // Check notification permission
         val notificationPermissionEnabled = NotificationAccessChecker.isNotificationAccessEnabled(applicationContext)
 
+        // NEW: Get real service connection state
+        val notificationServiceConnected = ServiceStatusManager.isServiceConnected()
+
+        // NEW: Get count of pending notifications
+        val pendingNotificationsCount = try {
+            database.capturedNotificationDao().getPendingCount()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting pending count", e)
+            null
+        }
+
+        // NEW: Get last notification captured timestamp
+        val lastNotificationCapturedAt = ServiceStatusManager.getLastNotificationCapturedAt()
+
         return DeviceHealthData(
             batteryLevel = batteryLevel,
             batteryOptimizationDisabled = batteryOptimizationDisabled,
-            notificationPermissionEnabled = notificationPermissionEnabled
+            notificationPermissionEnabled = notificationPermissionEnabled,
+            notificationServiceConnected = notificationServiceConnected,
+            pendingNotificationsCount = pendingNotificationsCount,
+            lastNotificationCapturedAt = lastNotificationCapturedAt
         )
     }
 

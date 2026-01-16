@@ -358,6 +358,37 @@ export default function DevicesPage() {
                     </div>
                   )}
 
+                  {/* Service Status - CRITICAL INDICATOR */}
+                  {device.notification_service_connected !== null && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Estado del servicio:</span>
+                      {device.notification_service_connected ? (
+                        <span className="flex items-center gap-1 text-green-600 font-medium">
+                          <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
+                          <span>Capturando</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-red-600 font-medium">
+                          <XCircle className="h-3 w-3" />
+                          <span>Desconectado</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Pending Notifications Warning */}
+                  {device.pending_notifications_count !== null && device.pending_notifications_count > 0 && (
+                    <div className="flex items-center justify-between text-sm bg-yellow-50 -mx-4 px-4 py-1">
+                      <span className="text-yellow-700 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        Pendientes locales:
+                      </span>
+                      <span className="text-yellow-700 font-medium">
+                        {device.pending_notifications_count}
+                      </span>
+                    </div>
+                  )}
+
                   {/* Last Heartbeat */}
                   {device.last_heartbeat && (
                     <div className="flex items-center justify-between text-sm">
