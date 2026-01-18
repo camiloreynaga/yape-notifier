@@ -528,7 +528,7 @@ class ApiService {
     page?: number;
   }): Promise<PaginatedResponse<DeviceLog>> {
     const response = await this.client.get<PaginatedResponse<DeviceLog>>(
-      '/api/device-logs/commerce',
+      API_ENDPOINTS.deviceLogs.commerce,
       { params }
     );
     return response.data;
@@ -548,7 +548,7 @@ class ApiService {
     }
   ): Promise<PaginatedResponse<DeviceLog>> {
     const response = await this.client.get<PaginatedResponse<DeviceLog>>(
-      `/api/devices/${deviceId}/logs`,
+      API_ENDPOINTS.deviceLogs.device(deviceId),
       { params }
     );
     return response.data;
@@ -559,7 +559,7 @@ class ApiService {
    */
   async getDeviceLogsSummary(hours = 24): Promise<DeviceLogsSummary> {
     const response = await this.client.get<DeviceLogsSummary>(
-      '/api/device-logs/summary',
+      API_ENDPOINTS.deviceLogs.summary,
       { params: { hours } }
     );
     return response.data;

@@ -60,4 +60,9 @@ export const API_ENDPOINTS = {
     delete: (id: number) => `/api/users/${id}`,
     regeneratePin: (id: number) => `/api/users/${id}/regenerate-pin`,
   },
+  deviceLogs: {
+    commerce: "/api/device-logs/commerce",
+    summary: "/api/device-logs/summary",
+    device: (deviceId: number) => `/api/devices/${deviceId}/logs`,
+  },
 } as const;
