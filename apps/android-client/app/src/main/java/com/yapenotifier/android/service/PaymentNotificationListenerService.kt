@@ -17,61 +17,90 @@ import com.yapenotifier.android.data.repository.SettingsRepository
 import com.yapenotifier.android.util.PaymentNotificationParser
 import com.yapenotifier.android.util.ServiceStatusManager
 import com.yapenotifier.android.worker.SendNotificationWorker
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.atomic.AtomicInteger
 
 class PaymentNotificationListenerService : NotificationListenerService() {
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    // CRITICAL FIX: Exception handler to prevent coroutine crashes from killing the service
+    private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        Log.e(TAG, "❌ Coroutine exception caught (service NOT killed)", throwable)
+        ServiceStatusManager.updateStatus("⚠️ Error interno recuperado")
+    }
+
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO + exceptionHandler)
     private lateinit var db: AppDatabase
     private lateinit var settingsRepository: SettingsRepository
 
     // FIXED: Usar @Volatile para visibilidad entre threads y usar DEFAULT_PACKAGES del repository
     @Volatile
     private var monitoredPackages: Set<String> = SettingsRepository.DEFAULT_PACKAGES
-    
+
     // FIXED: Job para el collector reactivo de paquetes
     private var packagesCollectorJob: Job? = null
+
+    // Reconnection retry counter for exponential backoff
+    private val reconnectAttempts = AtomicInteger(0)
+    private val MAX_RECONNECT_ATTEMPTS = 5
 
     override fun onCreate() {
         super.onCreate()
         db = AppDatabase.getDatabase(this)
         settingsRepository = SettingsRepository(this)
-        
-        // CRITICAL FIX: Use runBlocking to ensure packages are loaded before service starts processing
-        // This prevents race condition where notifications arrive before packages are loaded
-        try {
-            runBlocking(Dispatchers.IO) {
-                monitoredPackages = settingsRepository.monitoredPackagesFlow.first()
-                Log.i(TAG, "✅ Initial monitored packages loaded: $monitoredPackages")
+
+        // CRITICAL FIX: Load packages ASYNCHRONOUSLY with timeout to avoid ANR
+        // runBlocking was causing the service to hang on slow DataStore reads
+        // Use default packages immediately, then update when loaded
+        serviceScope.launch {
+            try {
+                // Timeout of 3 seconds - if DataStore is slow, use defaults
+                val packages = withTimeoutOrNull(3000L) {
+                    settingsRepository.monitoredPackagesFlow.first()
+                }
+                if (packages != null) {
+                    monitoredPackages = packages
+                    Log.i(TAG, "✅ Initial monitored packages loaded: $monitoredPackages")
+                    ServiceStatusManager.updateStatus("📦 ${monitoredPackages.size} apps cargadas")
+                } else {
+                    Log.w(TAG, "⚠️ Timeout loading packages, using ${monitoredPackages.size} defaults")
+                    ServiceStatusManager.updateStatus("⚠️ Timeout cargando apps, usando ${monitoredPackages.size} por defecto")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error loading monitored packages, using defaults: ${SettingsRepository.DEFAULT_PACKAGES}", e)
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error loading monitored packages, using defaults: ${SettingsRepository.DEFAULT_PACKAGES}", e)
-            monitoredPackages = SettingsRepository.DEFAULT_PACKAGES
         }
-        
+
         // FIXED: Iniciar collector reactivo para actualizaciones en tiempo real
         startPackagesCollector()
 
         ServiceStatusManager.updateStatus("✅ Servicio Creado - ${monitoredPackages.size} apps")
         Log.i(TAG, "PaymentNotificationListenerService created with ${monitoredPackages.size} monitored packages")
     }
-    
+
     /**
      * FIXED: Inicia un collector que escucha cambios en los paquetes monitoreados.
-     * Esto permite actualizar la lista sin reiniciar el servicio.
+     * Now with automatic restart on failure using catch operator.
      */
     private fun startPackagesCollector() {
         packagesCollectorJob?.cancel()
         packagesCollectorJob = serviceScope.launch {
-            try {
-                settingsRepository.monitoredPackagesFlow.collectLatest { packages ->
+            settingsRepository.monitoredPackagesFlow
+                .catch { e ->
+                    Log.e(TAG, "❌ Error in packages flow, restarting collector in 5s", e)
+                    delay(5000)
+                    startPackagesCollector() // Restart the collector on failure
+                }
+                .collectLatest { packages ->
                     val oldCount = monitoredPackages.size
                     monitoredPackages = packages
                     if (packages.size != oldCount) {
@@ -79,9 +108,6 @@ class PaymentNotificationListenerService : NotificationListenerService() {
                         ServiceStatusManager.updateStatus("🔄 ${packages.size} apps monitoreadas")
                     }
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ Error in packages collector", e)
-            }
         }
     }
 
@@ -89,6 +115,8 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         super.onListenerConnected()
         // Mark service as CONNECTED - this is the REAL state
         ServiceStatusManager.setServiceConnected(true)
+        // Reset reconnection attempts on successful connection
+        reconnectAttempts.set(0)
         ServiceStatusManager.updateStatus("🚀 ¡Conectado! Escuchando notificaciones.")
         Log.i(TAG, "✅ Notification listener connected successfully")
 
@@ -108,13 +136,26 @@ class PaymentNotificationListenerService : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         super.onNotificationPosted(sbn)
 
+        // CRITICAL: Wrap entire notification processing in try-catch to prevent service crashes
+        try {
+            processNotification(sbn)
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ CRITICAL: Exception in onNotificationPosted (service protected)", e)
+            ServiceStatusManager.updateStatus("⚠️ Error procesando notificación")
+        }
+    }
+
+    /**
+     * Process a notification. Separated from onNotificationPosted for better error handling.
+     */
+    private fun processNotification(sbn: StatusBarNotification) {
         val packageName = sbn.packageName
-        
+
         // Log ALL notifications for debugging (even if not monitored)
         Log.d(TAG, "📬 Notification received from package: $packageName")
         Log.d(TAG, "   Monitored packages: $monitoredPackages")
         Log.d(TAG, "   Is monitored: ${monitoredPackages.contains(packageName)}")
-        
+
         if (!monitoredPackages.contains(packageName)) {
             Log.d(TAG, "⏭️ Skipping notification from unmonitored package: $packageName")
             return
@@ -236,24 +277,32 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         super.onListenerDisconnected()
         // Mark service as DISCONNECTED
         ServiceStatusManager.setServiceConnected(false)
-        ServiceStatusManager.updateStatus("🔌 Desconectado - Reconectando...")
-        Log.w(TAG, "⚠️ Notification listener disconnected. Attempting auto-reconnect...")
-        
-        // FIXED: Intentar reconectar automáticamente
-        serviceScope.launch {
-            try {
-                // Esperar un poco antes de intentar reconectar
-                delay(2000)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    val componentName = ComponentName(applicationContext, PaymentNotificationListenerService::class.java)
-                    requestRebind(componentName)
-                    Log.i(TAG, "🔄 Rebind requested automatically")
-                    ServiceStatusManager.updateStatus("🔄 Reconexión solicitada...")
+
+        val attempt = reconnectAttempts.incrementAndGet()
+
+        if (attempt <= MAX_RECONNECT_ATTEMPTS) {
+            // Exponential backoff: 2s, 4s, 8s, 16s, 32s
+            val delayMs = (2000L * (1L shl (attempt - 1))).coerceAtMost(32000L)
+            ServiceStatusManager.updateStatus("🔌 Desconectado - Reconectando en ${delayMs/1000}s (intento $attempt/$MAX_RECONNECT_ATTEMPTS)")
+            Log.w(TAG, "⚠️ Notification listener disconnected. Reconnect attempt $attempt/$MAX_RECONNECT_ATTEMPTS in ${delayMs}ms")
+
+            serviceScope.launch {
+                try {
+                    delay(delayMs)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        val componentName = ComponentName(applicationContext, PaymentNotificationListenerService::class.java)
+                        requestRebind(componentName)
+                        Log.i(TAG, "🔄 Rebind requested automatically (attempt $attempt)")
+                        ServiceStatusManager.updateStatus("🔄 Reconexión solicitada (intento $attempt)...")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "❌ Error requesting rebind (attempt $attempt)", e)
+                    ServiceStatusManager.updateStatus("❌ Error reconectando (intento $attempt)")
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ Error requesting rebind", e)
-                ServiceStatusManager.updateStatus("❌ Error al reconectar")
             }
+        } else {
+            Log.e(TAG, "❌ Max reconnection attempts reached ($MAX_RECONNECT_ATTEMPTS). Service requires manual restart.")
+            ServiceStatusManager.updateStatus("❌ Desconectado - Reinicia permisos manualmente")
         }
     }
 
