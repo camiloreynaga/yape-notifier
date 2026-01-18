@@ -143,48 +143,59 @@ class DeviceLogController extends Controller
      */
     public function commerceLogs(Request $request)
     {
-        $user = $request->user();
+        try {
+            $user = $request->user();
 
-        if (!$user->commerce_id) {
+            if (!$user->commerce_id) {
+                return response()->json([
+                    'message' => 'No commerce associated',
+                ], 400);
+            }
+
+            $query = DeviceLog::where('commerce_id', $user->commerce_id)
+                ->with('device:id,name,alias,uuid')
+                ->orderByDesc('created_at');
+
+            // Filter by device
+            if ($request->has('device_id')) {
+                $query->where('device_id', $request->device_id);
+            }
+
+            // Filter by category
+            if ($request->has('category')) {
+                $query->where('category', $request->category);
+            }
+
+            // Filter by level
+            if ($request->has('level')) {
+                $query->where('level', $request->level);
+            }
+
+            // Filter critical only
+            if ($request->boolean('critical_only')) {
+                $query->critical();
+            }
+
+            // Filter by time range (hours)
+            $hours = $request->get('hours', 24);
+            $query->where('created_at', '>=', now()->subHours($hours));
+
+            // Paginate
+            $perPage = min($request->get('per_page', 50), 100);
+            $logs = $query->paginate($perPage);
+
+            return response()->json($logs);
+        } catch (\Exception $e) {
+            Log::error('Error fetching commerce logs', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return response()->json([
-                'message' => 'No commerce associated',
-            ], 400);
+                'message' => 'Error fetching logs',
+                'error' => $e->getMessage(),
+            ], 500);
         }
-
-        $query = DeviceLog::where('commerce_id', $user->commerce_id)
-            ->with('device:id,name,alias,uuid')
-            ->orderBy('device_timestamp', 'desc')
-            ->orderBy('created_at', 'desc');
-
-        // Filter by device
-        if ($request->has('device_id')) {
-            $query->where('device_id', $request->device_id);
-        }
-
-        // Filter by category
-        if ($request->has('category')) {
-            $query->where('category', $request->category);
-        }
-
-        // Filter by level
-        if ($request->has('level')) {
-            $query->where('level', $request->level);
-        }
-
-        // Filter critical only
-        if ($request->boolean('critical_only')) {
-            $query->critical();
-        }
-
-        // Filter by time range (hours)
-        $hours = $request->get('hours', 24);
-        $query->where('created_at', '>=', now()->subHours($hours));
-
-        // Paginate
-        $perPage = min($request->get('per_page', 50), 100);
-        $logs = $query->paginate($perPage);
-
-        return response()->json($logs);
     }
 
     /**
@@ -196,50 +207,62 @@ class DeviceLogController extends Controller
      */
     public function summary(Request $request)
     {
-        $user = $request->user();
+        try {
+            $user = $request->user();
 
-        if (!$user->commerce_id) {
-            return response()->json([
-                'message' => 'No commerce associated',
-            ], 400);
-        }
-
-        $hours = $request->get('hours', 24);
-
-        $summary = DeviceLog::where('commerce_id', $user->commerce_id)
-            ->where('created_at', '>=', now()->subHours($hours))
-            ->selectRaw('device_id, category, count(*) as count')
-            ->groupBy('device_id', 'category')
-            ->get()
-            ->groupBy('device_id')
-            ->map(function ($logs) {
-                return $logs->pluck('count', 'category');
-            });
-
-        // Get device info
-        $deviceIds = $summary->keys()->toArray();
-        $devices = Device::whereIn('id', $deviceIds)
-            ->select('id', 'name', 'alias', 'uuid')
-            ->get()
-            ->keyBy('id');
-
-        $result = [];
-        foreach ($summary as $deviceId => $counts) {
-            $device = $devices->get($deviceId);
-            if ($device) {
-                $result[] = [
-                    'device' => $device,
-                    'counts' => $counts,
-                    'total' => $counts->sum(),
-                    'has_disconnects' => ($counts->get('DISCONNECT', 0) > 0),
-                    'has_errors' => ($counts->get('ERROR', 0) > 0),
-                ];
+            if (!$user->commerce_id) {
+                return response()->json([
+                    'message' => 'No commerce associated',
+                ], 400);
             }
-        }
 
-        return response()->json([
-            'hours' => $hours,
-            'devices' => $result,
-        ]);
+            $hours = $request->get('hours', 24);
+
+            $summary = DeviceLog::where('commerce_id', $user->commerce_id)
+                ->where('created_at', '>=', now()->subHours($hours))
+                ->selectRaw('device_id, category, count(*) as count')
+                ->groupBy('device_id', 'category')
+                ->get()
+                ->groupBy('device_id')
+                ->map(function ($logs) {
+                    return $logs->pluck('count', 'category');
+                });
+
+            // Get device info
+            $deviceIds = $summary->keys()->toArray();
+            $devices = Device::whereIn('id', $deviceIds)
+                ->select('id', 'name', 'alias', 'uuid')
+                ->get()
+                ->keyBy('id');
+
+            $result = [];
+            foreach ($summary as $deviceId => $counts) {
+                $device = $devices->get($deviceId);
+                if ($device) {
+                    $result[] = [
+                        'device' => $device,
+                        'counts' => $counts,
+                        'total' => $counts->sum(),
+                        'has_disconnects' => ($counts->get('DISCONNECT', 0) > 0),
+                        'has_errors' => ($counts->get('ERROR', 0) > 0),
+                    ];
+                }
+            }
+
+            return response()->json([
+                'hours' => $hours,
+                'devices' => $result,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching logs summary', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'hours' => $hours ?? 24,
+                'devices' => [],
+            ]);
+        }
     }
 }

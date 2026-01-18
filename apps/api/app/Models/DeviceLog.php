@@ -97,8 +97,10 @@ class DeviceLog extends Model
      */
     public function scopeCritical($query)
     {
-        return $query->whereIn('category', ['DISCONNECT', 'ERROR'])
-            ->orWhere('level', 'critical');
+        return $query->where(function ($q) {
+            $q->whereIn('category', ['DISCONNECT', 'ERROR'])
+                ->orWhere('level', 'critical');
+        });
     }
 
     /**
