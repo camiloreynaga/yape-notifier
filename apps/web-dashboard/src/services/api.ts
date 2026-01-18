@@ -519,6 +519,7 @@ class ApiService {
    * Get logs for all devices in the commerce
    */
   async getCommerceLogs(params?: {
+    device_id?: number;
     category?: string;
     level?: string;
     critical_only?: boolean;

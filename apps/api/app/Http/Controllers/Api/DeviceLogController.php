@@ -156,6 +156,11 @@ class DeviceLogController extends Controller
             ->orderBy('device_timestamp', 'desc')
             ->orderBy('created_at', 'desc');
 
+        // Filter by device
+        if ($request->has('device_id')) {
+            $query->where('device_id', $request->device_id);
+        }
+
         // Filter by category
         if ($request->has('category')) {
             $query->where('category', $request->category);
