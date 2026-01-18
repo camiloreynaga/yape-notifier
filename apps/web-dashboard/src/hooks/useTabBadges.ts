@@ -9,6 +9,7 @@ import type { TabBadge } from '@/types/dashboard.types';
 export interface TabBadges {
   notifications: TabBadge | null;
   devices: TabBadge | null;
+  logs: TabBadge | null;
   settings: TabBadge | null;
 }
 
@@ -16,6 +17,7 @@ export function useTabBadges(): TabBadges {
   const [badges, setBadges] = useState<TabBadges>({
     notifications: null,
     devices: null,
+    logs: null,
     settings: null,
   });
 
@@ -39,9 +41,21 @@ export function useTabBadges(): TabBadges {
           return diffMinutes >= 5;
         }).length;
 
+        // Cargar resumen de logs para badge de errores/desconexiones
+        let logsErrorCount = 0;
+        try {
+          const logsSummary = await apiService.getDeviceLogsSummary(24);
+          logsErrorCount = logsSummary.devices.filter(
+            (d) => d.has_disconnects || d.has_errors
+          ).length;
+        } catch {
+          // Silently ignore if logs endpoint not available
+        }
+
         setBadges({
           notifications: pendingCount > 0 ? { count: pendingCount, variant: 'warning' } : null,
           devices: offlineCount > 0 ? { count: offlineCount, variant: 'danger' } : null,
+          logs: logsErrorCount > 0 ? { count: logsErrorCount, variant: 'danger' } : null,
           settings: null,
         });
       } catch (error) {

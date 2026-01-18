@@ -38,6 +38,7 @@ export default function DashboardTabs({ children, defaultTab = DEFAULT_TAB }: Da
       notifications: badges.notifications,
       devices: badges.devices,
       employees: null,
+      logs: badges.logs,
       settings: badges.settings,
     };
     return badgeMap;

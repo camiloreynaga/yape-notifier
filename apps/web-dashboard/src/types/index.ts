@@ -138,3 +138,38 @@ export interface ApiError {
   errors?: Record<string, string[]>;
 }
 
+// Device Logs types
+export interface DeviceLog {
+  id: number;
+  device_id: number;
+  commerce_id: number | null;
+  category: 'SERVICE' | 'DISCONNECT' | 'RECONNECT' | 'ERROR' | 'HEALTH' | 'SYSTEM';
+  level: 'debug' | 'info' | 'warning' | 'error' | 'critical';
+  message: string;
+  details: string | null;
+  device_timestamp: string | null;
+  created_at: string;
+  device?: {
+    id: number;
+    name: string;
+    alias: string | null;
+    uuid: string;
+  };
+}
+
+export interface DeviceLogsSummary {
+  hours: number;
+  devices: Array<{
+    device: {
+      id: number;
+      name: string;
+      alias: string | null;
+      uuid: string;
+    };
+    counts: Record<string, number>;
+    total: number;
+    has_disconnects: boolean;
+    has_errors: boolean;
+  }>;
+}
+

@@ -107,6 +107,7 @@ function AppRoutes() {
           <Route path="devices" element={<Navigate to="/dashboard?tab=devices" replace />} />
           <Route path="devices/add" element={<AddDevicePage />} />
           <Route path="employees" element={<Navigate to="/dashboard?tab=employees" replace />} />
+          <Route path="logs" element={<Navigate to="/dashboard?tab=logs" replace />} />
           <Route path="app-instances" element={<AppInstancesPage />} />
           <Route path="settings/monitored-apps" element={<Navigate to="/dashboard?tab=settings" replace />} />
         </Route>

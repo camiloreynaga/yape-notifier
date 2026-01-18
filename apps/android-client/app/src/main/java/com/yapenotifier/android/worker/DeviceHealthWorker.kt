@@ -8,8 +8,10 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.yapenotifier.android.data.local.PreferencesManager
 import com.yapenotifier.android.data.local.db.AppDatabase
+import com.yapenotifier.android.data.api.RetrofitClient
 import com.yapenotifier.android.data.model.DeviceHealthData
 import com.yapenotifier.android.data.repository.DeviceHealthRepository
+import com.yapenotifier.android.util.FileLogger
 import com.yapenotifier.android.util.NotificationAccessChecker
 import com.yapenotifier.android.util.ServiceStatusManager
 import kotlinx.coroutines.flow.first
@@ -40,15 +42,80 @@ class DeviceHealthWorker(appContext: Context, workerParams: WorkerParameters) :
                 "notificationServiceConnected=${healthData.notificationServiceConnected}, " +
                 "pendingNotificationsCount=${healthData.pendingNotificationsCount}")
 
+        // Log health data to file for debugging
+        FileLogger.logHealth(
+            serviceConnected = healthData.notificationServiceConnected ?: false,
+            pendingCount = healthData.pendingNotificationsCount,
+            batteryLevel = healthData.batteryLevel
+        )
+
         // Send to backend
         val success = repository.sendDeviceHealth(deviceId, healthData)
 
-        return if (success) {
+        if (success) {
             Log.i(TAG, "Device health data sent successfully")
-            Result.success()
+
+            // After successful health report, try to send pending logs
+            sendPendingLogs()
+
+            return Result.success()
         } else {
             Log.w(TAG, "Failed to send device health data. Will retry later.")
-            Result.retry()
+            return Result.retry()
+        }
+    }
+
+    /**
+     * Send pending critical logs to the server.
+     * Called after successful heartbeat to ensure connectivity.
+     */
+    private suspend fun sendPendingLogs() {
+        try {
+            val pendingCount = FileLogger.getPendingLogsCount()
+            if (pendingCount == 0) {
+                return
+            }
+
+            val deviceUuid = preferencesManager.deviceUuid.first()
+            if (deviceUuid.isNullOrBlank()) {
+                Log.w(TAG, "Device UUID not set, cannot send logs")
+                return
+            }
+
+            val pendingLogs = FileLogger.getPendingLogsForUpload()
+            if (pendingLogs.isEmpty()) {
+                return
+            }
+
+            Log.d(TAG, "Sending ${pendingLogs.size} critical logs to server")
+
+            val logsData = pendingLogs.map { entry ->
+                mapOf(
+                    "category" to entry.category,
+                    "level" to entry.level,
+                    "message" to entry.message,
+                    "details" to (entry.details ?: ""),
+                    "timestamp" to entry.timestamp
+                )
+            }
+
+            val requestBody = mapOf(
+                "device_uuid" to deviceUuid,
+                "logs" to logsData
+            )
+
+            val apiService = RetrofitClient.createApiService(applicationContext)
+            val response = apiService.sendDeviceLogs(requestBody)
+
+            if (response.isSuccessful) {
+                Log.i(TAG, "Successfully sent ${pendingLogs.size} logs to server")
+                FileLogger.markLogsUploaded()
+            } else {
+                Log.e(TAG, "Failed to send logs: ${response.code()}")
+                // Don't clear logs on failure - they'll be retried next time
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error sending logs to server", e)
         }
     }
 

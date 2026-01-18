@@ -14,6 +14,7 @@ import androidx.work.WorkManager
 import com.yapenotifier.android.data.local.db.AppDatabase
 import com.yapenotifier.android.data.local.db.CapturedNotification
 import com.yapenotifier.android.data.repository.SettingsRepository
+import com.yapenotifier.android.util.FileLogger
 import com.yapenotifier.android.util.PaymentNotificationParser
 import com.yapenotifier.android.util.ServiceStatusManager
 import com.yapenotifier.android.worker.SendNotificationWorker
@@ -35,6 +36,7 @@ class PaymentNotificationListenerService : NotificationListenerService() {
     // CRITICAL FIX: Exception handler to prevent coroutine crashes from killing the service
     private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
         Log.e(TAG, "❌ Coroutine exception caught (service NOT killed)", throwable)
+        FileLogger.logError("CoroutineException", throwable)
         ServiceStatusManager.updateStatus("⚠️ Error interno recuperado")
     }
 
@@ -84,6 +86,7 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         startPackagesCollector()
 
         ServiceStatusManager.updateStatus("✅ Servicio Creado - ${monitoredPackages.size} apps")
+        FileLogger.logServiceEvent("SERVICE_CREATED", "${monitoredPackages.size} packages")
         Log.i(TAG, "PaymentNotificationListenerService created with ${monitoredPackages.size} monitored packages")
     }
 
@@ -116,8 +119,9 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         // Mark service as CONNECTED - this is the REAL state
         ServiceStatusManager.setServiceConnected(true)
         // Reset reconnection attempts on successful connection
-        reconnectAttempts.set(0)
+        val previousAttempts = reconnectAttempts.getAndSet(0)
         ServiceStatusManager.updateStatus("🚀 ¡Conectado! Escuchando notificaciones.")
+        FileLogger.logServiceEvent("LISTENER_CONNECTED", if (previousAttempts > 0) "after $previousAttempts attempts" else "first connect")
         Log.i(TAG, "✅ Notification listener connected successfully")
 
         // Refresh monitored packages in background
@@ -141,6 +145,7 @@ class PaymentNotificationListenerService : NotificationListenerService() {
             processNotification(sbn)
         } catch (e: Exception) {
             Log.e(TAG, "❌ CRITICAL: Exception in onNotificationPosted (service protected)", e)
+            FileLogger.logError("onNotificationPosted", e)
             ServiceStatusManager.updateStatus("⚠️ Error procesando notificación")
         }
     }
@@ -270,6 +275,7 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         packagesCollectorJob?.cancel()
         packagesCollectorJob = null
         ServiceStatusManager.updateStatus("❌ Servicio Destruido")
+        FileLogger.logServiceEvent("SERVICE_DESTROYED", "onDestroy called - SYSTEM KILLED SERVICE")
         Log.w(TAG, "PaymentNotificationListenerService destroyed. Collector job cancelled.")
     }
 
@@ -279,6 +285,7 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         ServiceStatusManager.setServiceConnected(false)
 
         val attempt = reconnectAttempts.incrementAndGet()
+        FileLogger.logDisconnect("LISTENER_DISCONNECTED - System unbind", attempt)
 
         if (attempt <= MAX_RECONNECT_ATTEMPTS) {
             // Exponential backoff: 2s, 4s, 8s, 16s, 32s
@@ -288,6 +295,7 @@ class PaymentNotificationListenerService : NotificationListenerService() {
 
             serviceScope.launch {
                 try {
+                    FileLogger.logReconnect(false, attempt, delayMs)
                     delay(delayMs)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                         val componentName = ComponentName(applicationContext, PaymentNotificationListenerService::class.java)
@@ -297,11 +305,13 @@ class PaymentNotificationListenerService : NotificationListenerService() {
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "❌ Error requesting rebind (attempt $attempt)", e)
+                    FileLogger.logError("requestRebind", e)
                     ServiceStatusManager.updateStatus("❌ Error reconectando (intento $attempt)")
                 }
             }
         } else {
             Log.e(TAG, "❌ Max reconnection attempts reached ($MAX_RECONNECT_ATTEMPTS). Service requires manual restart.")
+            FileLogger.logDisconnect("MAX_ATTEMPTS_REACHED - Manual restart required", attempt)
             ServiceStatusManager.updateStatus("❌ Desconectado - Reinicia permisos manualmente")
         }
     }

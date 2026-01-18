@@ -2,7 +2,7 @@
  * Constantes para DashboardTabs
  */
 
-import { LayoutDashboard, Bell, Smartphone, Users, Settings } from 'lucide-react';
+import { LayoutDashboard, Bell, Smartphone, Users, FileText, Settings } from 'lucide-react';
 import type { TabValue } from '@/types/dashboard.types';
 
 export interface TabConfig {
@@ -38,10 +38,16 @@ export const TABS: TabConfig[] = [
     ariaLabel: 'Empleados',
   },
   {
+    value: 'logs',
+    label: 'Logs',
+    icon: FileText,
+    ariaLabel: 'Logs de dispositivos',
+  },
+  {
     value: 'settings',
-    label: 'Configuración',
+    label: 'Configuracion',
     icon: Settings,
-    ariaLabel: 'Configuración',
+    ariaLabel: 'Configuracion',
   },
 ];
 

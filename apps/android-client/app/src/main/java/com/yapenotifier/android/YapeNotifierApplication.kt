@@ -8,6 +8,7 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.yapenotifier.android.data.local.PreferencesManager
+import com.yapenotifier.android.util.FileLogger
 import com.yapenotifier.android.worker.SyncSettingsWorker
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -25,12 +26,16 @@ class YapeNotifierApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        
+
         // Initialize Timber for logging
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }
-        
+
+        // Initialize FileLogger for persistent debugging
+        FileLogger.init(this)
+        FileLogger.log("SYSTEM", "Application started - Build: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+
         Timber.tag("YapeNotifierApplication").d("Application created. API URL: ${BuildConfig.API_BASE_URL}")
         
         // CRITICAL: Generate and persist device UUID once on first app launch

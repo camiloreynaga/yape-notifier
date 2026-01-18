@@ -2,7 +2,7 @@
  * Tipos TypeScript para el Dashboard
  */
 
-export type TabValue = 'overview' | 'notifications' | 'devices' | 'employees' | 'settings';
+export type TabValue = 'overview' | 'notifications' | 'devices' | 'employees' | 'logs' | 'settings';
 
 export type PeriodFilter = 'today' | 'week' | 'month' | 'custom';
 

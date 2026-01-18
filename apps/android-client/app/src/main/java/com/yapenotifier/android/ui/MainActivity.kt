@@ -294,6 +294,10 @@ class MainActivity : AppCompatActivity() {
         binding.btnViewDatabase.setOnClickListener {
             startActivity(Intent(this, CapturedNotificationsActivity::class.java))
         }
+
+        binding.btnViewDebugLogs.setOnClickListener {
+            startActivity(Intent(this, DebugLogsActivity::class.java))
+        }
     }
 
     private fun loadUserInfo() {

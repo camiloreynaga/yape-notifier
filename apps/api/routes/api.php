@@ -3,6 +3,7 @@
 use App\Http\Controllers\AppInstanceController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CommerceController;
+use App\Http\Controllers\Api\DeviceLogController;
 use App\Http\Controllers\DeviceController;
 use App\Http\Controllers\DeviceHealthController;
 use App\Http\Controllers\DeviceLinkController;
@@ -89,3 +90,14 @@ Route::middleware('auth:sanctum')->post('/notifications', [NotificationControlle
 // Device health endpoint (REQUIRES authentication)
 // Professional Architecture: Only authenticated devices can report health
 Route::middleware('auth:sanctum')->post('/devices/{id}/health', [DeviceHealthController::class, 'update']);
+
+// Device logs endpoint (REQUIRES authentication)
+// Used by Android app to send critical logs for debugging
+Route::middleware('auth:sanctum')->post('/device-logs', [DeviceLogController::class, 'store']);
+
+// Device logs viewing endpoints (REQUIRES authentication)
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/device-logs/summary', [DeviceLogController::class, 'summary']);
+    Route::get('/device-logs/commerce', [DeviceLogController::class, 'commerceLogs']);
+    Route::get('/devices/{deviceId}/logs', [DeviceLogController::class, 'index']);
+});

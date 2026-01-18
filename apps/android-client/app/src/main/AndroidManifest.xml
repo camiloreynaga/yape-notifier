@@ -72,6 +72,13 @@
             android:label="Notificaciones Guardadas"
             android:theme="@style/Theme.YapeNotifier" />
 
+        <!-- Debug Logs Activity -->
+        <activity
+            android:name=".ui.DebugLogsActivity"
+            android:exported="false"
+            android:label="Logs de Debug"
+            android:theme="@style/Theme.YapeNotifier.NoActionBar" />
+
         <!-- Link Device Activity -->
         <activity
             android:name=".ui.LinkDeviceActivity"
@@ -153,6 +160,17 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!-- FileProvider for sharing debug logs -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
     </application>
 

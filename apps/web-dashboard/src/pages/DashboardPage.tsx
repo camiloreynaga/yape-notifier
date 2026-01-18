@@ -4,6 +4,7 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import NotificationsPage from './NotificationsPage';
 import DevicesPage from './DevicesPage';
 import EmployeesPage from './EmployeesPage';
+import DeviceLogsPage from './DeviceLogsPage';
 import MonitoredAppsPage from './MonitoredAppsPage';
 
 export default function DashboardPage() {
@@ -31,6 +32,12 @@ export default function DashboardPage() {
         return (
           <ErrorBoundary>
             <EmployeesPage />
+          </ErrorBoundary>
+        );
+      case 'logs':
+        return (
+          <ErrorBoundary>
+            <DeviceLogsPage />
           </ErrorBoundary>
         );
       case 'settings':

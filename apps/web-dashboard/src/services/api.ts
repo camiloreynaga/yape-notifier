@@ -2,7 +2,7 @@ import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig, AxiosResp
 import { API_BASE_URL, API_ENDPOINTS } from '@/config/api';
 import { logger } from './logger';
 import { apiCircuitBreaker, devicesCircuitBreaker, appInstancesCircuitBreaker } from './circuitBreaker';
-import type { AuthResponse, User, Device, Notification, NotificationFilters, NotificationStatistics, PaginatedResponse, ApiError, Commerce, AppInstance, MonitorPackage } from '@/types';
+import type { AuthResponse, User, Device, Notification, NotificationFilters, NotificationStatistics, PaginatedResponse, ApiError, Commerce, AppInstance, MonitorPackage, DeviceLog, DeviceLogsSummary } from '@/types';
 
 class ApiService {
   private client: AxiosInstance;
@@ -512,6 +512,56 @@ class ApiService {
       pin: string;
     }>(API_ENDPOINTS.users.regeneratePin(id));
     return { pin: response.data.pin };
+  }
+
+  // Device Logs methods
+  /**
+   * Get logs for all devices in the commerce
+   */
+  async getCommerceLogs(params?: {
+    category?: string;
+    level?: string;
+    critical_only?: boolean;
+    hours?: number;
+    per_page?: number;
+    page?: number;
+  }): Promise<PaginatedResponse<DeviceLog>> {
+    const response = await this.client.get<PaginatedResponse<DeviceLog>>(
+      '/api/device-logs/commerce',
+      { params }
+    );
+    return response.data;
+  }
+
+  /**
+   * Get logs for a specific device
+   */
+  async getDeviceLogs(
+    deviceId: number,
+    params?: {
+      category?: string;
+      level?: string;
+      hours?: number;
+      per_page?: number;
+      page?: number;
+    }
+  ): Promise<PaginatedResponse<DeviceLog>> {
+    const response = await this.client.get<PaginatedResponse<DeviceLog>>(
+      `/api/devices/${deviceId}/logs`,
+      { params }
+    );
+    return response.data;
+  }
+
+  /**
+   * Get summary of logs by device (for overview)
+   */
+  async getDeviceLogsSummary(hours = 24): Promise<DeviceLogsSummary> {
+    const response = await this.client.get<DeviceLogsSummary>(
+      '/api/device-logs/summary',
+      { params: { hours } }
+    );
+    return response.data;
   }
 }
 

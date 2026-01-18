@@ -202,4 +202,31 @@ interface ApiService {
     suspend fun getAppInstances(
         @Query("device_id") deviceId: Long? = null
     ): Response<AppInstancesResponse>
+
+    // --- Device Logs (Debug) ---
+    @POST("api/device-logs")
+    suspend fun sendDeviceLogs(@Body body: Map<String, Any>): Response<Unit>
+
+    @GET("api/devices/{deviceId}/logs")
+    suspend fun getDeviceLogs(
+        @Path("deviceId") deviceId: Long,
+        @Query("category") category: String? = null,
+        @Query("level") level: String? = null,
+        @Query("hours") hours: Int? = null,
+        @Query("per_page") perPage: Int? = null
+    ): Response<PaginatedResponse<DeviceLogEntry>>
+
+    @GET("api/device-logs/commerce")
+    suspend fun getCommerceLogs(
+        @Query("category") category: String? = null,
+        @Query("level") level: String? = null,
+        @Query("critical_only") criticalOnly: Boolean? = null,
+        @Query("hours") hours: Int? = null,
+        @Query("per_page") perPage: Int? = null
+    ): Response<PaginatedResponse<DeviceLogEntry>>
+
+    @GET("api/device-logs/summary")
+    suspend fun getDeviceLogsSummary(
+        @Query("hours") hours: Int? = null
+    ): Response<DeviceLogsSummaryResponse>
 }
