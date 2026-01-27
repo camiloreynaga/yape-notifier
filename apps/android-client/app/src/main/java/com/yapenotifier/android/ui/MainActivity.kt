@@ -135,9 +135,21 @@ class MainActivity : AppCompatActivity() {
                         val lastStatus = updatedHistory.first()
                         updateCaptureStatusFromServiceStatus(lastStatus)
                     } else {
-                        // Service still not connected - show warning
-                        ServiceStatusManager.updateStatus("⚠️ Servicio no conectado - Reinicia permisos")
+                        // Service still not connected despite permission being active.
+                        // This happens on some OEMs where requestRebind() doesn't work
+                        // after process death. The user needs to toggle the permission
+                        // off and on in system settings.
+                        ServiceStatusManager.updateStatus("⚠️ Servicio no conectado - Toca el botón para reactivar")
                         updateCaptureStatus("⚠️ Servicio desconectado", Color.parseColor("#FF9800"))
+
+                        // Show the notification permission button so user can go to
+                        // settings and toggle off/on to force the system to rebind
+                        binding.btnEnableNotifications.visibility = android.view.View.VISIBLE
+                        binding.btnEnableNotifications.isEnabled = true
+                        binding.btnEnableNotifications.text = "Reactivar Permiso de Notificaciones"
+                        binding.tvStatus.text = "Permiso activo pero servicio desconectado"
+                        binding.tvStatus.setTextColor(Color.parseColor("#FF9800"))
+                        binding.ivNotificationStatus.setImageResource(R.drawable.ic_warning_filled)
                     }
                 } else {
                     // Service is active - update based on last status
