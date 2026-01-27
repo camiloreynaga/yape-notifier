@@ -2,8 +2,8 @@ package com.yapenotifier.android.data.repository
 
 import android.content.Context
 import android.util.Log
+import com.yapenotifier.android.data.api.RetrofitClient
 import com.yapenotifier.android.data.local.PreferencesManager
-import com.yapenotifier.android.data.network.ApiClient
 import com.yapenotifier.android.util.FileLogger
 import kotlinx.coroutines.flow.first
 
@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.first
 class DeviceLogRepository(private val context: Context) {
 
     private val preferencesManager = PreferencesManager(context)
+    private val apiService = RetrofitClient.createApiService(context)
 
     companion object {
         private const val TAG = "DeviceLogRepository"
@@ -28,12 +29,6 @@ class DeviceLogRepository(private val context: Context) {
             val deviceUuid = preferencesManager.deviceUuid.first()
             if (deviceUuid.isNullOrBlank()) {
                 Log.w(TAG, "Device UUID not set, cannot send logs")
-                return false
-            }
-
-            val authToken = preferencesManager.authToken.first()
-            if (authToken.isNullOrBlank()) {
-                Log.w(TAG, "Auth token not set, cannot send logs")
                 return false
             }
 
@@ -52,7 +47,7 @@ class DeviceLogRepository(private val context: Context) {
                     "category" to entry.category,
                     "level" to entry.level,
                     "message" to entry.message,
-                    "details" to entry.details,
+                    "details" to (entry.details ?: ""),
                     "timestamp" to entry.timestamp
                 )
             }
@@ -62,11 +57,8 @@ class DeviceLogRepository(private val context: Context) {
                 "logs" to logsData
             )
 
-            // Send to server
-            val response = ApiClient.getService(context).sendDeviceLogs(
-                token = "Bearer $authToken",
-                body = requestBody
-            )
+            // Send to server using RetrofitClient
+            val response = apiService.sendDeviceLogs(requestBody)
 
             if (response.isSuccessful) {
                 Log.i(TAG, "Successfully sent ${pendingLogs.size} logs to server")

@@ -22,6 +22,8 @@ import com.yapenotifier.android.data.model.UpdateAppInstanceLabelRequest
 import com.yapenotifier.android.data.model.UpdateAppInstanceLabelResponse
 import com.yapenotifier.android.data.model.UpdateDeviceMonitoredAppsRequest
 import com.yapenotifier.android.data.model.DeviceHealthData
+import com.yapenotifier.android.data.model.DeviceLogEntry
+import com.yapenotifier.android.data.model.DeviceLogsSummaryResponse
 import com.yapenotifier.android.data.model.Notification
 import com.yapenotifier.android.data.model.PaginatedResponse
 import com.yapenotifier.android.data.model.LinkCodeGenerateRequest

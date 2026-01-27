@@ -20,9 +20,22 @@ object ServiceStatusManager {
     @Volatile
     private var _isServiceConnected: Boolean = false
 
-    // Track the last time a notification was captured
+    // Track the last time a notification was captured (payment match)
     @Volatile
     private var _lastNotificationCapturedAt: Long? = null
+
+    // Track the last time the service showed any sign of life
+    // Updated on: service connect, any notification received (even non-payment), heartbeat
+    @Volatile
+    private var _lastServiceActivityAt: Long? = null
+
+    // Track the last time onListenerConnected() was called
+    @Volatile
+    private var _lastListenerConnectedAt: Long? = null
+
+    // Track consecutive rebind attempts for exponential backoff
+    @Volatile
+    private var _rebindAttempts: Int = 0
 
     /**
      * Returns true if the NotificationListenerService is connected and listening.
@@ -36,17 +49,63 @@ object ServiceStatusManager {
     fun getLastNotificationCapturedAt(): Long? = _lastNotificationCapturedAt
 
     /**
+     * Returns the timestamp of the last service activity, or null if none.
+     * This is more reliable than lastNotificationCapturedAt because it updates
+     * whenever the service processes ANY notification, not just payment matches.
+     */
+    fun getLastServiceActivityAt(): Long? = _lastServiceActivityAt
+
+    /**
+     * Returns the timestamp of the last onListenerConnected() call, or null if never.
+     */
+    fun getLastListenerConnectedAt(): Long? = _lastListenerConnectedAt
+
+    /**
      * Called by PaymentNotificationListenerService when it connects/disconnects.
      */
     fun setServiceConnected(connected: Boolean) {
         _isServiceConnected = connected
+        if (connected) {
+            _lastListenerConnectedAt = System.currentTimeMillis()
+            _lastServiceActivityAt = System.currentTimeMillis()
+        }
     }
 
     /**
-     * Called when a notification is successfully captured.
+     * Called when the service processes any notification (even non-payment).
+     * This proves the service is alive and listening.
+     */
+    fun serviceActivityDetected() {
+        _lastServiceActivityAt = System.currentTimeMillis()
+    }
+
+    /**
+     * Called when a notification is successfully captured (payment match).
      */
     fun notificationCaptured() {
         _lastNotificationCapturedAt = System.currentTimeMillis()
+        _lastServiceActivityAt = System.currentTimeMillis()
+    }
+
+    /**
+     * Returns the current rebind attempt count.
+     */
+    fun getRebindAttempts(): Int = _rebindAttempts
+
+    /**
+     * Increments and returns the rebind attempt count.
+     * Called when a rebind is about to be attempted.
+     */
+    fun incrementRebindAttempt(): Int {
+        return ++_rebindAttempts
+    }
+
+    /**
+     * Resets the rebind attempt counter to 0.
+     * Called when service successfully connects.
+     */
+    fun resetRebindAttempts() {
+        _rebindAttempts = 0
     }
 
     fun updateStatus(message: String) {

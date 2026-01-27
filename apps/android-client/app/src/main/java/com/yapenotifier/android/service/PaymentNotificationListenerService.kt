@@ -1,7 +1,8 @@
 package com.yapenotifier.android.service
 
-import android.content.ComponentName
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
@@ -11,11 +12,15 @@ import androidx.work.Constraints
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import com.yapenotifier.android.R
+import com.yapenotifier.android.YapeNotifierApplication
 import com.yapenotifier.android.data.local.db.AppDatabase
 import com.yapenotifier.android.data.local.db.CapturedNotification
 import com.yapenotifier.android.data.repository.SettingsRepository
 import com.yapenotifier.android.util.FileLogger
+import com.yapenotifier.android.util.NetworkConnectivityReceiver
 import com.yapenotifier.android.util.PaymentNotificationParser
+import com.yapenotifier.android.util.ServiceRebinder
 import com.yapenotifier.android.util.ServiceStatusManager
 import com.yapenotifier.android.worker.SendNotificationWorker
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -85,9 +90,58 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         // FIXED: Iniciar collector reactivo para actualizaciones en tiempo real
         startPackagesCollector()
 
+        // CRITICAL: Start as foreground service to prevent Android from killing it
+        startForegroundService()
+
         ServiceStatusManager.updateStatus("✅ Servicio Creado - ${monitoredPackages.size} apps")
         FileLogger.logServiceEvent("SERVICE_CREATED", "${monitoredPackages.size} packages")
         Log.i(TAG, "PaymentNotificationListenerService created with ${monitoredPackages.size} monitored packages")
+    }
+
+    /**
+     * Start the service as a foreground service with a persistent notification.
+     * This prevents Android from killing the service under memory pressure.
+     */
+    private fun startForegroundService() {
+        try {
+            val notification = NotificationCompat.Builder(
+                this,
+                YapeNotifierApplication.FOREGROUND_SERVICE_CHANNEL_ID
+            )
+                .setContentTitle("NotiCentral activo")
+                .setContentText("Monitoreando notificaciones de pago")
+                .setSmallIcon(R.drawable.ic_bell_notification)
+                .setOngoing(true)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setCategory(NotificationCompat.CATEGORY_SERVICE)
+                .build()
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                // Android 14+ requires specifying foreground service type
+                startForeground(
+                    YapeNotifierApplication.FOREGROUND_SERVICE_NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                )
+            } else {
+                startForeground(
+                    YapeNotifierApplication.FOREGROUND_SERVICE_NOTIFICATION_ID,
+                    notification
+                )
+            }
+            Log.i(TAG, "✅ Foreground service started successfully")
+            FileLogger.log("SERVICE", "Foreground service started", "info")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to start foreground service", e)
+            FileLogger.logError("startForegroundService", e)
+            // Service will continue without foreground status - less protected but still functional
+        }
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // START_STICKY tells Android to re-create the service if it was killed
+        Log.d(TAG, "onStartCommand called (flags=$flags, startId=$startId)")
+        return START_STICKY
     }
 
     /**
@@ -118,27 +172,45 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         super.onListenerConnected()
         // Mark service as CONNECTED - this is the REAL state
         ServiceStatusManager.setServiceConnected(true)
-        // Reset reconnection attempts on successful connection
-        val previousAttempts = reconnectAttempts.getAndSet(0)
-        ServiceStatusManager.updateStatus("🚀 ¡Conectado! Escuchando notificaciones.")
-        FileLogger.logServiceEvent("LISTENER_CONNECTED", if (previousAttempts > 0) "after $previousAttempts attempts" else "first connect")
-        Log.i(TAG, "✅ Notification listener connected successfully")
 
-        // Refresh monitored packages in background
-        serviceScope.launch {
-            try {
-                settingsRepository.refreshMonitoredPackages()
-                monitoredPackages = settingsRepository.monitoredPackagesFlow.first()
-                Log.i(TAG, "✅ Refreshed monitored packages: $monitoredPackages (total: ${monitoredPackages.size})")
-                ServiceStatusManager.updateStatus("📦 ${monitoredPackages.size} apps monitoreadas")
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ Error refreshing monitored packages", e)
+        // Reset reconnection attempts on successful connection (both local and global)
+        val previousAttempts = reconnectAttempts.getAndSet(0)
+        ServiceStatusManager.resetRebindAttempts() // Reset watchdog counter too
+
+        ServiceStatusManager.updateStatus("🚀 ¡Conectado! Escuchando notificaciones.")
+
+        // Log success with network state info
+        val hasNetwork = NetworkConnectivityReceiver.isNetworkAvailable(applicationContext)
+        val details = buildString {
+            if (previousAttempts > 0) append("after $previousAttempts attempts, ")
+            else append("first connect, ")
+            append("network=${if (hasNetwork) "available" else "unavailable"}")
+        }
+        FileLogger.logServiceEvent("LISTENER_CONNECTED", details)
+        FileLogger.logReconnect(true, previousAttempts.coerceAtLeast(1), null)
+
+        Log.i(TAG, "✅ Notification listener connected successfully ($details)")
+
+        // Refresh monitored packages in background (only if network available)
+        if (hasNetwork) {
+            serviceScope.launch {
+                try {
+                    settingsRepository.refreshMonitoredPackages()
+                    monitoredPackages = settingsRepository.monitoredPackagesFlow.first()
+                    Log.i(TAG, "✅ Refreshed monitored packages: $monitoredPackages (total: ${monitoredPackages.size})")
+                    ServiceStatusManager.updateStatus("📦 ${monitoredPackages.size} apps monitoreadas")
+                } catch (e: Exception) {
+                    Log.e(TAG, "❌ Error refreshing monitored packages", e)
+                }
             }
         }
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         super.onNotificationPosted(sbn)
+
+        // Mark service as alive - any notification proves the listener is working
+        ServiceStatusManager.serviceActivityDetected()
 
         // CRITICAL: Wrap entire notification processing in try-catch to prevent service crashes
         try {
@@ -285,34 +357,57 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         ServiceStatusManager.setServiceConnected(false)
 
         val attempt = reconnectAttempts.incrementAndGet()
-        FileLogger.logDisconnect("LISTENER_DISCONNECTED - System unbind", attempt)
+
+        // Log detailed disconnect info including network state
+        val hasNetwork = NetworkConnectivityReceiver.isNetworkAvailable(applicationContext)
+        val disconnectReason = buildString {
+            append("LISTENER_DISCONNECTED - System unbind")
+            append(", network=${if (hasNetwork) "available" else "UNAVAILABLE"}")
+        }
+        FileLogger.logDisconnect(disconnectReason, attempt)
+
+        Log.w(TAG, "⚠️ Notification listener disconnected (attempt $attempt, network=$hasNetwork)")
 
         if (attempt <= MAX_RECONNECT_ATTEMPTS) {
-            // Exponential backoff: 2s, 4s, 8s, 16s, 32s
-            val delayMs = (2000L * (1L shl (attempt - 1))).coerceAtMost(32000L)
+            // Use ServiceRebinder's exponential backoff calculation
+            val delayMs = ServiceRebinder.calculateBackoffDelay(attempt, baseDelayMs = 2000L, maxDelayMs = 32000L)
+
             ServiceStatusManager.updateStatus("🔌 Desconectado - Reconectando en ${delayMs/1000}s (intento $attempt/$MAX_RECONNECT_ATTEMPTS)")
-            Log.w(TAG, "⚠️ Notification listener disconnected. Reconnect attempt $attempt/$MAX_RECONNECT_ATTEMPTS in ${delayMs}ms")
+            Log.w(TAG, "⚠️ Will attempt rebind in ${delayMs}ms (attempt $attempt/$MAX_RECONNECT_ATTEMPTS)")
 
             serviceScope.launch {
                 try {
                     FileLogger.logReconnect(false, attempt, delayMs)
                     delay(delayMs)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                        val componentName = ComponentName(applicationContext, PaymentNotificationListenerService::class.java)
-                        requestRebind(componentName)
-                        Log.i(TAG, "🔄 Rebind requested automatically (attempt $attempt)")
+
+                    // Use improved ServiceRebinder instead of direct requestRebind
+                    Log.i(TAG, "🔄 Attempting service rebind using ServiceRebinder (attempt $attempt)")
+                    ServiceStatusManager.updateStatus("🔄 Reconectando... (intento $attempt)")
+
+                    val rebindSuccess = ServiceRebinder.rebindNotificationListener(applicationContext)
+
+                    if (rebindSuccess) {
+                        Log.i(TAG, "🔄 Rebind request sent successfully (attempt $attempt)")
                         ServiceStatusManager.updateStatus("🔄 Reconexión solicitada (intento $attempt)...")
+                    } else {
+                        Log.w(TAG, "⚠️ Rebind request failed (attempt $attempt)")
+                        ServiceStatusManager.updateStatus("⚠️ Rebind fallido (intento $attempt)")
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "❌ Error requesting rebind (attempt $attempt)", e)
-                    FileLogger.logError("requestRebind", e)
+                    Log.e(TAG, "❌ Error during rebind attempt $attempt", e)
+                    FileLogger.logError("rebindAttempt", e)
                     ServiceStatusManager.updateStatus("❌ Error reconectando (intento $attempt)")
                 }
             }
         } else {
-            Log.e(TAG, "❌ Max reconnection attempts reached ($MAX_RECONNECT_ATTEMPTS). Service requires manual restart.")
-            FileLogger.logDisconnect("MAX_ATTEMPTS_REACHED - Manual restart required", attempt)
-            ServiceStatusManager.updateStatus("❌ Desconectado - Reinicia permisos manualmente")
+            // Max attempts reached - let the watchdog handle it from here
+            Log.e(TAG, "❌ Max reconnection attempts reached ($MAX_RECONNECT_ATTEMPTS). Watchdog will continue monitoring.")
+            FileLogger.logDisconnect("MAX_ATTEMPTS_REACHED - Watchdog will continue", attempt)
+            ServiceStatusManager.updateStatus("❌ Desconectado - Watchdog monitoreando...")
+
+            // Note: We don't tell user to restart manually anymore.
+            // The ServiceWatchdogWorker will continue trying every 15 minutes,
+            // and NetworkConnectivityReceiver will try when network is restored.
         }
     }
 
