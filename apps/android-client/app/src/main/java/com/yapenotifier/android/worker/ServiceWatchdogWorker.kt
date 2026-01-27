@@ -162,6 +162,17 @@ class ServiceWatchdogWorker(appContext: Context, workerParams: WorkerParameters)
                     return@withContext Result.success()
                 }
 
+                // Check if WorkManager cancelled us before we attempt rebind
+                if (isStopped) {
+                    Log.w(TAG, "Worker stopped before rebind attempt - aborting")
+                    FileLogger.log(
+                        "WATCHDOG",
+                        "Worker stopped/cancelled before rebind - runAttempt=$runAttemptCount",
+                        "warning"
+                    )
+                    return@withContext Result.success()
+                }
+
                 val currentAttempt = ServiceStatusManager.incrementRebindAttempt()
 
                 FileLogger.logReconnect(
@@ -328,20 +339,6 @@ class ServiceWatchdogWorker(appContext: Context, workerParams: WorkerParameters)
         } catch (_: Exception) {
             // Ignore
         }
-    }
-
-    /**
-     * Called when the worker is cancelled/stopped by WorkManager.
-     * Logs the reason to help diagnose "Job was cancelled" patterns.
-     */
-    override suspend fun onStopped() {
-        super.onStopped()
-        Log.w(TAG, "ServiceWatchdogWorker STOPPED (cancelled by system/WorkManager)")
-        FileLogger.log(
-            "WATCHDOG",
-            "Worker stopped/cancelled - runAttempt=$runAttemptCount, isStopped=$isStopped",
-            "warning"
-        )
     }
 
     companion object {
