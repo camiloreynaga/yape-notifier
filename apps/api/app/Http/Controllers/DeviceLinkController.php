@@ -32,10 +32,21 @@ class DeviceLinkController extends Controller
                 ], 400);
             }
 
-            // Check if user is admin (optional: can be removed if all users can generate codes)
+            // Check if user is admin
             if (!$user->isAdmin()) {
                 return response()->json([
                     'message' => 'Solo los administradores pueden generar códigos de vinculación',
+                ], 403);
+            }
+
+            // Check device limit based on plan
+            $commerce = $user->commerce()->with('plan')->first();
+            if ($commerce && !$commerce->canAddDevice()) {
+                return response()->json([
+                    'message' => 'Has alcanzado el límite de dispositivos de tu plan (' . $commerce->plan->max_devices . '). Actualiza tu plan para añadir más dispositivos.',
+                    'plan' => $commerce->plan->name,
+                    'max_devices' => $commerce->plan->max_devices,
+                    'current_devices' => $commerce->activeDevicesCount(),
                 ], 403);
             }
 

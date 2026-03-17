@@ -74,20 +74,19 @@ class User extends Authenticatable
         return $this->belongsTo(Commerce::class);
     }
 
-    /**
-     * Check if user is admin.
-     */
     public function isAdmin(): bool
     {
         return $this->role === 'admin';
     }
 
-    /**
-     * Check if user is captador.
-     */
     public function isCaptador(): bool
     {
         return $this->role === 'captador';
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === 'super_admin';
     }
 
     /**

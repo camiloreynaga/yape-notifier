@@ -71,6 +71,24 @@ class NotificationController extends Controller
                 ], 404);
             }
 
+            // Check daily notification limit based on plan (only for Starter plan)
+            $commerce = \App\Models\Commerce::with('plan')->find($device->commerce_id);
+            if ($commerce && !$commerce->canSendNotificationToday()) {
+                Log::warning('Daily notification limit reached', [
+                    'commerce_id' => $commerce->id,
+                    'plan' => $commerce->plan->name,
+                    'limit' => $commerce->plan->max_notifications_per_day,
+                    'today_count' => $commerce->todayNotificationsCount(),
+                ]);
+
+                return response()->json([
+                    'message' => 'Has alcanzado el límite de ' . $commerce->plan->max_notifications_per_day . ' notificaciones por día de tu plan ' . $commerce->plan->name . '. Actualiza tu plan para continuar.',
+                    'plan' => $commerce->plan->name,
+                    'limit' => $commerce->plan->max_notifications_per_day,
+                    'error' => 'daily_limit_reached',
+                ], 429);
+            }
+
             // Critical validation: Device MUST have commerce_id (from QR linking)
             // This is the authorization mechanism - QR linking authorizes the device
             if (!$device->commerce_id) {

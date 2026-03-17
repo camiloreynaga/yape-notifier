@@ -12,6 +12,8 @@ use App\Http\Controllers\MonitorPackageController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PinAuthController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\SuperAdmin\CommerceManagementController;
+use App\Http\Controllers\SuperAdmin\PlanController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -33,8 +35,8 @@ Route::get('/settings/monitored-packages', [MonitorPackageController::class, 'ge
 // Public device link code validation endpoint
 Route::get('/devices/link-code/{code}', [DeviceLinkController::class, 'validateLinkCode']);
 
-// Protected routes
-Route::middleware('auth:sanctum')->group(function () {
+// Protected routes (auth + commerce must be active)
+Route::middleware(['auth:sanctum', 'commerce.active'])->group(function () {
     // Auth routes
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
@@ -100,4 +102,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/device-logs/summary', [DeviceLogController::class, 'summary']);
     Route::get('/device-logs/commerce', [DeviceLogController::class, 'commerceLogs']);
     Route::get('/devices/{deviceId}/logs', [DeviceLogController::class, 'index']);
+});
+
+// Super Admin routes (REQUIRES authentication + super_admin role)
+Route::middleware(['auth:sanctum', 'super_admin'])->prefix('admin')->group(function () {
+    // Commerce management
+    Route::get('/commerces', [CommerceManagementController::class, 'index']);
+    Route::get('/commerces/pending', [CommerceManagementController::class, 'pending']);
+    Route::get('/commerces/{id}', [CommerceManagementController::class, 'show']);
+    Route::patch('/commerces/{id}/approve', [CommerceManagementController::class, 'approve']);
+    Route::patch('/commerces/{id}/suspend', [CommerceManagementController::class, 'suspend']);
+    Route::patch('/commerces/{id}/reactivate', [CommerceManagementController::class, 'reactivate']);
+    Route::patch('/commerces/{id}/plan', [CommerceManagementController::class, 'changePlan']);
+
+    // Plan management
+    Route::get('/plans', [PlanController::class, 'index']);
+    Route::post('/plans', [PlanController::class, 'store']);
+    Route::patch('/plans/{id}', [PlanController::class, 'update']);
 });

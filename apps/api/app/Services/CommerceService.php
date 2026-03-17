@@ -3,24 +3,29 @@
 namespace App\Services;
 
 use App\Models\Commerce;
+use App\Models\Plan;
 use App\Models\User;
 
 class CommerceService
 {
     /**
-     * Create a new commerce.
+     * Create a new commerce in 'pending' state with the Starter plan assigned by default.
      */
     public function createCommerce(User $owner, array $data): Commerce
     {
+        $starterPlan = Plan::where('slug', 'starter')->first();
+
         $commerce = Commerce::create([
-            'name' => $data['name'],
+            'name'          => $data['name'],
             'owner_user_id' => $owner->id,
+            'status'        => 'pending',
+            'plan_id'       => $starterPlan?->id,
         ]);
 
         // Assign commerce to owner
         $owner->update([
             'commerce_id' => $commerce->id,
-            'role' => 'admin',
+            'role'        => 'admin',
         ]);
 
         return $commerce;
