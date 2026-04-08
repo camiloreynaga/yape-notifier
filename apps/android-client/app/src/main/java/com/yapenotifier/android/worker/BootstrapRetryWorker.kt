@@ -27,6 +27,9 @@ class BootstrapRetryWorker(appContext: Context, workerParams: WorkerParameters) 
     CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
+        // Safety net: ensure ServiceStatusManager is hydrated in this process
+        ServiceStatusManager.init(applicationContext)
+
         Log.d(TAG, "BootstrapRetryWorker running...")
 
         try {

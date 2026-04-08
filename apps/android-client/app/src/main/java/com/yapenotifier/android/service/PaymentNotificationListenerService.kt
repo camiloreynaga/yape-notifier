@@ -60,6 +60,10 @@ class PaymentNotificationListenerService : NotificationListenerService() {
     private val reconnectAttempts = AtomicInteger(0)
     private val MAX_RECONNECT_ATTEMPTS = 5
 
+    // Rate-limited heartbeat: only log once per minute to avoid flooding logs
+    @Volatile private var lastHeartbeatLogAt: Long = 0L
+    private val HEARTBEAT_LOG_INTERVAL_MS = 60_000L
+
     override fun onCreate() {
         super.onCreate()
         db = AppDatabase.getDatabase(this)
@@ -212,6 +216,13 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         // Mark service as alive - any notification proves the listener is working
         ServiceStatusManager.serviceActivityDetected()
 
+        // Rate-limited heartbeat log: proves listener is alive even without payment notifications
+        val now = System.currentTimeMillis()
+        if (now - lastHeartbeatLogAt > HEARTBEAT_LOG_INTERVAL_MS) {
+            lastHeartbeatLogAt = now
+            FileLogger.log("HEARTBEAT", "Listener alive - notification from ${sbn.packageName}", "info")
+        }
+
         // CRITICAL: Wrap entire notification processing in try-catch to prevent service crashes
         try {
             processNotification(sbn)
@@ -347,7 +358,7 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         packagesCollectorJob?.cancel()
         packagesCollectorJob = null
         ServiceStatusManager.updateStatus("❌ Servicio Destruido")
-        FileLogger.logServiceEvent("SERVICE_DESTROYED", "onDestroy called - SYSTEM KILLED SERVICE")
+        FileLogger.logServiceEvent("SERVICE_DESTROYED", "onDestroy called - persisted connected=false")
         Log.w(TAG, "PaymentNotificationListenerService destroyed. Collector job cancelled.")
     }
 

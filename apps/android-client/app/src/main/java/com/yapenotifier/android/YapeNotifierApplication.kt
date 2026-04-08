@@ -44,6 +44,12 @@ class YapeNotifierApplication : Application() {
         // Initialize FileLogger for persistent debugging
         FileLogger.init(this)
         FileLogger.log("SYSTEM", "Application started - Build: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+        FileLogger.log("BUILD", "versionName=${BuildConfig.VERSION_NAME}, versionCode=${BuildConfig.VERSION_CODE}")
+
+        // CRITICAL: Initialize ServiceStatusManager early — hydrates persisted state from
+        // SharedPreferences and records processStartAt. Must run before bootstrapNotificationListener()
+        // and any other code that reads ServiceStatusManager.isServiceConnected().
+        ServiceStatusManager.init(this)
 
         Timber.tag("YapeNotifierApplication").d("Application created. API URL: ${BuildConfig.API_BASE_URL}")
         

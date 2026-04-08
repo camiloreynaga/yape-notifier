@@ -24,6 +24,9 @@ class DeviceHealthWorker(appContext: Context, workerParams: WorkerParameters) :
     private val database = AppDatabase.getDatabase(appContext)
 
     override suspend fun doWork(): Result {
+        // Safety net: ensure ServiceStatusManager is hydrated in this process
+        ServiceStatusManager.init(applicationContext)
+
         Log.d(TAG, "Starting device health worker...")
 
         // Get deviceId

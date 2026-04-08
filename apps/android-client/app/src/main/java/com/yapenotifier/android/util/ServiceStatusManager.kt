@@ -1,125 +1,211 @@
 package com.yapenotifier.android.util
 
+import android.content.Context
+import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/**
- * A singleton object to hold and broadcast the live status of background services.
- * This allows the UI (like MainActivity) to observe what the service is doing in real-time.
- * Also tracks whether the NotificationListenerService is actually connected.
- */
 object ServiceStatusManager {
+
+    private const val PREFS_NAME = "service_status_prefs"
+
+    private const val KEY_CONNECTED = "connected"
+    private const val KEY_LAST_ACTIVITY = "last_activity"
+    private const val KEY_LAST_CONNECTED = "last_connected"
+    private const val KEY_LAST_CAPTURED = "last_captured"
+    private const val KEY_REBIND_ATTEMPTS = "rebind_attempts"
+    private const val KEY_PROCESS_START_AT = "process_start_at"
+
+    // Ventana máxima sin actividad para seguir considerando vivo el listener.
+    // Si no hay ningún callback (onNotificationPosted/onListenerConnected) en este
+    // período, isServiceConnected() retorna false y el watchdog dispara rebind.
+    private const val SERVICE_IDLE_TIMEOUT_MS = 20 * 60_000L // 20 minutos
+
+    @Volatile private var initialized = false
+    @Volatile private var appContext: Context? = null
+
+    private fun prefs(): SharedPreferences {
+        val ctx = appContext ?: throw IllegalStateException("ServiceStatusManager.init(context) not called")
+        return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
 
     private val _statusHistory = MutableStateFlow<List<String>>(emptyList())
     val statusHistory = _statusHistory.asStateFlow()
 
-    // Track if the NotificationListenerService is actually connected
-    @Volatile
-    private var _isServiceConnected: Boolean = false
+    @Volatile private var _isServiceConnected: Boolean = false
+    @Volatile private var _lastNotificationCapturedAt: Long? = null
+    @Volatile private var _lastServiceActivityAt: Long? = null
+    @Volatile private var _lastListenerConnectedAt: Long? = null
+    @Volatile private var _rebindAttempts: Int = 0
+    @Volatile private var _processStartAt: Long = 0L
 
-    // Track the last time a notification was captured (payment match)
-    @Volatile
-    private var _lastNotificationCapturedAt: Long? = null
-
-    // Track the last time the service showed any sign of life
-    // Updated on: service connect, any notification received (even non-payment), heartbeat
-    @Volatile
-    private var _lastServiceActivityAt: Long? = null
-
-    // Track the last time onListenerConnected() was called
-    @Volatile
-    private var _lastListenerConnectedAt: Long? = null
-
-    // Track consecutive rebind attempts for exponential backoff
-    @Volatile
-    private var _rebindAttempts: Int = 0
+    // True only when onListenerDisconnected() or onDestroy() explicitly fired.
+    // Used by watchdog to distinguish "real disconnect" from "idle timeout".
+    @Volatile private var _hasRealDisconnect: Boolean = false
 
     /**
-     * Returns true if the NotificationListenerService is connected and listening.
-     * This is the REAL state of the service, not just if the permission is enabled.
+     * IMPORTANT: call this early (Application.onCreate) and also safe to call from Worker/Service.
+     * It hydrates persisted state AND records the current process start timestamp.
+     *
+     * Idempotent within a process: if already initialized, only ensures appContext is set.
+     * This prevents Workers calling init() from resetting _processStartAt and invalidating
+     * activity timestamps that prove the listener is alive.
      */
-    fun isServiceConnected(): Boolean = _isServiceConnected
+    fun init(context: Context) {
+        val ctx = context.applicationContext
+        appContext = ctx
+
+        if (initialized) return // Already initialized in this process — don't reset timestamps
+
+        val p = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+        // Mark this process start — only on FIRST init per process
+        _processStartAt = System.currentTimeMillis()
+        p.edit().putLong(KEY_PROCESS_START_AT, _processStartAt).apply()
+
+        // Hydrate persisted values
+        _isServiceConnected = p.getBoolean(KEY_CONNECTED, false)
+        _lastServiceActivityAt = p.getLongOrNull(KEY_LAST_ACTIVITY)
+        _lastListenerConnectedAt = p.getLongOrNull(KEY_LAST_CONNECTED)
+        _lastNotificationCapturedAt = p.getLongOrNull(KEY_LAST_CAPTURED)
+        _rebindAttempts = p.getInt(KEY_REBIND_ATTEMPTS, 0)
+
+        initialized = true
+    }
 
     /**
-     * Returns the timestamp of the last captured notification, or null if none.
+     * Recency-based connected state.
+     *
+     * The listener is considered alive if there is RECENT activity in THIS process,
+     * regardless of whether onListenerConnected() ever fired. This handles Xiaomi/MIUI
+     * where the system keeps the binding alive without invoking lifecycle callbacks.
+     *
+     * Decision order:
+     * 1. If not initialized or no timestamps at all → fall back to raw persisted flag.
+     * 2. Recent onNotificationPosted() activity in this process → alive.
+     * 3. Recent onListenerConnected() in this process → alive.
+     * 4. None of the above → considered disconnected (stale flag from previous process).
      */
+    fun isServiceConnected(): Boolean {
+        // Pre-init: return the raw flag (only happens very early in lifecycle)
+        if (!initialized) return _isServiceConnected
+
+        val now = System.currentTimeMillis()
+        val lastActivity = _lastServiceActivityAt
+        val lastConn = _lastListenerConnectedAt
+
+        // No callbacks ever recorded → use the persisted flag as best guess
+        if (lastActivity == null && lastConn == null) {
+            return _isServiceConnected
+        }
+
+        // Primary: recent listener activity in THIS process → alive
+        if (lastActivity != null &&
+            lastActivity >= _processStartAt &&
+            now - lastActivity <= SERVICE_IDLE_TIMEOUT_MS
+        ) {
+            return true
+        }
+
+        // Fallback: recent onListenerConnected() in THIS process → alive
+        if (lastConn != null &&
+            lastConn >= _processStartAt &&
+            now - lastConn <= SERVICE_IDLE_TIMEOUT_MS
+        ) {
+            return true
+        }
+
+        // No recent evidence → disconnected
+        return false
+    }
+
     fun getLastNotificationCapturedAt(): Long? = _lastNotificationCapturedAt
-
-    /**
-     * Returns the timestamp of the last service activity, or null if none.
-     * This is more reliable than lastNotificationCapturedAt because it updates
-     * whenever the service processes ANY notification, not just payment matches.
-     */
     fun getLastServiceActivityAt(): Long? = _lastServiceActivityAt
-
-    /**
-     * Returns the timestamp of the last onListenerConnected() call, or null if never.
-     */
     fun getLastListenerConnectedAt(): Long? = _lastListenerConnectedAt
+    fun getRebindAttempts(): Int = _rebindAttempts
+    fun hasRealDisconnect(): Boolean = _hasRealDisconnect
 
-    /**
-     * Called by PaymentNotificationListenerService when it connects/disconnects.
-     */
     fun setServiceConnected(connected: Boolean) {
         _isServiceConnected = connected
         if (connected) {
-            _lastListenerConnectedAt = System.currentTimeMillis()
-            _lastServiceActivityAt = System.currentTimeMillis()
+            _hasRealDisconnect = false
+        } else {
+            _hasRealDisconnect = true
+        }
+        if (!initialized) return
+
+        val now = System.currentTimeMillis()
+        val editor = prefs().edit().putBoolean(KEY_CONNECTED, connected)
+
+        if (connected) {
+            _lastListenerConnectedAt = now
+            _lastServiceActivityAt = now
+            _rebindAttempts = 0
+
+            editor.putLong(KEY_LAST_CONNECTED, now)
+            editor.putLong(KEY_LAST_ACTIVITY, now)
+            editor.putInt(KEY_REBIND_ATTEMPTS, 0)
+        }
+
+        editor.apply()
+    }
+
+    fun serviceActivityDetected() {
+        // If onNotificationPosted() is running, the listener IS connected — even if
+        // onListenerConnected() never re-fired in this process (OEM edge case).
+        val wasConnected = _isServiceConnected
+        _isServiceConnected = true
+        _hasRealDisconnect = false // Activity proves listener is alive — clear any disconnect flag
+        _lastServiceActivityAt = System.currentTimeMillis()
+        if (!initialized) return
+        prefs().edit()
+            .putBoolean(KEY_CONNECTED, true)
+            .putLong(KEY_LAST_ACTIVITY, _lastServiceActivityAt!!)
+            .apply()
+        if (!wasConnected) {
+            FileLogger.log("STATUS", "activityDetected -> set connected=true (persisted)")
         }
     }
 
-    /**
-     * Called when the service processes any notification (even non-payment).
-     * This proves the service is alive and listening.
-     */
-    fun serviceActivityDetected() {
-        _lastServiceActivityAt = System.currentTimeMillis()
-    }
-
-    /**
-     * Called when a notification is successfully captured (payment match).
-     */
     fun notificationCaptured() {
-        _lastNotificationCapturedAt = System.currentTimeMillis()
-        _lastServiceActivityAt = System.currentTimeMillis()
+        val now = System.currentTimeMillis()
+        _isServiceConnected = true
+        _lastNotificationCapturedAt = now
+        _lastServiceActivityAt = now
+        if (!initialized) return
+        prefs().edit()
+            .putBoolean(KEY_CONNECTED, true)
+            .putLong(KEY_LAST_CAPTURED, now)
+            .putLong(KEY_LAST_ACTIVITY, now)
+            .apply()
     }
 
-    /**
-     * Returns the current rebind attempt count.
-     */
-    fun getRebindAttempts(): Int = _rebindAttempts
-
-    /**
-     * Increments and returns the rebind attempt count.
-     * Called when a rebind is about to be attempted.
-     */
     fun incrementRebindAttempt(): Int {
-        return ++_rebindAttempts
+        _rebindAttempts += 1
+        if (initialized) prefs().edit().putInt(KEY_REBIND_ATTEMPTS, _rebindAttempts).apply()
+        return _rebindAttempts
     }
 
-    /**
-     * Resets the rebind attempt counter to 0.
-     * Called when service successfully connects.
-     */
     fun resetRebindAttempts() {
         _rebindAttempts = 0
+        if (initialized) prefs().edit().putInt(KEY_REBIND_ATTEMPTS, 0).apply()
     }
 
     fun updateStatus(message: String) {
         val timestamp = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
         val newStatus = "$timestamp - $message"
 
-        // Add the new status to the top of the list
         val updatedHistory = _statusHistory.value.toMutableList().apply {
             add(0, newStatus)
-            // Keep a maximum of 20 log entries
-            if (size > 20) {
-                removeLast()
-            }
+            if (size > 20) removeLast()
         }
         _statusHistory.value = updatedHistory
+    }
+
+    private fun SharedPreferences.getLongOrNull(key: String): Long? {
+        return if (contains(key)) getLong(key, 0L) else null
     }
 }

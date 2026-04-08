@@ -95,67 +95,44 @@ class MainActivity : AppCompatActivity() {
 
     private fun checkServiceStatus() {
         lifecycleScope.launch {
-            val notificationAccessEnabled = withContext(Dispatchers.IO) {
+            val hasPermission = withContext(Dispatchers.IO) {
                 NotificationAccessChecker.isNotificationAccessEnabled(this@MainActivity)
             }
 
-            if (!notificationAccessEnabled) {
-                // Permission not granted - service can't work
+            if (!hasPermission) {
                 updateCaptureStatus("❌ Sin permiso de notificaciones", Color.parseColor("#F44336"))
                 ServiceStatusManager.updateStatus("❌ Permiso de notificaciones no concedido")
+                return@launch
+            }
+
+            // Fuente de verdad: estado persistido en SharedPreferences, NO heurística de strings
+            val isConnected = ServiceStatusManager.isServiceConnected()
+
+            if (isConnected) {
+                updateCaptureStatus("✅ Capturando OK", Color.parseColor("#4CAF50"))
+                return@launch
+            }
+
+            // Permiso activo pero no conectado en ESTE proceso → pedir rebind
+            updateCaptureStatus("🔄 Conectando servicio...", Color.parseColor("#2196F3"))
+            ServiceStatusManager.updateStatus("⚠️ Intentando conectar servicio...")
+            tryRebindNotificationService()
+
+            // Espera corta solo para refrescar UI (NO para decidir que falló OEM)
+            delay(3000)
+
+            if (ServiceStatusManager.isServiceConnected()) {
+                updateCaptureStatus("✅ Capturando OK", Color.parseColor("#4CAF50"))
             } else {
-                // Permission granted - check if we have recent activity from the actual service
-                val history = ServiceStatusManager.statusHistory.value
-                val hasServiceActivity = history.any {
-                    it.contains("Servicio Creado") ||
-                    it.contains("Conectado") ||
-                    it.contains("Escuchando") ||
-                    it.contains("apps monitoreadas")
-                }
-
-                if (!hasServiceActivity) {
-                    // Service not connected yet - try to trigger rebind
-                    updateCaptureStatus("🔄 Conectando servicio...", Color.parseColor("#2196F3"))
-                    ServiceStatusManager.updateStatus("⚠️ Intentando conectar servicio...")
-
-                    // Try to request rebind
-                    tryRebindNotificationService()
-
-                    // Wait for service to connect
-                    delay(3000)
-
-                    val updatedHistory = ServiceStatusManager.statusHistory.value
-                    val nowConnected = updatedHistory.any {
-                        it.contains("Servicio Creado") ||
-                        it.contains("Conectado") ||
-                        it.contains("Escuchando")
-                    }
-
-                    if (nowConnected) {
-                        val lastStatus = updatedHistory.first()
-                        updateCaptureStatusFromServiceStatus(lastStatus)
-                    } else {
-                        // Service still not connected despite permission being active.
-                        // This happens on some OEMs where requestRebind() doesn't work
-                        // after process death. The user needs to toggle the permission
-                        // off and on in system settings.
-                        ServiceStatusManager.updateStatus("⚠️ Servicio no conectado - Toca el botón para reactivar")
-                        updateCaptureStatus("⚠️ Servicio desconectado", Color.parseColor("#FF9800"))
-
-                        // Show the notification permission button so user can go to
-                        // settings and toggle off/on to force the system to rebind
-                        binding.btnEnableNotifications.visibility = android.view.View.VISIBLE
-                        binding.btnEnableNotifications.isEnabled = true
-                        binding.btnEnableNotifications.text = "Reactivar Permiso de Notificaciones"
-                        binding.tvStatus.text = "Permiso activo pero servicio desconectado"
-                        binding.tvStatus.setTextColor(Color.parseColor("#FF9800"))
-                        binding.ivNotificationStatus.setImageResource(R.drawable.ic_warning_filled)
-                    }
-                } else {
-                    // Service is active - update based on last status
-                    val lastStatus = history.first()
-                    updateCaptureStatusFromServiceStatus(lastStatus)
-                }
+                // Mostrar botón de acceso a settings como acción, sin afirmar "desconectado definitivo".
+                // El observer de statusHistory actualizará la UI cuando onListenerConnected() dispare.
+                updateCaptureStatus("⚠️ Conectando… si no conecta, reactiva el permiso", Color.parseColor("#FF9800"))
+                binding.btnEnableNotifications.visibility = android.view.View.VISIBLE
+                binding.btnEnableNotifications.isEnabled = true
+                binding.btnEnableNotifications.text = "Abrir Ajustes de Permiso (Notificaciones)"
+                binding.tvStatus.text = "Permiso activo; esperando reenganche del sistema"
+                binding.tvStatus.setTextColor(Color.parseColor("#FF9800"))
+                binding.ivNotificationStatus.setImageResource(R.drawable.ic_warning_filled)
             }
         }
     }

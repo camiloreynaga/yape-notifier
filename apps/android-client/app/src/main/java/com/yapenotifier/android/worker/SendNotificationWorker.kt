@@ -9,6 +9,7 @@ import com.yapenotifier.android.data.model.NotificationData
 import com.yapenotifier.android.data.repository.AuthStatus
 import com.yapenotifier.android.data.repository.NotificationRepository
 import com.yapenotifier.android.data.repository.SendResult
+import com.yapenotifier.android.util.FileLogger
 import com.yapenotifier.android.util.PaymentNotificationParser
 import com.yapenotifier.android.util.ServiceStatusManager
 import com.yapenotifier.android.util.SourceAppMapper
@@ -42,6 +43,7 @@ class SendNotificationWorker(appContext: Context, workerParams: WorkerParameters
         if (commerceId.isNullOrBlank()) {
             Timber.w("Dispositivo no vinculado. Por favor, escanea el código QR.")
             ServiceStatusManager.updateStatus("⚠️ Dispositivo no vinculado - Escanea QR")
+            FileLogger.log("SEND", "BLOCKED: device not linked (commerceId null) - notifications will not be sent", "error")
             return Result.failure()
         }
         
@@ -60,10 +62,12 @@ class SendNotificationWorker(appContext: Context, workerParams: WorkerParameters
         val deviceId = preferencesManager.deviceUuid.first() ?: ""
         if (deviceId.isEmpty()) {
             Timber.e("DeviceID is not set. Cannot send notifications.")
-            return Result.failure() // Fail fast if no deviceId
+            FileLogger.log("SEND", "BLOCKED: deviceUuid not set - notifications will not be sent", "error")
+            return Result.failure()
         }
 
         Timber.d("Found ${pendingNotifications.size} pending notifications for deviceId: $deviceId")
+        FileLogger.log("SEND", "Starting batch: ${pendingNotifications.size} pending notifications", "info")
         var allSucceeded = true
         var authFailed = false
 
@@ -153,20 +157,33 @@ class SendNotificationWorker(appContext: Context, workerParams: WorkerParameters
                     Timber.i("Successfully sent notification ID: ${notification.id}")
                 }
                 is SendResult.Error -> {
-                    // Si es error de autenticación, detener el batch
                     if (sendResult.isAuthError) {
                         Timber.e("Error de autenticación (${sendResult.httpCode}) al enviar notificación ID: ${notification.id}. Token puede haber expirado. Deteniendo batch.")
                         ServiceStatusManager.updateStatus("⚠️ Token expirado - Inicia sesión nuevamente")
+                        FileLogger.log(
+                            "SEND",
+                            "AUTH_ERROR: http=${sendResult.httpCode}, notifId=${notification.id} - batch stopped, login required",
+                            "error"
+                        )
                         authFailed = true
-                        // No marcar como SENT, se reintentará después del login
                         break
                     } else {
                         Timber.e("Failed to send notification ID: ${notification.id}. Error: ${sendResult.message}. Will retry later.")
+                        FileLogger.log(
+                            "SEND",
+                            "ERROR: http=${sendResult.httpCode}, notifId=${notification.id}, msg=${sendResult.message}",
+                            "error"
+                        )
                         allSucceeded = false
                     }
                 }
                 is SendResult.NetworkError -> {
                     Timber.e("Network error while sending notification ID: ${notification.id}. Exception: ${sendResult.exception.message}. Will retry later.")
+                    FileLogger.log(
+                        "SEND",
+                        "NETWORK_ERROR: notifId=${notification.id}, exception=${sendResult.exception.message}",
+                        "error"
+                    )
                     allSucceeded = false
                 }
             }
@@ -178,7 +195,12 @@ class SendNotificationWorker(appContext: Context, workerParams: WorkerParameters
             return Result.success()
         }
 
-        return if (allSucceeded) Result.success() else Result.retry()
+        if (allSucceeded) {
+            FileLogger.log("SEND", "Batch complete: all ${pendingNotifications.size} notifications sent successfully", "info")
+            return Result.success()
+        } else {
+            return Result.retry()
+        }
     }
 
     companion object {

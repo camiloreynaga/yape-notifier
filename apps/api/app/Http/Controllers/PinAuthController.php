@@ -87,8 +87,8 @@ class PinAuthController extends Controller
             // Clear rate limiting on successful login
             Cache::forget($cacheKey);
 
-            // Generar token de autenticación (válido por 30 días)
-            $token = $user->createToken('android-device', ['*'], now()->addDays(30))->plainTextToken;
+            // Generar token de autenticación sin expiración (dispositivo dedicado)
+            $token = $user->createToken('android-device', ['*'])->plainTextToken;
 
             Log::info('PIN login successful', [
                 'user_id' => $user->id,

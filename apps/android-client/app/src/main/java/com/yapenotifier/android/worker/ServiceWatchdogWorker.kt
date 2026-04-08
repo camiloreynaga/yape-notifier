@@ -41,6 +41,9 @@ class ServiceWatchdogWorker(appContext: Context, workerParams: WorkerParameters)
     CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
+        // Safety net: ensure ServiceStatusManager is hydrated in this process
+        ServiceStatusManager.init(applicationContext)
+
         // --- WorkManager diagnostics ---
         Log.d(TAG, "ServiceWatchdogWorker starting health check " +
                 "(runAttempt=$runAttemptCount, isStopped=$isStopped, id=$id)")
@@ -124,25 +127,22 @@ class ServiceWatchdogWorker(appContext: Context, workerParams: WorkerParameters)
                     "rebindAttempts=$currentAttempts")
 
             // Step 3: Determinar si necesitamos rebind
-            // IMPORTANTE: Si serviceConnected=true, el servicio está vivo — NO TOCAR.
-            // La detección de "stale" fue ELIMINADA porque causaba que el watchdog
-            // matara un servicio perfectamente funcional que simplemente no había
-            // recibido notificaciones recientes. Una vez desconectado por el watchdog,
-            // requestRebind() no puede recuperar el servicio.
+            // isServiceConnected() ahora es recency-based (actividad < SERVICE_IDLE_TIMEOUT_MS),
+            // así que no necesitamos un safety-net duplicado aquí.
+            // Si el listener tiene actividad reciente → isConnected=true → no tocar.
+            // Si no tiene actividad reciente → isConnected=false → intentar rebind.
             val needsRebind = when {
-                // Service reports disconnected (real disconnection)
-                !isConnected -> {
-                    Log.w(TAG, "Service is disconnected - needs rebind")
+                !isConnected && isComponentEnabled -> {
+                    Log.w(TAG, "Service disconnected (no recent activity) - needs rebind")
                     true
                 }
-                // Component is disabled (should not happen normally)
                 !isComponentEnabled -> {
                     Log.w(TAG, "Component is disabled - needs rebind")
                     true
                 }
                 else -> {
                     Log.d(TAG, "Service is healthy (connected=$isConnected) - no action needed")
-                    // Dismiss any previous alert notifications since everything is OK
+                    ServiceStatusManager.resetRebindAttempts()
                     dismissAlertNotifications()
                     false
                 }
@@ -183,18 +183,29 @@ class ServiceWatchdogWorker(appContext: Context, workerParams: WorkerParameters)
 
                 Log.i(TAG, "Attempting safe rebind (attempt $currentAttempt)")
 
+                // Snapshot activity BEFORE rebind to detect genuine new events
+                val beforeActivity = ServiceStatusManager.getLastServiceActivityAt()
+
                 // ONLY safe rebind - requestRebind() cannot revoke permission
                 val rebindSuccess = ServiceRebinder.rebindNotificationListener(applicationContext)
 
                 if (rebindSuccess) {
                     Log.i(TAG, "Rebind request sent - waiting for service connection...")
 
-                    // Wait a bit and check if service connected
+                    // Wait for the system to process the rebind
                     delay(REBIND_CHECK_DELAY_MS)
 
+                    val afterActivity = ServiceStatusManager.getLastServiceActivityAt()
                     val connectedAfterRebind = ServiceStatusManager.isServiceConnected()
 
-                    if (connectedAfterRebind) {
+                    // New activity = timestamp advanced (not just a stale flag)
+                    val hasNewActivity = when {
+                        afterActivity == null -> false
+                        beforeActivity == null -> true
+                        else -> afterActivity > beforeActivity
+                    }
+
+                    if (connectedAfterRebind && hasNewActivity) {
                         Log.i(TAG, "Service successfully reconnected after rebind!")
                         FileLogger.logReconnect(
                             success = true,
@@ -202,18 +213,23 @@ class ServiceWatchdogWorker(appContext: Context, workerParams: WorkerParameters)
                             delayMs = REBIND_CHECK_DELAY_MS
                         )
                         ServiceStatusManager.resetRebindAttempts()
-                        // Dismiss any alert notification
                         dismissAlertNotifications()
                     } else {
-                        Log.w(TAG, "Service still disconnected after rebind attempt $currentAttempt")
+                        val isRealDisconnect = ServiceStatusManager.hasRealDisconnect()
+                        Log.w(TAG, "Service still disconnected after rebind attempt $currentAttempt " +
+                                "(connected=$connectedAfterRebind, newActivity=$hasNewActivity, realDisconnect=$isRealDisconnect)")
                         FileLogger.log(
                             "SERVICE",
-                            "Watchdog: Rebind attempt $currentAttempt - still disconnected",
+                            "Watchdog: Rebind attempt $currentAttempt - still disconnected " +
+                                "(connected=$connectedAfterRebind, newActivity=$hasNewActivity, realDisconnect=$isRealDisconnect)",
                             "warning"
                         )
 
-                        // After several failed attempts, show a notification to the user
-                        if (currentAttempt >= NOTIFY_USER_AFTER_ATTEMPTS) {
+                        // Only alert the user if there was a REAL disconnect event
+                        // (onListenerDisconnected/onDestroy fired), not just idle timeout.
+                        // Idle timeout during quiet hours (night) is normal — the listener
+                        // is alive but no notifications are arriving.
+                        if (currentAttempt >= NOTIFY_USER_AFTER_ATTEMPTS && isRealDisconnect) {
                             showServiceDisconnectedNotification()
                         }
                     }

@@ -62,6 +62,9 @@ class NetworkConnectivityReceiver : BroadcastReceiver() {
         val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         scope.launch {
             try {
+                // Safety net: ensure ServiceStatusManager is hydrated
+                ServiceStatusManager.init(context)
+
                 // Small delay to let network stabilize
                 delay(REBIND_DELAY_MS)
 
@@ -216,6 +219,9 @@ class NetworkConnectivityReceiver : BroadcastReceiver() {
             val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
             scope.launch {
                 try {
+                    // Safety net: ensure ServiceStatusManager is hydrated
+                    ServiceStatusManager.init(context)
+
                     // Delay to let network stabilize
                     delay(REBIND_DELAY_MS)
 

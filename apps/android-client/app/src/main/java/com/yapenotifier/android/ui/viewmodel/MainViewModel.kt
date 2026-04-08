@@ -60,11 +60,12 @@ class MainViewModel @Inject constructor(
                     _statusMessage.value = "No hay dispositivo vinculado"
                 }
 
-                // Clear device-related data, not auth token/user email
-                // This allows the device to be re-linked without losing login session
+                // Clear all local data including auth token so re-linking forces a fresh PIN login
                 preferencesManager.clearDeviceId()
                 preferencesManager.clearCommerceId()
-                preferencesManager.clearIsAdminMode() // Also clear mode flag
+                preferencesManager.clearIsAdminMode()
+                preferencesManager.clearAuthToken()
+                com.yapenotifier.android.data.api.RetrofitClient.clearTokenCache()
 
                 Timber.tag("MainViewModel").d("Local device data cleared successfully")
             } catch (e: Exception) {
