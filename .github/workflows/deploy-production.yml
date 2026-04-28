@@ -3,7 +3,7 @@ name: Deploy to Production
 # Se ejecuta en push a master cuando cambian archivos del backend, dashboard o infra
 on:
   push:
-    branches: [master]
+    branches: [benja-version]
     paths:
       - 'apps/api/**'
       - 'apps/web-dashboard/**'
@@ -133,9 +133,9 @@ jobs:
             cd ${{ env.DEPLOY_PATH }}
 
             # 1. Pull del codigo mas reciente
-            echo "[1/6] Pulling latest code..."
-            git fetch origin master
-            git reset --hard origin/master
+            echo "[1/7] Pulling latest code..."
+            git fetch origin benja-version
+            git reset --hard origin/benja-version
 
             # 2. Ir al directorio de produccion
             cd ${{ env.PRODUCTION_DIR }}
