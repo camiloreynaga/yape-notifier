@@ -200,9 +200,25 @@ class CommerceManagementController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $commerce = Commerce::with(['owner', 'plan', 'approvedBy', 'devices', 'users'])
+        $commerce = Commerce::with([
+                'owner',
+                'plan',
+                'approvedBy',
+                'devices',
+                'renewals.plan',
+                'renewals.renewedBy',
+            ])
             ->withCount(['notifications'])
             ->findOrFail($id);
+
+        $captadores = $commerce->users()
+            ->where('role', 'captador')
+            ->orderBy('name')
+            ->get(['id', 'name', 'pin']);
+
+        $commerce->captadores = $captadores;
+        $commerce->expiry_status = $commerce->expiryStatus();
+        $commerce->days_until_expiry = $commerce->daysUntilExpiry();
 
         return response()->json(['commerce' => $commerce]);
     }

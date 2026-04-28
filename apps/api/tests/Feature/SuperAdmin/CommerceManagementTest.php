@@ -138,4 +138,21 @@ class CommerceManagementTest extends TestCase
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.name', 'Pendiente Co');
     }
+
+    public function test_show_includes_renewals_and_captadores(): void
+    {
+        $this->actingAsSuperAdmin();
+        $commerce = Commerce::factory()->create();
+        User::factory()->create(['commerce_id' => $commerce->id, 'role' => 'captador', 'name' => 'María']);
+        User::factory()->create(['commerce_id' => $commerce->id, 'role' => 'captador', 'name' => 'Pedro']);
+        \App\Models\CommerceRenewal::factory()->create(['commerce_id' => $commerce->id]);
+
+        $response = $this->getJson("/api/admin/commerces/{$commerce->id}");
+
+        $response->assertOk()
+            ->assertJsonPath('commerce.captadores.0.name', 'María')
+            ->assertJsonCount(2, 'commerce.captadores')
+            ->assertJsonCount(1, 'commerce.renewals')
+            ->assertJsonPath('commerce.expiry_status', $commerce->expiryStatus());
+    }
 }
