@@ -13,6 +13,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PinAuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\SuperAdmin\CommerceManagementController;
+use App\Http\Controllers\SuperAdmin\DashboardController;
 use App\Http\Controllers\SuperAdmin\PlanController;
 use Illuminate\Support\Facades\Route;
 
@@ -120,4 +121,7 @@ Route::middleware(['auth:sanctum', 'super_admin'])->prefix('admin')->group(funct
     Route::get('/plans', [PlanController::class, 'index']);
     Route::post('/plans', [PlanController::class, 'store']);
     Route::patch('/plans/{id}', [PlanController::class, 'update']);
+
+    // Dashboard KPIs
+    Route::get('/dashboard/kpis', [DashboardController::class, 'kpis']);
 });
