@@ -139,6 +139,42 @@ class CommerceManagementController extends Controller
     }
 
     /**
+     * Renew a commerce plan, extending plan_expires_at by 30 days.
+     * PATCH /api/admin/commerces/{id}/renew
+     */
+    public function renew(Request $request, int $id): JsonResponse
+    {
+        $request->validate([
+            'plan_slug'   => 'required|string|exists:plans,slug',
+            'amount_paid' => 'nullable|numeric|min:0',
+            'notes'       => 'nullable|string|max:1000',
+        ]);
+
+        $commerce = Commerce::findOrFail($id);
+
+        if ($commerce->status === 'pending') {
+            return response()->json([
+                'message' => 'Cannot renew a pending commerce. Approve it first.',
+            ], 400);
+        }
+
+        $plan = Plan::where('slug', $request->plan_slug)->where('is_active', true)->firstOrFail();
+
+        $commerce = app(\App\Services\CommerceService::class)->renew(
+            $commerce,
+            $plan,
+            $request->user(),
+            $request->input('amount_paid'),
+            $request->input('notes')
+        );
+
+        return response()->json([
+            'message'  => 'Commerce renewed successfully.',
+            'commerce' => $commerce->load(['owner', 'plan', 'renewals.plan', 'renewals.renewedBy']),
+        ]);
+    }
+
+    /**
      * Show details of a single commerce.
      * GET /api/admin/commerces/{id}
      */

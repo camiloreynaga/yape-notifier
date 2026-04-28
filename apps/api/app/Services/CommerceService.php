@@ -82,6 +82,45 @@ class CommerceService
         ]);
         return $commerce->fresh();
     }
+
+    /**
+     * Renew a commerce: extend plan_expires_at by 30 days and record renewal history.
+     */
+    public function renew(
+        Commerce $commerce,
+        Plan $plan,
+        User $renewedBy,
+        ?float $amountPaid = null,
+        ?string $notes = null
+    ): Commerce {
+        $previousExpiresAt = $commerce->plan_expires_at;
+
+        if ($commerce->status === 'suspended' || ! $previousExpiresAt || $previousExpiresAt->isPast()) {
+            $newExpiresAt = now()->addDays(30);
+        } else {
+            $newExpiresAt = $previousExpiresAt->copy()->addDays(30);
+        }
+
+        \DB::transaction(function () use ($commerce, $plan, $renewedBy, $previousExpiresAt, $newExpiresAt, $amountPaid, $notes) {
+            $commerce->update([
+                'status'          => 'active',
+                'plan_id'         => $plan->id,
+                'plan_expires_at' => $newExpiresAt,
+            ]);
+
+            \App\Models\CommerceRenewal::create([
+                'commerce_id'         => $commerce->id,
+                'plan_id'             => $plan->id,
+                'renewed_by_user_id'  => $renewedBy->id,
+                'previous_expires_at' => $previousExpiresAt,
+                'new_expires_at'      => $newExpiresAt,
+                'amount_paid'         => $amountPaid,
+                'notes'               => $notes,
+            ]);
+        });
+
+        return $commerce->fresh();
+    }
 }
 
 

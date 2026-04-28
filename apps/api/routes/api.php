@@ -114,6 +114,7 @@ Route::middleware(['auth:sanctum', 'super_admin'])->prefix('admin')->group(funct
     Route::patch('/commerces/{id}/suspend', [CommerceManagementController::class, 'suspend']);
     Route::patch('/commerces/{id}/reactivate', [CommerceManagementController::class, 'reactivate']);
     Route::patch('/commerces/{id}/plan', [CommerceManagementController::class, 'changePlan']);
+    Route::patch('/commerces/{id}/renew', [CommerceManagementController::class, 'renew']);
 
     // Plan management
     Route::get('/plans', [PlanController::class, 'index']);
