@@ -149,17 +149,21 @@ jobs:
             docker compose --env-file .env up -d --remove-orphans
 
             # 5. Ejecutar migraciones
-            echo "[4/6] Running migrations..."
+            echo "[4/7] Running migrations..."
             docker compose --env-file .env exec -T php-fpm php artisan migrate --force
 
-            # 6. Limpiar caches de Laravel
-            echo "[5/6] Clearing caches..."
+            # 6. Ejecutar seeders idempotentes (super admin, planes, etc)
+            echo "[5/7] Running seeders..."
+            docker compose --env-file .env exec -T php-fpm php artisan db:seed --force
+
+            # 7. Limpiar caches de Laravel
+            echo "[6/7] Clearing caches..."
             docker compose --env-file .env exec -T php-fpm php artisan config:cache
             docker compose --env-file .env exec -T php-fpm php artisan route:cache
             docker compose --env-file .env exec -T php-fpm php artisan view:cache
 
-            # 7. Health check
-            echo "[6/6] Health check..."
+            # 8. Health check
+            echo "[7/7] Health check..."
             sleep 10
             if curl -sf https://api.notificaciones.space/up > /dev/null; then
               echo "API is healthy!"
