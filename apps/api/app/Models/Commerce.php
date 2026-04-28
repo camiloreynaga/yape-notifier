@@ -11,6 +11,9 @@ class Commerce extends Model
 {
     use HasFactory;
 
+    public const GRACE_DAYS = 3;
+    public const EXPIRING_SOON_DAYS = 7;
+
     protected $fillable = [
         'name',
         'owner_user_id',
@@ -84,6 +87,42 @@ class Commerce extends Model
         }
 
         return $this->todayNotificationsCount() < $this->plan->max_notifications_per_day;
+    }
+
+    public function expiryStatus(): string
+    {
+        if ($this->status === 'pending') {
+            return 'pending';
+        }
+        if ($this->status === 'suspended') {
+            return 'suspended';
+        }
+        if (! $this->plan_expires_at) {
+            return 'active';
+        }
+
+        $now = now();
+        $expires = $this->plan_expires_at;
+        $graceEnd = $expires->copy()->addDays(self::GRACE_DAYS);
+
+        if ($now->greaterThan($graceEnd)) {
+            return 'expired';
+        }
+        if ($now->greaterThan($expires)) {
+            return 'in_grace';
+        }
+        if ($now->diffInDays($expires) < self::EXPIRING_SOON_DAYS) {
+            return 'expiring_soon';
+        }
+        return 'active';
+    }
+
+    public function daysUntilExpiry(): ?int
+    {
+        if (! $this->plan_expires_at) {
+            return null;
+        }
+        return (int) round(now()->diffInDays($this->plan_expires_at, false));
     }
 
     public function owner(): BelongsTo
