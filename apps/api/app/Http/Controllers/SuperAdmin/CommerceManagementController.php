@@ -17,13 +17,33 @@ class CommerceManagementController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = Commerce::with(['owner', 'plan', 'approvedBy'])
-            ->withCount(['devices', 'users', 'notifications']);
+            ->withCount([
+                'devices',
+                'users',
+                'notifications',
+                'users as captadores_count' => function ($q) {
+                    $q->where('role', 'captador');
+                },
+            ]);
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
+        if ($request->filled('q')) {
+            $term = '%' . $request->q . '%';
+            $query->where(function ($q) use ($term) {
+                $q->where('name', 'ILIKE', $term)
+                  ->orWhereHas('owner', fn ($qq) => $qq->where('email', 'ILIKE', $term));
+            });
+        }
 
         $commerces = $query->orderBy('created_at', 'desc')->paginate(20);
+
+        $commerces->getCollection()->transform(function ($commerce) {
+            $commerce->expiry_status = $commerce->expiryStatus();
+            $commerce->days_until_expiry = $commerce->daysUntilExpiry();
+            return $commerce;
+        });
 
         return response()->json($commerces);
     }

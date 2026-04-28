@@ -112,4 +112,30 @@ class CommerceManagementTest extends TestCase
             'plan_slug' => 'basic',
         ])->assertStatus(400);
     }
+
+    public function test_index_includes_expiry_status_and_days_until_expiry(): void
+    {
+        $this->actingAsSuperAdmin();
+        Commerce::factory()->expiringSoon()->create(['name' => 'Café Luna']);
+
+        $response = $this->getJson('/api/admin/commerces');
+
+        $response->assertOk()
+            ->assertJsonPath('data.0.name', 'Café Luna')
+            ->assertJsonPath('data.0.expiry_status', 'expiring_soon')
+            ->assertJsonStructure(['data' => [['days_until_expiry', 'captadores_count']]]);
+    }
+
+    public function test_index_filters_by_status(): void
+    {
+        $this->actingAsSuperAdmin();
+        Commerce::factory()->pending()->create(['name' => 'Pendiente Co']);
+        Commerce::factory()->create(['name' => 'Activo Co']);
+
+        $response = $this->getJson('/api/admin/commerces?status=pending');
+
+        $response->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.name', 'Pendiente Co');
+    }
 }
