@@ -65,17 +65,11 @@ class CommerceManagementController extends Controller
         }
 
         $plan = Plan::where('slug', $request->plan_slug)->where('is_active', true)->firstOrFail();
-
-        $commerce->update([
-            'status'      => 'active',
-            'plan_id'     => $plan->id,
-            'approved_at' => now(),
-            'approved_by' => $request->user()->id,
-        ]);
+        $commerce = app(\App\Services\CommerceService::class)->approve($commerce, $plan, $request->user());
 
         return response()->json([
             'message'  => 'Commerce approved successfully.',
-            'commerce' => $commerce->fresh()->load(['owner', 'plan', 'approvedBy']),
+            'commerce' => $commerce->load(['owner', 'plan', 'approvedBy']),
         ]);
     }
 

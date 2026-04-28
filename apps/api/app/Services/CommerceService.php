@@ -22,11 +22,13 @@ class CommerceService
             'plan_id'       => $starterPlan?->id,
         ]);
 
-        // Assign commerce to owner
-        $owner->update([
-            'commerce_id' => $commerce->id,
-            'role'        => 'admin',
-        ]);
+        // Assign commerce to owner. Preserve super_admin role — those users
+        // own the platform, not the commerce, and should never be downgraded.
+        $updates = ['commerce_id' => $commerce->id];
+        if (!$owner->isSuperAdmin()) {
+            $updates['role'] = 'admin';
+        }
+        $owner->update($updates);
 
         return $commerce;
     }
@@ -64,6 +66,21 @@ class CommerceService
             'commerce_id' => null,
             'role' => 'admin',
         ]);
+    }
+
+    /**
+     * Approve a commerce: set it active, assign a plan, and set plan_expires_at to now+30 days.
+     */
+    public function approve(Commerce $commerce, Plan $plan, User $approvedBy): Commerce
+    {
+        $commerce->update([
+            'status'          => 'active',
+            'plan_id'         => $plan->id,
+            'plan_expires_at' => now()->addDays(30),
+            'approved_at'     => now(),
+            'approved_by'     => $approvedBy->id,
+        ]);
+        return $commerce->fresh();
     }
 }
 
