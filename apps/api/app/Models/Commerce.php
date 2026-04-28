@@ -148,6 +148,14 @@ class Commerce extends Model
     {
         return $this->hasMany(DeviceLinkCode::class);
     }
+
+    /**
+     * Get the renewals for this commerce.
+     */
+    public function renewals(): HasMany
+    {
+        return $this->hasMany(CommerceRenewal::class)->orderBy('created_at', 'desc');
+    }
 }
 
 
