@@ -37,7 +37,7 @@ class PlanController extends Controller
     {
         $plan = Plan::findOrFail($id);
 
-        $request->validate([
+        $validated = $request->validate([
             'name'                      => 'sometimes|string|max:255',
             'max_devices'               => 'nullable|integer|min:1',
             'max_notifications_per_day' => 'nullable|integer|min:1',
@@ -45,9 +45,7 @@ class PlanController extends Controller
             'is_active'                 => 'sometimes|boolean',
         ]);
 
-        $plan->update($request->only([
-            'name', 'max_devices', 'max_notifications_per_day', 'price', 'is_active',
-        ]));
+        $plan->update($validated);
 
         return response()->json(['plan' => $plan->fresh()]);
     }
