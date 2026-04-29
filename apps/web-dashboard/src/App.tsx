@@ -17,7 +17,6 @@ const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const AddDevicePage = lazy(() => import('./pages/AddDevicePage'));
 const AppInstancesPage = lazy(() => import('./pages/AppInstancesPage'));
-const NotificationDetailPage = lazy(() => import('./pages/NotificationDetailPage'));
 const CreateCommercePage = lazy(() => import('./pages/CreateCommercePage'));
 const SuperAdminPage = lazy(() => import('./pages/SuperAdminPage'));
 const SuperAdminCommercesTab = lazy(() => import('./pages/SuperAdminCommercesTab'));
@@ -125,7 +124,6 @@ function AppRoutes() {
           <Route path="dashboard" element={<DashboardPage />} />
           {/* Rutas individuales para deep linking */}
           <Route path="notifications" element={<Navigate to="/dashboard?tab=notifications" replace />} />
-          <Route path="notifications/:id" element={<NotificationDetailPage />} />
           <Route path="devices" element={<Navigate to="/dashboard?tab=devices" replace />} />
           <Route path="devices/add" element={<AddDevicePage />} />
           <Route path="employees" element={<Navigate to="/dashboard?tab=employees" replace />} />
