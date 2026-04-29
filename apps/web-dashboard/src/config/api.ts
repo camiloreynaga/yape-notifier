@@ -65,4 +65,16 @@ export const API_ENDPOINTS = {
     summary: "/api/device-logs/summary",
     device: (deviceId: number) => `/api/devices/${deviceId}/logs`,
   },
+  admin: {
+    commerces: '/api/admin/commerces',
+    commerce: (id: number) => `/api/admin/commerces/${id}`,
+    approve: (id: number) => `/api/admin/commerces/${id}/approve`,
+    suspend: (id: number) => `/api/admin/commerces/${id}/suspend`,
+    reactivate: (id: number) => `/api/admin/commerces/${id}/reactivate`,
+    changePlan: (id: number) => `/api/admin/commerces/${id}/plan`,
+    renew: (id: number) => `/api/admin/commerces/${id}/renew`,
+    plans: '/api/admin/plans',
+    plan: (id: number) => `/api/admin/plans/${id}`,
+    dashboardKpis: '/api/admin/dashboard/kpis',
+  },
 } as const;
