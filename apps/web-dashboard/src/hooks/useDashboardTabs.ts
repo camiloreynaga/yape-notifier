@@ -15,10 +15,18 @@ export interface UseDashboardTabsReturn {
 }
 
 /**
- * Valida si un string es un TabValue válido
+ * Valida si un string es un TabValue válido.
+ * IMPORTANT: keep this list in sync with TABS in DashboardTabs.constants.ts.
  */
 function isValidTab(tab: string | null): tab is TabValue {
-  return tab === 'overview' || tab === 'notifications' || tab === 'devices' || tab === 'settings';
+  return (
+    tab === 'overview' ||
+    tab === 'notifications' ||
+    tab === 'devices' ||
+    tab === 'employees' ||
+    tab === 'logs' ||
+    tab === 'settings'
+  );
 }
 
 export function useDashboardTabs(defaultTab: TabValue = DEFAULT_TAB): UseDashboardTabsReturn {
@@ -31,12 +39,15 @@ export function useDashboardTabs(defaultTab: TabValue = DEFAULT_TAB): UseDashboa
     return isValidTab(tabFromUrl) ? tabFromUrl : defaultTab;
   });
 
-  // Sincronizar con URL
+  // Sincronizar con URL — also handle the case where tab is removed (back to default)
   useEffect(() => {
     if (isValidTab(tabFromUrl)) {
       setActiveTabState(tabFromUrl);
+    } else if (tabFromUrl === null) {
+      // No ?tab=X — reset to default (overview)
+      setActiveTabState(defaultTab);
     }
-  }, [tabFromUrl]);
+  }, [tabFromUrl, defaultTab]);
 
   const setActiveTab = useCallback(
     (tab: TabValue) => {
