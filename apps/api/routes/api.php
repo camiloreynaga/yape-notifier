@@ -54,6 +54,7 @@ Route::middleware(['auth:sanctum', 'commerce.active'])->group(function () {
     Route::get('/devices/link-codes', [DeviceLinkController::class, 'getActiveCodes']);
 
     // Notification routes (admin/management - require authentication)
+    Route::get('/notifications/by-instance', [NotificationController::class, 'byInstance']);
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::get('/notifications/statistics', [NotificationController::class, 'statistics']);
     Route::get('/notifications/{id}', [NotificationController::class, 'show']);

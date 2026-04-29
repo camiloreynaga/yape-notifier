@@ -250,6 +250,52 @@ class NotificationController extends Controller
         }
     }
 
+    public function byInstance(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $commerceId = $user->commerce_id;
+
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+
+        $query = \App\Models\Notification::query()
+            ->select([
+                'app_instance_id',
+                \DB::raw('COUNT(*) as total'),
+                \DB::raw("COUNT(CASE WHEN status = 'validated' THEN 1 END) as validated"),
+                \DB::raw("COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending"),
+                \DB::raw("COUNT(CASE WHEN status = 'inconsistent' THEN 1 END) as inconsistent"),
+                \DB::raw('COALESCE(SUM(amount), 0) as amount_total'),
+            ])
+            ->whereNotNull('app_instance_id')
+            ->where('commerce_id', $commerceId)
+            ->groupBy('app_instance_id');
+
+        if ($startDate) {
+            $query->where('created_at', '>=', $startDate);
+        }
+        if ($endDate) {
+            $query->where('created_at', '<=', $endDate);
+        }
+
+        $rows = $query->get();
+        $instanceIds = $rows->pluck('app_instance_id')->all();
+        $labels = \App\Models\AppInstance::whereIn('id', $instanceIds)
+            ->pluck('instance_label', 'id');
+
+        $data = $rows->map(fn ($r) => [
+            'instance_id'    => (int) $r->app_instance_id,
+            'instance_label' => $labels[$r->app_instance_id] ?? 'Sin etiqueta',
+            'total'          => (int) $r->total,
+            'validated'      => (int) $r->validated,
+            'pending'        => (int) $r->pending,
+            'inconsistent'   => (int) $r->inconsistent,
+            'amount_total'   => number_format((float) $r->amount_total, 2, '.', ''),
+        ])->values();
+
+        return response()->json(['data' => $data]);
+    }
+
     /**
      * Update notification status.
      *

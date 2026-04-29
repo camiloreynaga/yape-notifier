@@ -186,4 +186,68 @@ class NotificationTest extends TestCase
         $response->assertOk();
         $this->assertEquals(5, $response->json('total'));
     }
+
+    public function test_by_instance_returns_aggregated_stats_per_instance(): void
+    {
+        $user = \App\Models\User::factory()->create(['role' => 'admin']);
+        $commerce = \App\Models\Commerce::factory()->create(['owner_user_id' => $user->id, 'status' => 'active']);
+        $user->update(['commerce_id' => $commerce->id]);
+        $token = $user->createToken('test')->plainTextToken;
+
+        $device = \App\Models\Device::factory()->create([
+            'user_id' => $user->id,
+            'commerce_id' => $commerce->id,
+        ]);
+        $instanceA = \App\Models\AppInstance::factory()->create([
+            'device_id' => $device->id,
+            'instance_label' => 'Katty - Yape',
+        ]);
+        $instanceB = \App\Models\AppInstance::factory()->create([
+            'device_id' => $device->id,
+            'instance_label' => 'Erika - Yape',
+        ]);
+
+        \App\Models\Notification::factory()->create([
+            'user_id' => $user->id,
+            'commerce_id' => $commerce->id,
+            'device_id' => $device->id,
+            'app_instance_id' => $instanceA->id,
+            'amount' => 70,
+            'status' => 'pending',
+        ]);
+        \App\Models\Notification::factory()->create([
+            'user_id' => $user->id,
+            'commerce_id' => $commerce->id,
+            'device_id' => $device->id,
+            'app_instance_id' => $instanceA->id,
+            'amount' => 30,
+            'status' => 'validated',
+        ]);
+        \App\Models\Notification::factory()->create([
+            'user_id' => $user->id,
+            'commerce_id' => $commerce->id,
+            'device_id' => $device->id,
+            'app_instance_id' => $instanceB->id,
+            'amount' => 50,
+            'status' => 'pending',
+        ]);
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson('/api/notifications/by-instance');
+
+        $response->assertOk()
+            ->assertJsonStructure([
+                'data' => [
+                    ['instance_id', 'instance_label', 'total', 'validated', 'pending', 'inconsistent', 'amount_total'],
+                ],
+            ])
+            ->assertJsonCount(2, 'data');
+
+        $rows = collect($response->json('data'))->keyBy('instance_id');
+        $this->assertEquals(2, $rows[$instanceA->id]['total']);
+        $this->assertEquals(1, $rows[$instanceA->id]['validated']);
+        $this->assertEquals(1, $rows[$instanceA->id]['pending']);
+        $this->assertEquals('100.00', $rows[$instanceA->id]['amount_total']);
+        $this->assertEquals(1, $rows[$instanceB->id]['total']);
+    }
 }
