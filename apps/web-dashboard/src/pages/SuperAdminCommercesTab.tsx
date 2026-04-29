@@ -2,7 +2,12 @@ import { useState } from 'react';
 import { Search } from 'lucide-react';
 import KpiCards from '@/components/SuperAdmin/KpiCards';
 import CommercesTable from '@/components/SuperAdmin/CommercesTable';
-import type { CommerceListItem } from '@/types';
+import RenewCommerceModal from '@/components/SuperAdmin/RenewCommerceModal';
+import ApproveCommerceModal from '@/components/SuperAdmin/ApproveCommerceModal';
+import ChangePlanModal from '@/components/SuperAdmin/ChangePlanModal';
+import SuspendConfirmDialog from '@/components/SuperAdmin/SuspendConfirmDialog';
+import CommerceDetailDrawer from '@/components/SuperAdmin/CommerceDetailDrawer';
+import type { CommerceListItem, CommerceDetail } from '@/types';
 
 const FILTER_TO_STATUS: Record<string, string | undefined> = {
   pending: 'pending',
@@ -16,7 +21,7 @@ export default function SuperAdminCommercesTab() {
   const [drawerCommerceId, setDrawerCommerceId] = useState<number | null>(null);
   const [pendingAction, setPendingAction] = useState<{
     action: 'approve' | 'renew' | 'reactivate' | 'change_plan' | 'suspend';
-    commerce: CommerceListItem;
+    commerce: CommerceListItem | CommerceDetail;
   } | null>(null);
 
   const queryParams = {
@@ -63,12 +68,26 @@ export default function SuperAdminCommercesTab() {
         onAction={(action, commerce) => setPendingAction({ action, commerce })}
       />
 
-      {/* Drawer + modals are wired in Task 28 — for now, both are placeholders */}
-      {drawerCommerceId !== null && (
-        <div className="hidden">{drawerCommerceId}</div>
+      <CommerceDetailDrawer
+        commerceId={drawerCommerceId}
+        onClose={() => setDrawerCommerceId(null)}
+        onAction={(action, commerce) => setPendingAction({ action, commerce })}
+      />
+
+      {pendingAction?.action === 'approve' && (
+        <ApproveCommerceModal commerce={pendingAction.commerce} onClose={() => setPendingAction(null)} />
       )}
-      {pendingAction !== null && (
-        <div className="hidden">{pendingAction.action}</div>
+      {pendingAction?.action === 'renew' && (
+        <RenewCommerceModal commerce={pendingAction.commerce} onClose={() => setPendingAction(null)} />
+      )}
+      {pendingAction?.action === 'reactivate' && (
+        <RenewCommerceModal commerce={pendingAction.commerce} onClose={() => setPendingAction(null)} />
+      )}
+      {pendingAction?.action === 'change_plan' && (
+        <ChangePlanModal commerce={pendingAction.commerce} onClose={() => setPendingAction(null)} />
+      )}
+      {pendingAction?.action === 'suspend' && (
+        <SuspendConfirmDialog commerce={pendingAction.commerce} onClose={() => setPendingAction(null)} />
       )}
     </div>
   );
