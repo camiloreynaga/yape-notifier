@@ -47,7 +47,9 @@
       "Bash(cmd /c \"set JAVA_HOME=C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr && set PATH=C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\\\\bin;%PATH% && cd /d d:\\\\App-lectura\\\\yape-notifier\\\\apps\\\\android-client && gradlew.bat assembleRelease > build_output.txt 2>&1 && echo BUILD_SUCCESS || echo BUILD_FAILED\")",
       "Bash(powershell -ExecutionPolicy Bypass -File \"d:\\\\App-lectura\\\\yape-notifier\\\\apps\\\\android-client\\\\build_apk.ps1\")",
       "Bash(find d:App-lecturayape-notifier/apps/api -name *.php -path *auth* -o -path *config* -name sanctum.php)",
-      "Bash(find d:/App-lectura/yape-notifier -name .env* -o -name *.env)"
+      "Bash(find d:/App-lectura/yape-notifier -name .env* -o -name *.env)",
+      "Bash(npx claude-code-templates@latest *)",
+      "Bash(curl -s http://localhost:8000/api/notifications/1 -H \"Accept: application/json\" -H \"Authorization: Bearer test\" -w \"\\\\nHTTP: %{http_code}\\\\n\")"
     ]
   }
 }
