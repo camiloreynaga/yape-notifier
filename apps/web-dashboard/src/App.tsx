@@ -20,6 +20,8 @@ const AppInstancesPage = lazy(() => import('./pages/AppInstancesPage'));
 const NotificationDetailPage = lazy(() => import('./pages/NotificationDetailPage'));
 const CreateCommercePage = lazy(() => import('./pages/CreateCommercePage'));
 const SuperAdminPage = lazy(() => import('./pages/SuperAdminPage'));
+const SuperAdminCommercesTab = lazy(() => import('./pages/SuperAdminCommercesTab'));
+const SuperAdminPlansTab = lazy(() => import('./pages/SuperAdminPlansTab'));
 
 // Configurar React Query Client
 const queryClient = new QueryClient({
@@ -108,7 +110,11 @@ function AppRoutes() {
             <Layout />
           </PrivateRoute>
         }>
-          <Route index element={<SuperAdminPage />} />
+          <Route element={<SuperAdminPage />}>
+            <Route index element={<Navigate to="/super-admin/commerces" replace />} />
+            <Route path="commerces" element={<SuperAdminCommercesTab />} />
+            <Route path="plans" element={<SuperAdminPlansTab />} />
+          </Route>
         </Route>
         <Route path="/" element={
           <PrivateRoute requireCommerce={true}>
