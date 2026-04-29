@@ -55,7 +55,7 @@ export default function EmployeesPage() {
     setFormData({
       name: user.name,
       email: user.email,
-      role: user.role === 'system' ? 'captador' : user.role,
+      role: user.role === 'admin' || user.role === 'captador' ? user.role : 'captador',
       is_active: user.is_active ?? true,
     });
     setGeneratedPin(null);
