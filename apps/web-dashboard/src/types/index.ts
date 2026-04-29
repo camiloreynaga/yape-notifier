@@ -173,3 +173,67 @@ export interface DeviceLogsSummary {
   }>;
 }
 
+export type ExpiryStatus =
+  | 'pending'
+  | 'active'
+  | 'expiring_soon'
+  | 'in_grace'
+  | 'expired'
+  | 'suspended';
+
+export interface Plan {
+  id: number;
+  name: string;
+  slug: string;
+  max_devices: number | null;
+  max_notifications_per_day: number | null;
+  price: number;
+  is_active: boolean;
+  commerces_count?: number;
+}
+
+export interface CommerceRenewal {
+  id: number;
+  commerce_id: number;
+  plan_id: number;
+  renewed_by_user_id: number;
+  previous_expires_at: string | null;
+  new_expires_at: string;
+  amount_paid: number | null;
+  notes: string | null;
+  created_at: string;
+  plan?: Plan;
+  renewedBy?: { id: number; name: string };
+}
+
+export interface CommerceListItem {
+  id: number;
+  name: string;
+  status: 'pending' | 'active' | 'suspended';
+  plan_id: number | null;
+  plan_expires_at: string | null;
+  expiry_status: ExpiryStatus;
+  days_until_expiry: number | null;
+  captadores_count: number;
+  devices_count: number;
+  notifications_count: number;
+  owner?: { id: number; name: string; email: string; phone: string | null };
+  plan?: Plan;
+  approved_at: string | null;
+  created_at: string;
+}
+
+export interface CommerceDetail extends CommerceListItem {
+  captadores: Array<{ id: number; name: string; pin: string | null }>;
+  renewals: CommerceRenewal[];
+}
+
+export interface SuperAdminKpis {
+  total: number;
+  pending: number;
+  active: number;
+  expiring_soon: number;
+  in_grace: number;
+  expired: number;
+  suspended: number;
+}
