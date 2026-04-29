@@ -3,12 +3,9 @@
  * badges, animaciones y lazy loading
  */
 
-import { ReactNode, Suspense, useMemo } from 'react';
-import clsx from 'clsx';
+import { ReactNode, Suspense } from 'react';
 import { useDashboardTabs } from '@/hooks/useDashboardTabs';
-import { useTabBadges } from '@/hooks/useTabBadges';
-import { TABS, DEFAULT_TAB } from './DashboardTabs.constants';
-import TabBadge from '@/components/TabBadge';
+import { DEFAULT_TAB } from './DashboardTabs.constants';
 import type { TabValue } from '@/types/dashboard.types';
 
 interface DashboardTabsProps {
@@ -28,21 +25,9 @@ function TabContentSkeleton() {
 }
 
 export default function DashboardTabs({ children, defaultTab = DEFAULT_TAB }: DashboardTabsProps) {
-  const { activeTab, setActiveTab, handleKeyDown, tabRefs } = useDashboardTabs(defaultTab);
-  const badges = useTabBadges();
-
-  // Mapear badges a tabs
-  const tabBadges = useMemo(() => {
-    const badgeMap: Record<TabValue, typeof badges.notifications> = {
-      overview: null,
-      notifications: badges.notifications,
-      devices: badges.devices,
-      employees: null,
-      logs: badges.logs,
-      settings: badges.settings,
-    };
-    return badgeMap;
-  }, [badges]);
+  // Reads active tab from URL but no longer renders the visual tab buttons —
+  // the Sidebar component now handles navigation between tabs.
+  const { activeTab } = useDashboardTabs(defaultTab);
 
   return (
     <div className="space-y-6">
@@ -54,65 +39,12 @@ export default function DashboardTabs({ children, defaultTab = DEFAULT_TAB }: Da
         Saltar al contenido principal
       </a>
 
-      {/* Tabs Navigation - Sticky */}
-      <div className="sticky top-16 z-40 bg-white border-b border-gray-200 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 shadow-sm" role="tablist" aria-label="Navegación del dashboard">
-        <nav
-          className="-mb-px flex space-x-4 sm:space-x-8 overflow-x-auto scrollbar-hide"
-          aria-label="Tabs"
-          style={{
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none',
-          }}
-        >
-          {TABS.map((tab, index) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.value;
-            const badge = tabBadges[tab.value];
-
-            return (
-              <button
-                key={tab.value}
-                ref={(el) => {
-                  tabRefs.current[index] = el;
-                }}
-                onClick={() => setActiveTab(tab.value)}
-                onKeyDown={(e) => handleKeyDown(e, index)}
-                className={clsx(
-                  'group inline-flex items-center py-3 sm:py-4 px-2 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-all duration-300',
-                  'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:rounded-t-lg',
-                  'relative whitespace-nowrap flex-shrink-0',
-                  isActive
-                    ? 'border-primary-500 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                )}
-                role="tab"
-                aria-selected={isActive}
-                aria-controls={`tabpanel-${tab.value}`}
-                aria-label={tab.ariaLabel}
-                id={`tab-${tab.value}`}
-                tabIndex={isActive ? 0 : -1}
-              >
-                <Icon
-                  className={clsx(
-                    '-ml-0.5 mr-2 h-5 w-5 transition-colors duration-200',
-                    isActive ? 'text-primary-500' : 'text-gray-400 group-hover:text-gray-500'
-                  )}
-                  aria-hidden="true"
-                />
-                <span>{tab.label}</span>
-                <TabBadge badge={badge} />
-                {/* Indicador animado de tab activo */}
-                {isActive && (
-                  <span
-                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-500 animate-pulse"
-                    aria-hidden="true"
-                  />
-                )}
-              </button>
-            );
-          })}
-        </nav>
-      </div>
+      {/*
+        Visual horizontal tabs removed — navigation is now handled by the
+        Sidebar (Layout/Sidebar.tsx). This component still reads the active
+        tab from the URL via useDashboardTabs and renders the right content,
+        but the tab buttons themselves are hidden to avoid duplicate nav.
+      */}
 
       {/* Tab Content con animación y lazy loading */}
       <div

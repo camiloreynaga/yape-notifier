@@ -1,4 +1,4 @@
-import { Eye, Check, MoreVertical, RotateCcw } from 'lucide-react';
+import { Eye, Check, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import Button from '@/components/UI/Button';
 import StatusBadge from '@/components/UI/StatusBadge';
@@ -11,7 +11,6 @@ interface Props {
   loading?: boolean;
   validatingId?: number | null;
   onValidate: (n: Notification) => void;
-  onMarkInconsistent: (n: Notification) => void;
   onRevert: (n: Notification) => void;
   onView: (n: Notification) => void;
 }
@@ -29,7 +28,7 @@ function appBadge(sourceApp?: string | null) {
 }
 
 export default function NotificationsTable({
-  notifications, loading, validatingId, onValidate, onMarkInconsistent, onRevert, onView,
+  notifications, loading, validatingId, onValidate, onRevert, onView,
 }: Props) {
   if (loading) {
     return <div className="rounded-xl bg-white p-8 text-center text-gray-500">Cargando notificaciones...</div>;
@@ -109,15 +108,6 @@ export default function NotificationsTable({
                     <Button size="sm" variant="ghost" icon={<Eye className="h-3.5 w-3.5" />} onClick={() => onView(n)}>
                       Ver
                     </Button>
-                    {n.status === 'pending' && (
-                      <button
-                        onClick={() => onMarkInconsistent(n)}
-                        className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-                        title="Marcar inconsistente"
-                      >
-                        <MoreVertical className="h-3.5 w-3.5" />
-                      </button>
-                    )}
                   </div>
                 </td>
               </tr>

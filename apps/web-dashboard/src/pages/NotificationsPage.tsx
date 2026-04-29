@@ -166,7 +166,6 @@ export default function NotificationsPage() {
         loading={loading}
         validatingId={validate.isPending ? validate.variables?.id ?? null : null}
         onValidate={onValidate}
-        onMarkInconsistent={onMarkInconsistent}
         onRevert={onRevert}
         onView={(n) => setDrawerNotif(n)}
       />

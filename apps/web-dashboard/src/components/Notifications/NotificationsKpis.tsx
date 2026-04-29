@@ -30,11 +30,9 @@ export default function NotificationsKpis({ stats, loading, activeFilter, onFilt
   }
 
   const total = stats.total ?? 0;
-  // by_status may be array OR record depending on backend. Try array first, fallback to 0.
-  const byStatusArr = Array.isArray((stats as unknown as { by_status?: unknown }).by_status)
-    ? (stats as unknown as { by_status: { status: string; count: number }[] }).by_status
-    : [];
-  const get = (s: string) => byStatusArr.find((x) => x.status === s)?.count ?? 0;
+  // backend returns by_status as Record<string, number>, e.g. { pending: 100, validated: 80 }
+  const byStatus = stats.by_status ?? {};
+  const get = (s: string) => byStatus[s] ?? 0;
 
   const cards: CardConfig[] = [
     { key: 'all',          label: 'Total del periodo',     count: total,                  icon: Bell,           bg: 'bg-white',       fg: 'text-gray-800',   ring: 'ring-gray-200' },
