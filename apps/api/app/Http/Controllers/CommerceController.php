@@ -20,6 +20,13 @@ class CommerceController extends Controller
     {
         $user = $request->user();
 
+        // Super admins do not own commerces — they manage other commerces
+        if ($user->isSuperAdmin()) {
+            return response()->json([
+                'message' => 'Super admins cannot create commerces. Use the admin panel to manage existing commerces.',
+            ], 403);
+        }
+
         // Check if user already has a commerce
         if ($user->commerce_id) {
             return response()->json([

@@ -3,7 +3,7 @@ export interface User {
   name: string;
   email: string;
   commerce_id: number | null;
-  role: 'admin' | 'captador' | 'system';
+  role: 'super_admin' | 'admin' | 'captador' | 'system';
   pin?: string | null;
   is_active?: boolean;
   created_at: string;

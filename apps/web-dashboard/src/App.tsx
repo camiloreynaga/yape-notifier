@@ -19,6 +19,7 @@ const AddDevicePage = lazy(() => import('./pages/AddDevicePage'));
 const AppInstancesPage = lazy(() => import('./pages/AppInstancesPage'));
 const NotificationDetailPage = lazy(() => import('./pages/NotificationDetailPage'));
 const CreateCommercePage = lazy(() => import('./pages/CreateCommercePage'));
+const SuperAdminPage = lazy(() => import('./pages/SuperAdminPage'));
 
 // Configurar React Query Client
 const queryClient = new QueryClient({
@@ -37,7 +38,7 @@ interface PrivateRouteProps {
 }
 
 function PrivateRoute({ children, requireCommerce = false }: PrivateRouteProps) {
-  const { isAuthenticated, loading, hasCommerce } = useAuth();
+  const { isAuthenticated, loading, hasCommerce, user } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -52,8 +53,16 @@ function PrivateRoute({ children, requireCommerce = false }: PrivateRouteProps) 
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
+  const isSuperAdmin = user?.role === 'super_admin';
+
+  // Super admins tienen su propia vista. Cualquier ruta del dashboard
+  // de comercio (que asume commerce_id) los manda a /super-admin.
+  if (isSuperAdmin && !location.pathname.startsWith('/super-admin')) {
+    return <Navigate to="/super-admin" replace />;
+  }
+
   // Si requiere commerce y no lo tiene, redirigir a crear commerce
-  // Excepto si ya está en la página de crear commerce
+  // Excepto si ya esta en esa ruta
   if (requireCommerce && !hasCommerce && location.pathname !== '/create-commerce') {
     return <Navigate to="/create-commerce" replace />;
   }
@@ -94,6 +103,13 @@ function AppRoutes() {
             <CreateCommercePage />
           </PrivateRoute>
         } />
+        <Route path="/super-admin" element={
+          <PrivateRoute requireCommerce={false}>
+            <Layout />
+          </PrivateRoute>
+        }>
+          <Route index element={<SuperAdminPage />} />
+        </Route>
         <Route path="/" element={
           <PrivateRoute requireCommerce={true}>
             <Layout />

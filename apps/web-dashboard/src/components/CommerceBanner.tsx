@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
  */
 export default function CommerceBanner() {
   const location = useLocation();
-  const { hasCommerce, loading, isAuthenticated } = useAuth();
+  const { hasCommerce, loading, isAuthenticated, user } = useAuth();
   const [dismissed, setDismissed] = useState(false);
 
   // No mostrar en páginas públicas (login, register)
@@ -26,6 +26,11 @@ export default function CommerceBanner() {
 
   // No mostrar si no está autenticado (por seguridad)
   if (!isAuthenticated) {
+    return null;
+  }
+
+  // Super admins no son duenos de comercios — el banner no aplica
+  if (user?.role === 'super_admin') {
     return null;
   }
 
