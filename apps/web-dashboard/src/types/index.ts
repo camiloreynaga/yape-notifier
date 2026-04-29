@@ -82,16 +82,18 @@ export interface Commerce {
 }
 
 export interface NotificationFilters {
-  device_id?: number;
+  device_id?: number | number[];
   source_app?: string;
   package_name?: string;
   app_instance_id?: number;
+  instance_id?: number | number[]; // alias accepted by backend
   start_date?: string;
   end_date?: string;
   status?: 'pending' | 'validated' | 'inconsistent';
   exclude_duplicates?: boolean;
   per_page?: number;
   page?: number;
+  q?: string;
 }
 
 export interface NotificationStatistics {
@@ -236,4 +238,14 @@ export interface SuperAdminKpis {
   in_grace: number;
   expired: number;
   suspended: number;
+}
+
+export interface NotificationsByInstanceRow {
+  instance_id: number;
+  instance_label: string;
+  total: number;
+  validated: number;
+  pending: number;
+  inconsistent: number;
+  amount_total: string; // backend returns formatted decimal as string
 }
