@@ -14,7 +14,7 @@ import com.yapenotifier.android.R
 import com.yapenotifier.android.databinding.ActivityAdminSettingsBinding
 import com.yapenotifier.android.data.api.ApiService
 import com.yapenotifier.android.data.local.PreferencesManager
-import com.yapenotifier.android.data.local.db.CapturedNotificationDao
+import com.yapenotifier.android.data.local.db.AppDatabase
 import com.yapenotifier.android.ui.DebugLogsActivity
 import com.yapenotifier.android.ui.LoginActivity
 import com.yapenotifier.android.ui.MonitoredAppsSelectionActivity
@@ -41,8 +41,9 @@ class AdminSettingsActivity : AppCompatActivity() {
     @Inject
     lateinit var apiService: ApiService
 
-    @Inject
-    lateinit var capturedNotificationDao: CapturedNotificationDao
+    private val capturedNotificationDao by lazy {
+        AppDatabase.getDatabase(applicationContext).capturedNotificationDao()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
