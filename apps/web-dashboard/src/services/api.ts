@@ -250,8 +250,23 @@ class ApiService {
 
   // Notification methods
   async getNotifications(filters?: NotificationFilters): Promise<PaginatedResponse<Notification>> {
+    // axios serializes arrays with the [] suffix when paramsSerializer is left default;
+    // we explicitly set arrayFormat to brackets via custom serializer for safety.
     const response = await this.client.get<PaginatedResponse<Notification>>(
       API_ENDPOINTS.notifications.list,
+      {
+        params: filters,
+        paramsSerializer: {
+          indexes: null, // produces ?instance_id[]=1&instance_id[]=2
+        },
+      }
+    );
+    return response.data;
+  }
+
+  async getNotificationsByInstance(filters?: { start_date?: string; end_date?: string }): Promise<{ data: import('@/types').NotificationsByInstanceRow[] }> {
+    const response = await this.client.get<{ data: import('@/types').NotificationsByInstanceRow[] }>(
+      API_ENDPOINTS.notifications.byInstance,
       { params: filters }
     );
     return response.data;

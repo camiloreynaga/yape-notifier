@@ -28,6 +28,7 @@ export const API_ENDPOINTS = {
     show: (id: number) => `/api/notifications/${id}`,
     statistics: "/api/notifications/statistics",
     updateStatus: (id: number) => `/api/notifications/${id}/status`,
+    byInstance: "/api/notifications/by-instance",
   },
   monitorPackages: {
     list: "/api/monitor-packages",
