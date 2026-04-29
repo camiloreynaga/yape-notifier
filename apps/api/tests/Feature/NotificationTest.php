@@ -144,4 +144,46 @@ class NotificationTest extends TestCase
                 'duplicates',
             ]);
     }
+
+    public function test_list_filters_by_multiple_instance_ids(): void
+    {
+        $user = \App\Models\User::factory()->create(['role' => 'admin']);
+        $commerce = \App\Models\Commerce::factory()->create(['owner_user_id' => $user->id, 'status' => 'active']);
+        $user->update(['commerce_id' => $commerce->id]);
+        $token = $user->createToken('test')->plainTextToken;
+
+        $device = \App\Models\Device::factory()->create([
+            'user_id' => $user->id,
+            'commerce_id' => $commerce->id,
+        ]);
+
+        $instanceA = \App\Models\AppInstance::factory()->create(['device_id' => $device->id]);
+        $instanceB = \App\Models\AppInstance::factory()->create(['device_id' => $device->id]);
+        $instanceC = \App\Models\AppInstance::factory()->create(['device_id' => $device->id]);
+
+        \App\Models\Notification::factory()->count(2)->create([
+            'user_id' => $user->id,
+            'commerce_id' => $commerce->id,
+            'device_id' => $device->id,
+            'app_instance_id' => $instanceA->id,
+        ]);
+        \App\Models\Notification::factory()->count(3)->create([
+            'user_id' => $user->id,
+            'commerce_id' => $commerce->id,
+            'device_id' => $device->id,
+            'app_instance_id' => $instanceB->id,
+        ]);
+        \App\Models\Notification::factory()->count(1)->create([
+            'user_id' => $user->id,
+            'commerce_id' => $commerce->id,
+            'device_id' => $device->id,
+            'app_instance_id' => $instanceC->id,
+        ]);
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson("/api/notifications?instance_id[]={$instanceA->id}&instance_id[]={$instanceB->id}");
+
+        $response->assertOk();
+        $this->assertEquals(5, $response->json('total'));
+    }
 }

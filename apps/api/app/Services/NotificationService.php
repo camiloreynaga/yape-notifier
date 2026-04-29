@@ -241,9 +241,10 @@ class NotificationService
                 ->orderBy('received_at', 'desc');
         }
 
-        // Filter by device
-        if (isset($filters['device_id'])) {
-            $query->where('device_id', $filters['device_id']);
+        // Filter by device (accepts scalar or array)
+        if (! empty($filters['device_id'])) {
+            $deviceIds = (array) $filters['device_id'];
+            $query->whereIn('device_id', $deviceIds);
         }
 
         // Filter by source app
@@ -256,9 +257,10 @@ class NotificationService
             $query->where('package_name', $filters['package_name']);
         }
 
-        // Filter by app instance
-        if (isset($filters['app_instance_id'])) {
-            $query->where('app_instance_id', $filters['app_instance_id']);
+        // Filter by app instance (accepts scalar or array)
+        if (! empty($filters['app_instance_id'])) {
+            $instanceIds = (array) $filters['app_instance_id'];
+            $query->whereIn('app_instance_id', $instanceIds);
         }
 
         // Filter by date range

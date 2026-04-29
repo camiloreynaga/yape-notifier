@@ -168,16 +168,26 @@ class NotificationController extends Controller
     public function index(ListNotificationsRequest $request): JsonResponse
     {
         try {
-            $filters = $request->only([
-                'device_id',
-                'source_app',
-                'package_name',
-                'app_instance_id',
-                'start_date',
-                'end_date',
-                'status',
-                'exclude_duplicates',
-            ]);
+            $filters = [
+                'device_id'          => $request->input('device_id'),
+                'app_instance_id'    => $request->input('app_instance_id'),
+                'instance_id'        => $request->input('instance_id'), // accept alias
+                'source_app'         => $request->input('source_app'),
+                'package_name'       => $request->input('package_name'),
+                'start_date'         => $request->input('start_date'),
+                'end_date'           => $request->input('end_date'),
+                'status'             => $request->input('status'),
+                'exclude_duplicates' => $request->boolean('exclude_duplicates'),
+            ];
+
+            // Allow instance_id as alias of app_instance_id (frontend uses instance_id[])
+            if (! empty($filters['instance_id']) && empty($filters['app_instance_id'])) {
+                $filters['app_instance_id'] = $filters['instance_id'];
+            }
+            unset($filters['instance_id']);
+
+            // Drop nulls so the service doesn't apply empty filters
+            $filters = array_filter($filters, fn ($v) => $v !== null && $v !== '');
 
             $perPage = $request->integer('per_page', 50);
             $notifications = $this->notificationService
