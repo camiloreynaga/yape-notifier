@@ -27,6 +27,11 @@ export default function Layout() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-4">
               <h1 className="text-2xl font-bold text-primary-600">Yape Notifier</h1>
+              {user?.role === 'super_admin' && (
+                <span className="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-bold text-indigo-700 ring-1 ring-indigo-200">
+                  SUPER ADMIN
+                </span>
+              )}
               {isStandalonePage && (
                 <button
                   onClick={() => navigate('/dashboard')}
