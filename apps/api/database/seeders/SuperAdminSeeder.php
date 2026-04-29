@@ -11,11 +11,11 @@ class SuperAdminSeeder extends Seeder
     /**
      * Crea (o actualiza) el usuario super admin a partir de variables de entorno.
      *
-     * Variables requeridas en .env:
+     * Variables en .env (leidas via config/admin.php; compatible con config:cache):
      *   SUPER_ADMIN_EMAIL    — email del super admin
      *   SUPER_ADMIN_PASSWORD — password en texto plano (se hashea automaticamente)
      *
-     * Variables opcionales:
+     * Opcional:
      *   SUPER_ADMIN_NAME     — nombre, default "Super Admin"
      *
      * Idempotente: si el usuario ya existe se actualiza; si no, se crea.
@@ -24,15 +24,15 @@ class SuperAdminSeeder extends Seeder
      */
     public function run(): void
     {
-        $email = env('SUPER_ADMIN_EMAIL');
-        $password = env('SUPER_ADMIN_PASSWORD');
+        $email = config('admin.super_admin_email');
+        $password = config('admin.super_admin_password');
 
         if (empty($email) || empty($password)) {
             $this->command->warn('SuperAdminSeeder: SUPER_ADMIN_EMAIL o SUPER_ADMIN_PASSWORD no configurados, saltando.');
             return;
         }
 
-        $name = env('SUPER_ADMIN_NAME', 'Super Admin');
+        $name = config('admin.super_admin_name', 'Super Admin');
 
         $user = User::updateOrCreate(
             ['email' => $email],
