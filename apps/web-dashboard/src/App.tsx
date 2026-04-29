@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import Layout from './components/Layout';
+import AppLayout from './components/Layout/AppLayout';
 import { NotificationToastContainer } from './components/NotificationToast';
 import { ErrorNotificationContainer } from './components/ErrorNotification';
 import ToastContainer from './components/Toast/ToastContainer';
@@ -107,7 +107,7 @@ function AppRoutes() {
         } />
         <Route path="/super-admin" element={
           <PrivateRoute requireCommerce={false}>
-            <Layout />
+            <AppLayout />
           </PrivateRoute>
         }>
           <Route element={<SuperAdminPage />}>
@@ -118,7 +118,7 @@ function AppRoutes() {
         </Route>
         <Route path="/" element={
           <PrivateRoute requireCommerce={true}>
-            <Layout />
+            <AppLayout />
           </PrivateRoute>
         }>
           <Route index element={<Navigate to="/dashboard" replace />} />
