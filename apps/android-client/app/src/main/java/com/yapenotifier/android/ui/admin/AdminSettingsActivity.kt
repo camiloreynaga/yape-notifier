@@ -1,7 +1,10 @@
 package com.yapenotifier.android.ui.admin
 
+import android.content.Context
 import android.content.Intent
+import android.os.BatteryManager
 import android.os.Bundle
+import android.os.PowerManager
 import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -11,13 +14,22 @@ import com.yapenotifier.android.R
 import com.yapenotifier.android.databinding.ActivityAdminSettingsBinding
 import com.yapenotifier.android.data.api.ApiService
 import com.yapenotifier.android.data.local.PreferencesManager
+import com.yapenotifier.android.data.local.db.CapturedNotificationDao
+import com.yapenotifier.android.ui.DebugLogsActivity
 import com.yapenotifier.android.ui.LoginActivity
 import com.yapenotifier.android.ui.MonitoredAppsSelectionActivity
 import com.yapenotifier.android.util.DeviceHealthWorkerHelper
+import com.yapenotifier.android.util.NotificationAccessChecker
+import com.yapenotifier.android.util.ServiceStatusManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 @AndroidEntryPoint
 class AdminSettingsActivity : AppCompatActivity() {
@@ -28,6 +40,9 @@ class AdminSettingsActivity : AppCompatActivity() {
     
     @Inject
     lateinit var apiService: ApiService
+
+    @Inject
+    lateinit var capturedNotificationDao: CapturedNotificationDao
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,6 +56,13 @@ class AdminSettingsActivity : AppCompatActivity() {
         setupClickListeners()
         loadUserInfo()
         loadHeartbeatInterval()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Refresh operational widgets each time user returns to this screen
+        loadServiceStatus()
+        loadDiagnostics()
     }
 
     private fun setupToolbar() {
@@ -91,6 +113,78 @@ class AdminSettingsActivity : AppCompatActivity() {
 
         binding.btnLogout.setOnClickListener {
             showLogoutDialog()
+        }
+
+        binding.btnViewLogs.setOnClickListener {
+            startActivity(Intent(this, DebugLogsActivity::class.java))
+        }
+    }
+
+    private fun loadServiceStatus() {
+        // Make sure ServiceStatusManager is initialized (it's a singleton)
+        try {
+            ServiceStatusManager.init(applicationContext)
+        } catch (e: Exception) {
+            Timber.w(e, "ServiceStatusManager init failed")
+        }
+
+        val connected = ServiceStatusManager.isServiceConnected()
+        if (connected) {
+            binding.tvServiceStatusBadge.text = "Activo"
+            binding.tvServiceStatusBadge.setBackgroundResource(R.drawable.bg_badge_online)
+        } else {
+            binding.tvServiceStatusBadge.text = "Inactivo"
+            binding.tvServiceStatusBadge.setBackgroundResource(R.drawable.bg_badge_offline)
+        }
+
+        val lastActivity = ServiceStatusManager.getLastServiceActivityAt()
+        binding.tvLastActivity.text = formatRelativeTime(lastActivity)
+
+        lifecycleScope.launch {
+            try {
+                val sentToday = capturedNotificationDao.getSentTodayCount()
+                val pending = capturedNotificationDao.getPendingCount()
+                binding.tvCapturedCount.text = sentToday.toString()
+                binding.tvPendingCount.text = pending.toString()
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to load capture stats")
+                binding.tvCapturedCount.text = "—"
+                binding.tvPendingCount.text = "—"
+            }
+        }
+    }
+
+    private fun loadDiagnostics() {
+        // Notification permission
+        val hasNotifPermission = NotificationAccessChecker.isNotificationAccessEnabled(this)
+        binding.tvNotificationPermission.text = if (hasNotifPermission) "OK" else "Faltante"
+        binding.tvNotificationPermission.setTextColor(
+            if (hasNotifPermission) 0xFF2E7D32.toInt() else 0xFFC62828.toInt()
+        )
+
+        // Battery optimization
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        val batteryOptIgnored = pm.isIgnoringBatteryOptimizations(packageName)
+        binding.tvBatteryOptimization.text = if (batteryOptIgnored) "Sin restriccion" else "Restringe"
+        binding.tvBatteryOptimization.setTextColor(
+            if (batteryOptIgnored) 0xFF2E7D32.toInt() else 0xFFEF6C00.toInt()
+        )
+
+        // Battery level
+        val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+        val level = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+        binding.tvBatteryLevel.text = if (level >= 0) "$level%" else "—"
+    }
+
+    private fun formatRelativeTime(epochMs: Long?): String {
+        if (epochMs == null || epochMs == 0L) return "Sin actividad"
+        val diff = System.currentTimeMillis() - epochMs
+        val mins = TimeUnit.MILLISECONDS.toMinutes(diff)
+        return when {
+            mins < 1 -> "Hace un momento"
+            mins < 60 -> "Hace $mins min"
+            mins < 1440 -> "Hace ${mins / 60} h"
+            else -> SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date(epochMs))
         }
     }
 

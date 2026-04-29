@@ -8,9 +8,6 @@ import android.view.View
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import android.text.TextWatcher
-import androidx.appcompat.widget.SearchView
-import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.chip.Chip
@@ -20,9 +17,6 @@ import com.yapenotifier.android.databinding.ActivityAdminPanelBinding
 import com.yapenotifier.android.ui.admin.adapter.NotificationAdapter
 import com.yapenotifier.android.ui.admin.viewmodel.AdminPanelViewModel
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import timber.log.Timber
 
 @AndroidEntryPoint
@@ -45,7 +39,6 @@ class AdminPanelActivity : AppCompatActivity() {
             setupRecyclerView()
             setupSwipeRefresh()
             setupBottomNavigation()
-            setupSearch()
             setupClickListeners()
             setupObservers()
             setupFilters()
@@ -158,6 +151,14 @@ class AdminPanelActivity : AppCompatActivity() {
             }
 
             adapter.submitList(state.notifications)
+
+            // Update KPI cards: count + sum of amounts of currently visible notifications
+            val ops = state.notifications.size
+            val total = state.notifications
+                .mapNotNull { it.amount }
+                .sumOf { it.toDouble() }
+            binding.tvKpiOpsValue.text = ops.toString()
+            binding.tvKpiAmountValue.text = String.format("S/ %.2f", total)
 
             // Show empty state when no data and not loading
             if (state.notifications.isEmpty() && !state.loading) {
@@ -317,32 +318,6 @@ class AdminPanelActivity : AppCompatActivity() {
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.menu_admin_panel, menu)
         return true
-    }
-    
-    private fun setupSearch() {
-        // Setup search from EditText in layout
-        binding.etSearch.setOnEditorActionListener { _, _, _ ->
-            viewModel.setSearchQuery(binding.etSearch.text.toString())
-            true
-        }
-        
-        // Debounce search input
-        var searchJob: Job? = null
-        binding.etSearch.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: android.text.Editable?) {
-                val query = s?.toString() ?: ""
-                // Pausar polling cuando usuario está escribiendo
-                viewModel.setUserTyping(query.isNotEmpty())
-                
-                searchJob?.cancel()
-                searchJob = lifecycleScope.launch {
-                    delay(500)
-                    viewModel.setSearchQuery(query)
-                }
-            }
-        })
     }
     
     private fun setupClickListeners() {
