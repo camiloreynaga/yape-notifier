@@ -8,7 +8,7 @@ interface AuthContextType {
   token: string | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string, phone?: string) => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   hasCommerce: boolean;
@@ -108,8 +108,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     await checkCommerce();
   };
 
-  const register = async (name: string, email: string, password: string) => {
-    const response = await apiService.register(name, email, password);
+  const register = async (name: string, email: string, password: string, phone?: string) => {
+    const response = await apiService.register(name, email, password, phone);
     setToken(response.token);
     setUser(response.user);
     localStorage.setItem('auth_token', response.token);

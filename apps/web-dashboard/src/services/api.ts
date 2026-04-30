@@ -130,10 +130,11 @@ class ApiService {
 
 
   // Auth methods
-  async register(name: string, email: string, password: string): Promise<AuthResponse> {
+  async register(name: string, email: string, password: string, phone?: string): Promise<AuthResponse> {
     const response = await this.client.post<AuthResponse>(API_ENDPOINTS.auth.register, {
       name,
       email,
+      phone,
       password,
       password_confirmation: password,
     });
