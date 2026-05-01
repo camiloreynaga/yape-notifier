@@ -1,7 +1,7 @@
 import { forwardRef, ButtonHTMLAttributes } from 'react';
 import { Loader2 } from 'lucide-react';
 
-type Variant = 'primary' | 'dark' | 'outline' | 'ghost' | 'danger' | 'success';
+type Variant = 'primary' | 'dark' | 'outline' | 'ghost' | 'danger' | 'success' | 'cta';
 type Size = 'sm' | 'md' | 'lg';
 
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -17,7 +17,9 @@ const VARIANTS: Record<Variant, string> = {
   outline: 'border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 disabled:opacity-50',
   ghost:   'bg-transparent text-gray-700 hover:bg-gray-100 disabled:opacity-50',
   danger:  'bg-red-600 text-white hover:bg-red-700 disabled:bg-red-300',
-  success: 'bg-green-600 text-white hover:bg-green-700 disabled:bg-green-300',
+  // success/cta — emerald serio para acciones que mueven dinero (validar pagos)
+  success: 'bg-cta-700 text-white hover:bg-cta-800 disabled:bg-cta-100 disabled:text-cta-400',
+  cta:     'bg-cta-700 text-white hover:bg-cta-800 disabled:bg-cta-100 disabled:text-cta-400',
 };
 
 const SIZES: Record<Size, string> = {

@@ -1,80 +1,175 @@
-import { Bell, Clock, CheckCircle, AlertTriangle, DollarSign } from 'lucide-react';
-import type { NotificationStatistics } from '@/types';
+import { Clock, CheckCircle2, DollarSign, AlertTriangle, ArrowUpRight } from 'lucide-react';
+import type { NotificationStatistics, Notification } from '@/types';
 
 interface Props {
   stats?: NotificationStatistics;
   loading?: boolean;
+  notificationsForDuplicates?: Notification[];
   activeFilter: 'all' | 'pending' | 'validated' | 'inconsistent';
   onFilterChange: (filter: 'all' | 'pending' | 'validated' | 'inconsistent') => void;
 }
 
 interface CardConfig {
-  key: 'all' | 'pending' | 'validated' | 'inconsistent' | 'amount';
+  key: 'pending' | 'validated' | 'amount' | 'duplicate';
   label: string;
   value: string;
+  delta?: string;
+  deltaTone?: 'good' | 'warn' | 'neutral';
   icon: React.ComponentType<{ className?: string }>;
-  bg: string;
-  fg: string;
-  ring: string;
-  clickable?: boolean;
+  filterKey?: 'pending' | 'validated' | null;
+  emphasize?: boolean;
 }
 
-export default function NotificationsKpis({ stats, loading, activeFilter, onFilterChange }: Props) {
-  if (loading || !stats) {
+const fmtNum = (n: number) => n.toLocaleString('es-PE');
+const fmtAmount = (n: number) =>
+  'S/ ' + n.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function detectDuplicates(notifications: Notification[]): number {
+  // count notifications that have at least one near-duplicate within 60s window
+  let count = 0;
+  for (let i = 0; i < notifications.length; i++) {
+    const a = notifications[i];
+    if (!a.security_code) continue;
+    const aTime = new Date(a.created_at).getTime();
+    for (let j = i + 1; j < notifications.length; j++) {
+      const b = notifications[j];
+      if (
+        b.security_code === a.security_code &&
+        Number(b.amount) === Number(a.amount) &&
+        Math.abs(new Date(b.created_at).getTime() - aTime) < 60_000
+      ) {
+        count++;
+        break;
+      }
+    }
+  }
+  return count;
+}
+
+export default function NotificationsKpis({
+  stats,
+  loading,
+  notificationsForDuplicates = [],
+  activeFilter,
+  onFilterChange,
+}: Props) {
+  const isLoading = loading === true && !stats;
+
+  // Robust defaults: render with zeros if stats not loaded yet so cards
+  // are not stuck as empty skeletons forever.
+  const total = stats?.total ?? 0;
+  const totalAmount = stats?.total_amount ?? 0;
+  const byStatus = stats?.by_status ?? {};
+  const pendingCount = byStatus['pending'] ?? 0;
+  const validatedCount = byStatus['validated'] ?? 0;
+  const duplicateCount = detectDuplicates(notificationsForDuplicates);
+
+  const pendingTone: 'good' | 'warn' = pendingCount > 5 ? 'warn' : 'good';
+  const duplicateTone: 'good' | 'warn' = duplicateCount > 0 ? 'warn' : 'good';
+
+  const cards: CardConfig[] = [
+    {
+      key: 'pending',
+      label: 'Pendientes',
+      value: fmtNum(pendingCount),
+      delta: pendingCount > 0 ? 'requieren validación' : 'al día',
+      deltaTone: pendingTone,
+      icon: Clock,
+      filterKey: 'pending',
+      emphasize: pendingCount > 0,
+    },
+    {
+      key: 'validated',
+      label: 'Validadas en el período',
+      value: fmtNum(validatedCount),
+      delta: total > 0 ? `${Math.round((validatedCount / total) * 100)}% del total` : '0% del total',
+      deltaTone: 'neutral',
+      icon: CheckCircle2,
+      filterKey: 'validated',
+    },
+    {
+      key: 'amount',
+      label: 'Monto total del período',
+      value: fmtAmount(totalAmount),
+      delta: `${total} operaciones`,
+      deltaTone: 'neutral',
+      icon: DollarSign,
+      filterKey: null,
+    },
+    {
+      key: 'duplicate',
+      label: 'Posibles duplicados',
+      value: fmtNum(duplicateCount),
+      delta: duplicateCount > 0 ? 'revisar antes de validar' : 'sin coincidencias',
+      deltaTone: duplicateTone,
+      icon: AlertTriangle,
+      filterKey: null,
+    },
+  ];
+
+  if (isLoading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {[0, 1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-24 rounded-xl bg-gray-200 animate-pulse" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="h-28 rounded-xl bg-white border border-slate-200 animate-pulse" />
         ))}
       </div>
     );
   }
 
-  const total = stats.total ?? 0;
-  const totalAmount = stats.total_amount ?? 0;
-  // backend returns by_status as Record<string, number>, e.g. { pending: 100, validated: 80 }
-  const byStatus = stats.by_status ?? {};
-  const get = (s: string) => byStatus[s] ?? 0;
-
-  const fmt = (n: number) => n.toLocaleString('es-PE');
-  const fmtAmount = (n: number) =>
-    'S/ ' + n.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-  const cards: CardConfig[] = [
-    { key: 'all',          label: 'Total del periodo', value: fmt(total),          icon: Bell,          bg: 'bg-white',     fg: 'text-gray-800',   ring: 'ring-gray-200',   clickable: true },
-    { key: 'amount',       label: 'Monto total',       value: fmtAmount(totalAmount), icon: DollarSign,  bg: 'bg-emerald-50', fg: 'text-emerald-800', ring: 'ring-emerald-200', clickable: false },
-    { key: 'pending',      label: 'Pendientes',        value: fmt(get('pending')),    icon: Clock,        bg: 'bg-yellow-50',  fg: 'text-yellow-800', ring: 'ring-yellow-200', clickable: true },
-    { key: 'validated',    label: 'Validadas',         value: fmt(get('validated')),  icon: CheckCircle,  bg: 'bg-green-50',   fg: 'text-green-800',  ring: 'ring-green-200',  clickable: true },
-    { key: 'inconsistent', label: 'Inconsistentes',    value: fmt(get('inconsistent')), icon: AlertTriangle, bg: 'bg-red-50',  fg: 'text-red-800',    ring: 'ring-red-200',    clickable: true },
-  ];
-
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map((card) => {
-        const isFilterCard = card.clickable !== false;
-        const isActive = isFilterCard && activeFilter === card.key;
         const Icon = card.icon;
-        const baseClass = `text-left rounded-xl ${card.bg} p-4 ring-1 ring-inset ${card.ring} transition-all`;
-        const interactClass = isFilterCard
-          ? `cursor-pointer hover:shadow-sm ${isActive ? 'ring-2 ring-offset-2 ring-accent-300' : ''}`
+        const isActive = card.filterKey != null && activeFilter === card.filterKey;
+        const isClickable = card.filterKey != null;
+
+        const baseClass =
+          'group text-left rounded-xl bg-white border p-5 transition-all relative overflow-hidden';
+        const borderClass = card.emphasize
+          ? 'border-amber-300'
+          : isActive
+          ? 'border-cta-600'
+          : 'border-slate-200';
+        const interactClass = isClickable
+          ? 'cursor-pointer hover:border-slate-300 hover:shadow-sm'
           : 'cursor-default';
+
+        const deltaColor =
+          card.deltaTone === 'good'
+            ? 'text-emerald-700'
+            : card.deltaTone === 'warn'
+            ? 'text-amber-700'
+            : 'text-slate-500';
+
         return (
           <button
             key={card.key}
             type="button"
+            disabled={!isClickable}
             onClick={() => {
-              if (isFilterCard && card.key !== 'amount') {
-                onFilterChange(card.key as Props['activeFilter']);
-              }
+              if (card.filterKey) onFilterChange(card.filterKey);
             }}
-            disabled={!isFilterCard}
-            className={`${baseClass} ${interactClass}`}
+            className={`${baseClass} ${borderClass} ${interactClass}`}
           >
-            <div className="flex items-center justify-between mb-1">
-              <Icon className={`h-4 w-4 ${card.fg}`} />
+            {card.emphasize && (
+              <span className="absolute top-0 left-0 right-0 h-0.5 bg-amber-400" aria-hidden />
+            )}
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                {card.label}
+              </span>
+              <Icon className="h-4 w-4 text-slate-400" />
             </div>
-            <div className={`text-2xl font-bold ${card.fg} truncate`}>{card.value}</div>
-            <div className={`text-xs ${card.fg} opacity-80`}>{card.label}</div>
+            <div className="text-3xl font-bold text-slate-900 tracking-tight tabular-nums">
+              {card.value}
+            </div>
+            {card.delta && (
+              <div className={`mt-2 text-xs font-medium flex items-center gap-1 ${deltaColor}`}>
+                {card.deltaTone === 'good' && <ArrowUpRight className="h-3 w-3" />}
+                {card.delta}
+              </div>
+            )}
           </button>
         );
       })}

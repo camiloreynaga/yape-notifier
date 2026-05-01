@@ -80,16 +80,25 @@ export default function NotificationsPage() {
     staleTime: 30_000,
   });
 
-  // Client-side search by q across visible columns
+  // Client-side filtering: search query + amount range
   const filtered = useMemo(() => {
-    if (!debouncedQ) return notificationsArray;
-    const q = debouncedQ.toLowerCase();
-    return notificationsArray.filter((n) =>
-      [n.payer_name, n.security_code, String(n.amount), n.device?.alias, n.device?.name]
-        .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(q))
-    );
-  }, [notificationsArray, debouncedQ]);
+    let result = notificationsArray;
+    if (debouncedQ) {
+      const q = debouncedQ.toLowerCase();
+      result = result.filter((n) =>
+        [n.payer_name, n.security_code, String(n.amount), n.device?.alias, n.device?.name]
+          .filter(Boolean)
+          .some((v) => String(v).toLowerCase().includes(q))
+      );
+    }
+    if (toolbar.min_amount != null) {
+      result = result.filter((n) => Number(n.amount ?? 0) >= toolbar.min_amount!);
+    }
+    if (toolbar.max_amount != null) {
+      result = result.filter((n) => Number(n.amount ?? 0) <= toolbar.max_amount!);
+    }
+    return result;
+  }, [notificationsArray, debouncedQ, toolbar.min_amount, toolbar.max_amount]);
 
   // Validate / mark inconsistent / revert mutations
   const validate = useValidateNotification();
@@ -138,25 +147,44 @@ export default function NotificationsPage() {
     }
   };
 
+  // Counts for status chip badges (from stats so they reflect period totals)
+  const pendingChipCount = stats?.by_status?.pending ?? 0;
+  const validatedChipCount = stats?.by_status?.validated ?? 0;
+
   return (
-    <div className="space-y-6" onBlur={updateUrl}>
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Notificaciones</h1>
-        <p className="text-sm text-gray-600">Visualiza y valida las notificaciones recibidas.</p>
+    <div className="space-y-5" onBlur={updateUrl}>
+      <div className="flex items-end justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Centro de Validación</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            {filtered.length > 0
+              ? `${filtered.length} operacion${filtered.length === 1 ? '' : 'es'} en el período seleccionado`
+              : 'Sin operaciones en el período seleccionado'}
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          Conexión en tiempo real
+        </div>
       </div>
 
       <NotificationsKpis
         stats={stats}
+        notificationsForDuplicates={filtered}
         activeFilter={statusFilter}
         onFilterChange={setStatusFilter}
       />
 
       <NotificationsToolbar
         filters={toolbar}
+        status={statusFilter}
         onChange={(next) => { setToolbar(next); updateUrl(); }}
+        onStatusChange={setStatusFilter}
         onRefresh={() => refetch()}
         onExport={onExport}
         exporting={exporting}
+        pendingCount={pendingChipCount}
+        validatedCount={validatedChipCount}
       />
 
       <InstancesBreakdown start_date={range.start_date} end_date={range.end_date} />
