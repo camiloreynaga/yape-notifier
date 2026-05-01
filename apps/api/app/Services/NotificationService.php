@@ -263,13 +263,21 @@ class NotificationService
             $query->whereIn('app_instance_id', $instanceIds);
         }
 
-        // Filter by date range
+        // Filter by date range. Accept both 'YYYY-MM-DD' and full datetime.
         if (isset($filters['start_date'])) {
-            $query->where('received_at', '>=', $filters['start_date']);
+            $startDate = $filters['start_date'];
+            if (strlen($startDate) <= 10) {
+                $startDate .= ' 00:00:00';
+            }
+            $query->where('received_at', '>=', $startDate);
         }
 
         if (isset($filters['end_date'])) {
-            $query->where('received_at', '<=', $filters['end_date']);
+            $endDate = $filters['end_date'];
+            if (strlen($endDate) <= 10) {
+                $endDate .= ' 23:59:59';
+            }
+            $query->where('received_at', '<=', $endDate);
         }
 
         // Filter by status
@@ -302,13 +310,24 @@ class NotificationService
             $baseQuery = Notification::where('notifications.user_id', $user->id);
         }
 
-        // Apply date filters
+        // Apply date filters. The frontend may send either:
+        //   - 'YYYY-MM-DD' (date only) — we extend to start/end of day
+        //   - 'YYYY-MM-DD HH:MM:SS' (already includes time) — we use as-is
+        // Both are interpreted as UTC by PostgreSQL.
         if (isset($filters['start_date'])) {
-            $baseQuery->where('notifications.received_at', '>=', $filters['start_date']);
+            $startDate = $filters['start_date'];
+            if (strlen($startDate) <= 10) {
+                $startDate .= ' 00:00:00';
+            }
+            $baseQuery->where('notifications.received_at', '>=', $startDate);
         }
 
         if (isset($filters['end_date'])) {
-            $baseQuery->where('notifications.received_at', '<=', $filters['end_date'].' 23:59:59');
+            $endDate = $filters['end_date'];
+            if (strlen($endDate) <= 10) {
+                $endDate .= ' 23:59:59';
+            }
+            $baseQuery->where('notifications.received_at', '<=', $endDate);
         }
 
         // Total statistics (excluding duplicates)
