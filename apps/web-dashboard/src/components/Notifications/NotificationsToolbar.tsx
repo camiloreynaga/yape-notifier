@@ -231,42 +231,45 @@ export default function NotificationsToolbar({
 }
 
 // Helper for parent to convert Period → start_date/end_date timestamps.
-// Returns full datetime strings (YYYY-MM-DD HH:MM:SS) so backend SQL comparisons
-// include the entire end day. Using YYYY-MM-DD only breaks because PostgreSQL
-// interprets it as 00:00:00, excluding rows from the end day's afternoon.
+//
+// IMPORTANT: returns ISO 8601 UTC strings (with the trailing Z), not local
+// "YYYY-MM-DD HH:MM:SS". This is because the backend stores created_at in UTC,
+// and PostgreSQL interprets a naive string like "2026-04-30 23:59:59" as UTC.
+// In a user located at UTC-5 (Peru) that means everything after local 18:59:59
+// gets filtered out — exactly the bug we hit.
+//
+// By sending ISO 8601 UTC, the comparison is timezone-correct: local-end-of-day
+// becomes the right UTC instant, so notifications received in the local evening
+// remain in range.
 export function periodToRange(period: Period): { start_date?: string; end_date?: string } {
   const today = new Date();
-  // Format as 'YYYY-MM-DD HH:MM:SS' in local time (backend stores in same TZ)
-  const fmt = (d: Date) => {
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  };
   const startOfDay = (d: Date) => { d.setHours(0, 0, 0, 0); return d; };
   const endOfDay = (d: Date) => { d.setHours(23, 59, 59, 999); return d; };
+  const iso = (d: Date) => d.toISOString();
 
   switch (period) {
     case 'today':
-      return { start_date: fmt(startOfDay(new Date(today))), end_date: fmt(endOfDay(new Date(today))) };
+      return { start_date: iso(startOfDay(new Date(today))), end_date: iso(endOfDay(new Date(today))) };
     case 'yesterday': {
       const y = new Date(today); y.setDate(y.getDate() - 1);
-      return { start_date: fmt(startOfDay(new Date(y))), end_date: fmt(endOfDay(new Date(y))) };
+      return { start_date: iso(startOfDay(new Date(y))), end_date: iso(endOfDay(new Date(y))) };
     }
     case 'last7': {
       const s = new Date(today); s.setDate(s.getDate() - 6);
-      return { start_date: fmt(startOfDay(s)), end_date: fmt(endOfDay(new Date(today))) };
+      return { start_date: iso(startOfDay(s)), end_date: iso(endOfDay(new Date(today))) };
     }
     case 'last30': {
       const s = new Date(today); s.setDate(s.getDate() - 29);
-      return { start_date: fmt(startOfDay(s)), end_date: fmt(endOfDay(new Date(today))) };
+      return { start_date: iso(startOfDay(s)), end_date: iso(endOfDay(new Date(today))) };
     }
     case 'thisMonth': {
       const s = new Date(today.getFullYear(), today.getMonth(), 1);
-      return { start_date: fmt(startOfDay(s)), end_date: fmt(endOfDay(new Date(today))) };
+      return { start_date: iso(startOfDay(s)), end_date: iso(endOfDay(new Date(today))) };
     }
     case 'lastMonth': {
       const s = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       const e = new Date(today.getFullYear(), today.getMonth(), 0);
-      return { start_date: fmt(startOfDay(s)), end_date: fmt(endOfDay(e)) };
+      return { start_date: iso(startOfDay(s)), end_date: iso(endOfDay(e)) };
     }
     default:
       return {};
