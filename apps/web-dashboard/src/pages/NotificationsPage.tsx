@@ -49,16 +49,25 @@ export default function NotificationsPage() {
     end_date: range.end_date,
   }), [statusFilter, toolbar.instance_ids, toolbar.device_ids, range]);
 
-  // Sync URL with state
+  // Sync URL with state. Preserve existing query params (especially `tab`)
+  // so the dashboard tab nav doesn't lose its current selection.
   const updateUrl = useCallback(() => {
-    const next = new URLSearchParams();
-    if (toolbar.q) next.set('q', toolbar.q);
-    if (toolbar.instance_ids[0]) next.set('instance', String(toolbar.instance_ids[0]));
-    if (toolbar.device_ids[0]) next.set('device', String(toolbar.device_ids[0]));
-    if (toolbar.period !== 'last7') next.set('period', toolbar.period);
-    if (statusFilter !== 'all') next.set('status', statusFilter);
+    const next = new URLSearchParams(searchParams);
+
+    // Filter params we own — set or delete based on current state
+    const setOrDelete = (key: string, value: string | null) => {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    };
+
+    setOrDelete('q', toolbar.q || null);
+    setOrDelete('instance', toolbar.instance_ids[0] ? String(toolbar.instance_ids[0]) : null);
+    setOrDelete('device', toolbar.device_ids[0] ? String(toolbar.device_ids[0]) : null);
+    setOrDelete('period', toolbar.period !== 'last7' ? toolbar.period : null);
+    setOrDelete('status', statusFilter !== 'all' ? statusFilter : null);
+
     setSearchParams(next, { replace: true });
-  }, [toolbar, statusFilter, setSearchParams]);
+  }, [toolbar, statusFilter, searchParams, setSearchParams]);
 
   // Notifications data via existing hook
   // useNotifications returns { notifications: PaginatedResponse<Notification> | null, loading, refetch }

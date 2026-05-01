@@ -232,44 +232,47 @@ export default function NotificationsToolbar({
 
 // Helper for parent to convert Period → start_date/end_date timestamps.
 //
-// IMPORTANT: returns ISO 8601 UTC strings (with the trailing Z), not local
-// "YYYY-MM-DD HH:MM:SS". This is because the backend stores created_at in UTC,
-// and PostgreSQL interprets a naive string like "2026-04-30 23:59:59" as UTC.
-// In a user located at UTC-5 (Peru) that means everything after local 18:59:59
-// gets filtered out — exactly the bug we hit.
-//
-// By sending ISO 8601 UTC, the comparison is timezone-correct: local-end-of-day
-// becomes the right UTC instant, so notifications received in the local evening
-// remain in range.
+// Returns 'YYYY-MM-DD HH:MM:SS' strings in UTC. The backend stores created_at
+// in UTC and PostgreSQL parses naive datetime strings as UTC, so we need:
+//   - End instant: local end-of-day → its UTC equivalent
+//   - Same for start instant
+// Sending ISO 8601 with 'Z' breaks the statistics endpoint (500), so this
+// format is the safest middle ground: clean string, correct UTC instant.
 export function periodToRange(period: Period): { start_date?: string; end_date?: string } {
   const today = new Date();
   const startOfDay = (d: Date) => { d.setHours(0, 0, 0, 0); return d; };
   const endOfDay = (d: Date) => { d.setHours(23, 59, 59, 999); return d; };
-  const iso = (d: Date) => d.toISOString();
+
+  // Convert a Date (which is an instant) to its UTC wall-clock string
+  const fmtUtc = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ` +
+      `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+  };
 
   switch (period) {
     case 'today':
-      return { start_date: iso(startOfDay(new Date(today))), end_date: iso(endOfDay(new Date(today))) };
+      return { start_date: fmtUtc(startOfDay(new Date(today))), end_date: fmtUtc(endOfDay(new Date(today))) };
     case 'yesterday': {
       const y = new Date(today); y.setDate(y.getDate() - 1);
-      return { start_date: iso(startOfDay(new Date(y))), end_date: iso(endOfDay(new Date(y))) };
+      return { start_date: fmtUtc(startOfDay(new Date(y))), end_date: fmtUtc(endOfDay(new Date(y))) };
     }
     case 'last7': {
       const s = new Date(today); s.setDate(s.getDate() - 6);
-      return { start_date: iso(startOfDay(s)), end_date: iso(endOfDay(new Date(today))) };
+      return { start_date: fmtUtc(startOfDay(s)), end_date: fmtUtc(endOfDay(new Date(today))) };
     }
     case 'last30': {
       const s = new Date(today); s.setDate(s.getDate() - 29);
-      return { start_date: iso(startOfDay(s)), end_date: iso(endOfDay(new Date(today))) };
+      return { start_date: fmtUtc(startOfDay(s)), end_date: fmtUtc(endOfDay(new Date(today))) };
     }
     case 'thisMonth': {
       const s = new Date(today.getFullYear(), today.getMonth(), 1);
-      return { start_date: iso(startOfDay(s)), end_date: iso(endOfDay(new Date(today))) };
+      return { start_date: fmtUtc(startOfDay(s)), end_date: fmtUtc(endOfDay(new Date(today))) };
     }
     case 'lastMonth': {
       const s = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       const e = new Date(today.getFullYear(), today.getMonth(), 0);
-      return { start_date: iso(startOfDay(s)), end_date: iso(endOfDay(e)) };
+      return { start_date: fmtUtc(startOfDay(s)), end_date: fmtUtc(endOfDay(e)) };
     }
     default:
       return {};
