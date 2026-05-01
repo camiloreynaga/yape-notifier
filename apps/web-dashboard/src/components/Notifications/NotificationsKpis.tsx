@@ -70,7 +70,7 @@ export default function NotificationsKpis({
   const cards: CardConfig[] = [
     {
       key: 'pending',
-      label: 'Pendientes',
+      label: 'Pendientes hoy',
       value: fmtNum(pendingCount),
       delta: pendingCount > 0 ? 'requieren validación' : 'al día',
       deltaTone: pendingTone,
@@ -80,18 +80,18 @@ export default function NotificationsKpis({
     },
     {
       key: 'validated',
-      label: 'Validadas en el período',
+      label: 'Validadas hoy',
       value: fmtNum(validatedCount),
-      delta: total > 0 ? `${Math.round((validatedCount / total) * 100)}% del total` : '0% del total',
+      delta: total > 0 ? `${Math.round((validatedCount / total) * 100)}% del total del día` : '0% del total',
       deltaTone: 'neutral',
       icon: CheckCircle2,
       filterKey: 'validated',
     },
     {
       key: 'amount',
-      label: 'Monto total del período',
+      label: 'Monto total de hoy',
       value: fmtAmount(totalAmount),
-      delta: `${total} operaciones`,
+      delta: `${total} operacion${total === 1 ? '' : 'es'} del día`,
       deltaTone: 'neutral',
       icon: DollarSign,
       filterKey: null,

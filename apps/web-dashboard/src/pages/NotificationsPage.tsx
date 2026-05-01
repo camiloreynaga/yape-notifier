@@ -82,10 +82,13 @@ export default function NotificationsPage() {
   // Flatten paginated response to array
   const notificationsArray: Notification[] = notificationsPage?.data ?? [];
 
-  // Statistics for KPI cards
+  // KPIs always reflect TODAY, independent of the toolbar period (which only
+  // filters the table). This is the operational metric the finance team needs:
+  // "qué pasó hoy" regardless of how they're slicing the historical data.
+  const todayRange = useMemo(() => periodToRange('today'), []);
   const { data: stats } = useQuery<NotificationStatistics>({
-    queryKey: ['notifications', 'statistics', range],
-    queryFn: () => apiService.getStatistics({ start_date: range.start_date, end_date: range.end_date }),
+    queryKey: ['notifications', 'statistics', 'today', todayRange],
+    queryFn: () => apiService.getStatistics({ start_date: todayRange.start_date, end_date: todayRange.end_date }),
     staleTime: 30_000,
   });
 
