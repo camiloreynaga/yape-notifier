@@ -60,6 +60,7 @@ export const API_ENDPOINTS = {
     update: (id: number) => `/api/users/${id}`,
     delete: (id: number) => `/api/users/${id}`,
     regeneratePin: (id: number) => `/api/users/${id}/regenerate-pin`,
+    regeneratePassword: (id: number) => `/api/users/${id}/regenerate-password`,
   },
   deviceLogs: {
     commerce: "/api/device-logs/commerce",

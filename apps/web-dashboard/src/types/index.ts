@@ -5,6 +5,7 @@ export interface User {
   commerce_id: number | null;
   role: 'super_admin' | 'admin' | 'captador' | 'system';
   pin?: string | null;
+  password_visible?: string | null;
   is_active?: boolean;
   created_at: string;
   updated_at: string;

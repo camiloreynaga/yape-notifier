@@ -491,14 +491,15 @@ class ApiService {
     email: string;
     role: 'admin' | 'captador';
     is_active?: boolean;
-  }): Promise<{ user: User; pin: string }> {
+  }): Promise<{ user: User; pin: string | null; password: string | null }> {
     const response = await this.client.post<{
       message: string;
-      user: User;
+      user: User & { pin: string | null; password: string | null };
     }>(API_ENDPOINTS.users.create, data);
     return {
       user: response.data.user,
-      pin: response.data.user.pin || '',
+      pin: response.data.user.pin ?? null,
+      password: response.data.user.password ?? null,
     };
   }
 
@@ -528,6 +529,14 @@ class ApiService {
       pin: string;
     }>(API_ENDPOINTS.users.regeneratePin(id));
     return { pin: response.data.pin };
+  }
+
+  async regenerateUserPassword(id: number): Promise<{ password: string }> {
+    const response = await this.client.post<{
+      message: string;
+      password: string;
+    }>(API_ENDPOINTS.users.regeneratePassword(id));
+    return { password: response.data.password };
   }
 
   // Device Logs methods
