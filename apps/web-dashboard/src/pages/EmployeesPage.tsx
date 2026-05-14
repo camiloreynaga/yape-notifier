@@ -3,7 +3,7 @@ import { apiService } from '@/services/api';
 import type { User } from '@/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Plus, Edit, Trash2, Power, PowerOff, User as UserIcon, Key, Copy, Check } from 'lucide-react';
+import { Plus, Edit, Trash2, Power, PowerOff, User as UserIcon, Key, Copy, Check, Eye, EyeOff, RefreshCw } from 'lucide-react';
 
 export default function EmployeesPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -19,6 +19,9 @@ export default function EmployeesPage() {
   const [generatedPin, setGeneratedPin] = useState<string | null>(null);
   const [copiedPin, setCopiedPin] = useState(false);
   const [error, setError] = useState('');
+  const [revealedPasswords, setRevealedPasswords] = useState<Record<number, boolean>>({});
+  const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
+  const [copiedPassword, setCopiedPassword] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -46,6 +49,7 @@ export default function EmployeesPage() {
       is_active: true,
     });
     setGeneratedPin(null);
+    setGeneratedPassword(null);
     setError('');
     setShowModal(true);
   };
@@ -59,6 +63,7 @@ export default function EmployeesPage() {
       is_active: user.is_active ?? true,
     });
     setGeneratedPin(null);
+    setGeneratedPassword(null);
     setError('');
     setShowModal(true);
   };
@@ -73,9 +78,10 @@ export default function EmployeesPage() {
       } else {
         const result = await apiService.createUser(formData);
         setGeneratedPin(result.pin);
+        setGeneratedPassword(result.password);
       }
-      // No cerrar modal si se generó PIN (para que el admin lo vea)
-      if (editingUser || !generatedPin) {
+      // Keep the modal open if a credential was generated so the admin can copy it
+      if (editingUser || (!generatedPin && !generatedPassword)) {
         setShowModal(false);
       }
       loadUsers();
@@ -139,6 +145,35 @@ export default function EmployeesPage() {
     }
   };
 
+  const handleRegeneratePassword = async (user: User) => {
+    if (!confirm(`¿Regenerar contraseña para ${user.name}? La contraseña actual dejará de funcionar.`)) {
+      return;
+    }
+    try {
+      const result = await apiService.regenerateUserPassword(user.id);
+      setGeneratedPassword(result.password);
+      setGeneratedPin(null);
+      setShowModal(true);
+      setEditingUser(user);
+      loadUsers();
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      alert(err.response?.data?.message || 'Error al regenerar contraseña');
+    }
+  };
+
+  const copyPasswordToClipboard = () => {
+    if (generatedPassword) {
+      navigator.clipboard.writeText(generatedPassword);
+      setCopiedPassword(true);
+      setTimeout(() => setCopiedPassword(false), 2000);
+    }
+  };
+
+  const togglePasswordReveal = (userId: number) => {
+    setRevealedPasswords((prev) => ({ ...prev, [userId]: !prev[userId] }));
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -183,6 +218,9 @@ export default function EmployeesPage() {
                 PIN
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Contraseña
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Estado
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -196,7 +234,7 @@ export default function EmployeesPage() {
           <tbody className="bg-white divide-y divide-gray-200">
             {users.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
                   No hay empleados registrados
                 </td>
               </tr>
@@ -237,6 +275,49 @@ export default function EmployeesPage() {
                       </div>
                     ) : (
                       <span className="text-sm text-gray-400">Sin PIN</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {user.role === 'admin' ? (
+                      user.password_visible ? (
+                        <div className="flex items-center gap-2">
+                          <code className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
+                            {revealedPasswords[user.id] ? user.password_visible : '••••••••'}
+                          </code>
+                          <button
+                            onClick={() => togglePasswordReveal(user.id)}
+                            className="text-gray-500 hover:text-gray-800"
+                            title={revealedPasswords[user.id] ? 'Ocultar' : 'Ver contraseña'}
+                          >
+                            {revealedPasswords[user.id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(user.password_visible!);
+                            }}
+                            className="text-gray-500 hover:text-gray-800"
+                            title="Copiar contraseña"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleRegeneratePassword(user)}
+                            className="text-primary-600 hover:text-primary-800"
+                            title="Regenerar contraseña"
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleRegeneratePassword(user)}
+                          className="text-sm text-primary-600 hover:text-primary-800 underline"
+                        >
+                          Generar contraseña
+                        </button>
+                      )
+                    ) : (
+                      <span className="text-sm text-gray-400">—</span>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -325,6 +406,29 @@ export default function EmployeesPage() {
                 </div>
               )}
 
+              {generatedPassword && (
+                <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-sm font-medium text-green-800 mb-2">
+                    Contraseña generada:
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <code className="text-xl font-mono font-bold text-green-900 bg-white px-4 py-2 rounded border-2 border-green-300">
+                      {generatedPassword}
+                    </code>
+                    <button
+                      onClick={copyPasswordToClipboard}
+                      className="p-2 text-green-700 hover:bg-green-100 rounded"
+                      title="Copiar contraseña"
+                    >
+                      {copiedPassword ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-green-700 mt-2">
+                    Guarda esta contraseña. El administrador la necesitará para iniciar sesión en el dashboard web.
+                  </p>
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
@@ -390,12 +494,13 @@ export default function EmployeesPage() {
                     onClick={() => {
                       setShowModal(false);
                       setGeneratedPin(null);
+                      setGeneratedPassword(null);
                     }}
                     className="btn btn-secondary"
                   >
-                    {generatedPin ? 'Cerrar' : 'Cancelar'}
+                    {(generatedPin || generatedPassword) ? 'Cerrar' : 'Cancelar'}
                   </button>
-                  {!generatedPin && (
+                  {!generatedPin && !generatedPassword && (
                     <button type="submit" className="btn btn-primary">
                       {editingUser ? 'Actualizar' : 'Crear'}
                     </button>
