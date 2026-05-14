@@ -213,6 +213,12 @@ class UserController extends Controller
                 ], 403);
             }
 
+            if ($user->role !== 'captador') {
+                return response()->json([
+                    'message' => 'Los administradores usan contraseña, no PIN.',
+                ], 400);
+            }
+
             // Generar nuevo PIN único
             $newPin = User::generateUniquePin(4);
             $user->pin = $newPin;
@@ -241,8 +247,64 @@ class UserController extends Controller
     }
 
     /**
+     * Regenerate the visible password for an admin employee.
+     *
+     * POST /api/users/{id}/regenerate-password
+     */
+    public function regeneratePassword(Request $request, int $id): JsonResponse
+    {
+        try {
+            $adminUser = $request->user();
+            $user = User::findOrFail($id);
+
+            if ($user->commerce_id !== $adminUser->commerce_id && ! $adminUser->isSuperAdmin()) {
+                return response()->json([
+                    'message' => 'No tienes permiso para regenerar la contraseña de este usuario',
+                ], 403);
+            }
+
+            if ($user->email === 'system@yapenotifier.internal') {
+                return response()->json([
+                    'message' => 'No se puede regenerar la contraseña del usuario del sistema',
+                ], 403);
+            }
+
+            if ($user->role !== 'admin') {
+                return response()->json([
+                    'message' => 'Los captadores usan PIN, no contraseña.',
+                ], 400);
+            }
+
+            $plainPassword = Str::random(12);
+            $user->password = Hash::make($plainPassword);
+            $user->password_visible = Crypt::encryptString($plainPassword);
+            $user->save();
+
+            Log::info('Password regenerated', [
+                'user_id' => $user->id,
+                'regenerated_by' => $adminUser->id,
+            ]);
+
+            return response()->json([
+                'message' => 'Contraseña regenerada exitosamente',
+                'password' => $plainPassword,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to regenerate password', [
+                'user_id' => $id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Error al regenerar contraseña.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
+        }
+    }
+
+    /**
      * Delete an employee user.
-     * 
+     *
      * DELETE /api/users/{id}
      */
     public function destroy(Request $request, int $id): JsonResponse

@@ -66,4 +66,50 @@ class EmployeeCredentialsTest extends TestCase
         $this->assertEquals($plain, Crypt::decryptString($user->password_visible));
         $this->assertTrue(Hash::check($plain, $user->password));
     }
+
+    public function test_regenerate_password_for_admin_returns_new_usable_password(): void
+    {
+        [$owner, $commerce] = $this->actingAdmin();
+        $employee = User::factory()->create([
+            'role' => 'admin',
+            'commerce_id' => $commerce->id,
+            'pin' => null,
+        ]);
+
+        $response = $this->postJson("/api/users/{$employee->id}/regenerate-password");
+
+        $response->assertOk();
+        $plain = $response->json('password');
+        $this->assertNotEmpty($plain);
+
+        $employee->refresh();
+        $this->assertTrue(Hash::check($plain, $employee->password));
+        $this->assertEquals($plain, Crypt::decryptString($employee->password_visible));
+    }
+
+    public function test_regenerate_password_for_captador_is_rejected(): void
+    {
+        [$owner, $commerce] = $this->actingAdmin();
+        $captador = User::factory()->create([
+            'role' => 'captador',
+            'commerce_id' => $commerce->id,
+            'pin' => '1111',
+        ]);
+
+        $this->postJson("/api/users/{$captador->id}/regenerate-password")
+            ->assertStatus(400);
+    }
+
+    public function test_regenerate_pin_for_admin_is_rejected(): void
+    {
+        [$owner, $commerce] = $this->actingAdmin();
+        $employee = User::factory()->create([
+            'role' => 'admin',
+            'commerce_id' => $commerce->id,
+            'pin' => null,
+        ]);
+
+        $this->postJson("/api/users/{$employee->id}/regenerate-pin")
+            ->assertStatus(400);
+    }
 }
