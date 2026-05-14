@@ -29,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'verified'         => \App\Http\Middleware\EnsureEmailIsVerified::class,
             'super_admin'      => \App\Http\Middleware\RequireSuperAdmin::class,
             'commerce.active'  => \App\Http\Middleware\EnsureCommerceActive::class,
+            'require_admin'    => \App\Http\Middleware\RequireAdmin::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
