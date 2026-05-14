@@ -8,18 +8,22 @@ import type { ApiError } from '@/types';
 
 export default function CreateCommercePage() {
   const navigate = useNavigate();
-  const { checkCommerce, hasCommerce } = useAuth();
+  const { checkCommerce, hasCommerce, commerce } = useAuth();
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  // Redirigir si ya tiene commerce
+  // Si ya tiene commerce: activo → dashboard; pendiente/suspendido → pantalla de estado.
+  // Esto evita que un usuario con comercio pendiente quede atascado re-creando.
   useEffect(() => {
-    if (hasCommerce) {
+    if (!hasCommerce) return;
+    if (commerce && commerce.status === 'active') {
       navigate('/dashboard', { replace: true });
+    } else {
+      navigate('/commerce-status', { replace: true });
     }
-  }, [hasCommerce, navigate]);
+  }, [hasCommerce, commerce, navigate]);
 
   const validateName = (value: string): string | null => {
     const trimmed = value.trim();
@@ -63,10 +67,11 @@ export default function CreateCommercePage() {
 
     try {
       await apiService.createCommerce(name.trim());
-      // Actualizar el estado de commerce en AuthContext
+      // Refresca el estado en AuthContext. El comercio nace en 'pending',
+      // así que mandamos a la pantalla de estado, no al dashboard
+      // (el dashboard rebotaría igual por el middleware commerce.active).
       await checkCommerce();
-      // Redirigir al dashboard
-      navigate('/dashboard', { replace: true });
+      navigate('/commerce-status', { replace: true });
     } catch (err: unknown) {
       const axiosError = err as AxiosError<ApiError>;
       let errorMessage = 'Error al crear comercio';

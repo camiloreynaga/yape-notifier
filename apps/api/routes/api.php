@@ -36,6 +36,15 @@ Route::get('/settings/monitored-packages', [MonitorPackageController::class, 'ge
 // Public device link code validation endpoint
 Route::get('/devices/link-code/{code}', [DeviceLinkController::class, 'validateLinkCode']);
 
+// Self-service commerce endpoints — only auth, NOT commerce.active.
+// A user with a pending/suspended commerce must still be able to read their
+// own commerce status, otherwise they get bounced to /create-commerce forever.
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/commerces', [CommerceController::class, 'store']);
+    Route::get('/commerces/me', [CommerceController::class, 'show']);
+    Route::get('/commerces/check', [CommerceController::class, 'check']);
+});
+
 // Protected routes (auth + commerce must be active)
 Route::middleware(['auth:sanctum', 'commerce.active'])->group(function () {
     // Auth routes
@@ -70,11 +79,6 @@ Route::middleware(['auth:sanctum', 'commerce.active'])->group(function () {
     Route::get('/app-instances', [AppInstanceController::class, 'index']);
     Route::get('/devices/{deviceId}/app-instances', [AppInstanceController::class, 'getDeviceInstances']);
     Route::patch('/app-instances/{id}/label', [AppInstanceController::class, 'updateLabel']);
-
-    // Commerce routes
-    Route::post('/commerces', [CommerceController::class, 'store']);
-    Route::get('/commerces/me', [CommerceController::class, 'show']);
-    Route::get('/commerces/check', [CommerceController::class, 'check']);
 
     // Employee management — only admins / super admins
     Route::middleware('require_admin')->group(function () {

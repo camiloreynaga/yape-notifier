@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { apiService } from '@/services/api';
 import { updateAuthToken } from '@/services/echo';
-import type { User } from '@/types';
+import type { User, Commerce } from '@/types';
 
 interface AuthContextType {
   user: User | null;
@@ -12,6 +12,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   hasCommerce: boolean;
+  /** Full commerce of the current user (null if none). Exposes `status`. */
+  commerce: Commerce | null;
   checkCommerce: () => Promise<boolean>;
 }
 
@@ -35,29 +37,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasCommerce, setHasCommerce] = useState(false);
+  const [commerce, setCommerce] = useState<Commerce | null>(null);
 
   /**
-   * Verifica si el usuario tiene un commerce asociado
+   * Verifica si el usuario tiene un commerce asociado.
+   * Guarda el objeto completo (incluye `status`) para que la app pueda
+   * distinguir pending / active / suspended.
    */
   const checkCommerce = useCallback(async (): Promise<boolean> => {
     try {
-      const commerce = await apiService.checkCommerce();
-      const hasCommerceValue = !!commerce;
+      const result = await apiService.checkCommerce();
+      const hasCommerceValue = !!result;
       setHasCommerce(hasCommerceValue);
-      
+      setCommerce(result ?? null);
+
       // Actualizar el usuario con el commerce_id si existe
-      if (commerce) {
+      if (result) {
         setUser((prevUser) => {
           if (prevUser) {
-            return { ...prevUser, commerce_id: commerce.id };
+            return { ...prevUser, commerce_id: result.id };
           }
           return prevUser;
         });
       }
-      
+
       return hasCommerceValue;
     } catch (error) {
       setHasCommerce(false);
+      setCommerce(null);
       return false;
     }
   }, []);
@@ -85,6 +92,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setToken(null);
           setUser(null);
           setHasCommerce(false);
+          setCommerce(null);
         })
         .finally(() => {
           setLoading(false);
@@ -131,6 +139,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setToken(null);
       setUser(null);
       setHasCommerce(false);
+      setCommerce(null);
       localStorage.removeItem('auth_token');
       localStorage.removeItem('user');
     }
@@ -145,6 +154,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
     isAuthenticated: !!token && !!user,
     hasCommerce,
+    commerce,
     checkCommerce,
   };
 

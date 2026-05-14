@@ -78,6 +78,7 @@ export interface Commerce {
   id: number;
   name: string;
   owner_user_id: number;
+  status: 'pending' | 'active' | 'suspended';
   created_at: string;
   updated_at: string;
 }

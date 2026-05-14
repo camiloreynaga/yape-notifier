@@ -18,6 +18,7 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const AddDevicePage = lazy(() => import('./pages/AddDevicePage'));
 const AppInstancesPage = lazy(() => import('./pages/AppInstancesPage'));
 const CreateCommercePage = lazy(() => import('./pages/CreateCommercePage'));
+const CommerceStatusPage = lazy(() => import('./pages/CommerceStatusPage'));
 const SuperAdminPage = lazy(() => import('./pages/SuperAdminPage'));
 const SuperAdminCommercesTab = lazy(() => import('./pages/SuperAdminCommercesTab'));
 const SuperAdminPlansTab = lazy(() => import('./pages/SuperAdminPlansTab'));
@@ -39,7 +40,7 @@ interface PrivateRouteProps {
 }
 
 function PrivateRoute({ children, requireCommerce = false }: PrivateRouteProps) {
-  const { isAuthenticated, loading, hasCommerce, user } = useAuth();
+  const { isAuthenticated, loading, hasCommerce, commerce, user } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -62,10 +63,21 @@ function PrivateRoute({ children, requireCommerce = false }: PrivateRouteProps) 
     return <Navigate to="/super-admin" replace />;
   }
 
-  // Si requiere commerce y no lo tiene, redirigir a crear commerce
-  // Excepto si ya esta en esa ruta
-  if (requireCommerce && !hasCommerce && location.pathname !== '/create-commerce') {
-    return <Navigate to="/create-commerce" replace />;
+  if (requireCommerce) {
+    // No commerce at all → create flow
+    if (!hasCommerce && location.pathname !== '/create-commerce') {
+      return <Navigate to="/create-commerce" replace />;
+    }
+    // Has a commerce but it's pending/suspended → status screen.
+    // This is the fix for users getting stuck re-creating a pending commerce.
+    if (
+      hasCommerce &&
+      commerce &&
+      commerce.status !== 'active' &&
+      location.pathname !== '/commerce-status'
+    ) {
+      return <Navigate to="/commerce-status" replace />;
+    }
   }
 
   return <>{children}</>;
@@ -102,6 +114,11 @@ function AppRoutes() {
         <Route path="/create-commerce" element={
           <PrivateRoute requireCommerce={false}>
             <CreateCommercePage />
+          </PrivateRoute>
+        } />
+        <Route path="/commerce-status" element={
+          <PrivateRoute requireCommerce={false}>
+            <CommerceStatusPage />
           </PrivateRoute>
         } />
         <Route path="/super-admin" element={
