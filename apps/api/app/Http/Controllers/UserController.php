@@ -7,8 +7,10 @@ use App\Http\Requests\User\UpdateUserRequest;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class UserController extends Controller
 {
@@ -66,22 +68,39 @@ class UserController extends Controller
                 ], 403);
             }
 
-            // Generar PIN único automáticamente
-            $pin = User::generateUniquePin(4);
+            $role = $request->role ?? 'captador';
 
-            // Crear usuario con PIN
+            // Each role gets one credential type:
+            //   captador → PIN (Android app)
+            //   admin    → password (web dashboard)
+            $pin = null;
+            $plainPassword = null;
+
+            if ($role === 'captador') {
+                $pin = User::generateUniquePin(4);
+                // captadores don't log in with a password — store a random one
+                $passwordHash = Hash::make(bin2hex(random_bytes(16)));
+                $passwordVisible = null;
+            } else { // admin
+                $plainPassword = Str::random(12);
+                $passwordHash = Hash::make($plainPassword);
+                $passwordVisible = Crypt::encryptString($plainPassword);
+            }
+
             $user = User::create([
                 'name' => $request->name,
                 'email' => $request->email,
-                'password' => Hash::make(bin2hex(random_bytes(16))), // Password aleatorio seguro
+                'password' => $passwordHash,
+                'password_visible' => $passwordVisible,
                 'pin' => $pin,
-                'role' => $request->role ?? 'captador',
+                'role' => $role,
                 'commerce_id' => $adminUser->commerce_id,
                 'is_active' => $request->is_active ?? true,
             ]);
 
-            Log::info('Employee created with PIN', [
+            Log::info('Employee created', [
                 'user_id' => $user->id,
+                'role' => $role,
                 'created_by' => $adminUser->id,
                 'commerce_id' => $adminUser->commerce_id,
             ]);
@@ -94,7 +113,8 @@ class UserController extends Controller
                     'email' => $user->email,
                     'role' => $user->role,
                     'is_active' => $user->is_active,
-                    'pin' => $pin, // Devolver PIN para mostrarlo al admin
+                    'pin' => $pin,                 // null for admin
+                    'password' => $plainPassword,  // null for captador, shown once
                 ],
             ], 201);
         } catch (\Exception $e) {
