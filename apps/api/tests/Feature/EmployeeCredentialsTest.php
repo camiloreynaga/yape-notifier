@@ -112,4 +112,42 @@ class EmployeeCredentialsTest extends TestCase
         $this->postJson("/api/users/{$employee->id}/regenerate-pin")
             ->assertStatus(400);
     }
+
+    public function test_index_returns_decrypted_password_for_admin_employees(): void
+    {
+        [$owner, $commerce] = $this->actingAdmin();
+
+        $create = $this->postJson('/api/users', [
+            'name' => 'Admin Visible',
+            'email' => 'admin.visible@test.com',
+            'role' => 'admin',
+        ]);
+        $plain = $create->json('user.password');
+
+        $response = $this->getJson('/api/users');
+        $response->assertOk();
+
+        $row = collect($response->json('users'))
+            ->firstWhere('email', 'admin.visible@test.com');
+
+        $this->assertNotNull($row);
+        $this->assertEquals($plain, $row['password_visible']);
+    }
+
+    public function test_index_returns_null_password_for_captadores(): void
+    {
+        [$owner, $commerce] = $this->actingAdmin();
+
+        $this->postJson('/api/users', [
+            'name' => 'Cap Visible',
+            'email' => 'cap.visible@test.com',
+            'role' => 'captador',
+        ]);
+
+        $response = $this->getJson('/api/users');
+        $row = collect($response->json('users'))
+            ->firstWhere('email', 'cap.visible@test.com');
+
+        $this->assertNull($row['password_visible']);
+    }
 }

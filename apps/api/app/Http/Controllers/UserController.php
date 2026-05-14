@@ -35,13 +35,24 @@ class UserController extends Controller
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($user) {
+                $passwordVisible = null;
+                if ($user->password_visible) {
+                    try {
+                        $passwordVisible = Crypt::decryptString($user->password_visible);
+                    } catch (\Exception $e) {
+                        // APP_KEY changed or corrupt value — degrade gracefully
+                        $passwordVisible = null;
+                    }
+                }
+
                 return [
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
                     'role' => $user->role,
                     'is_active' => $user->is_active,
-                    'pin' => $user->pin, // Mostrar PIN para que el admin lo vea
+                    'pin' => $user->pin,
+                    'password_visible' => $passwordVisible,
                     'created_at' => $user->created_at,
                     'updated_at' => $user->updated_at,
                 ];
