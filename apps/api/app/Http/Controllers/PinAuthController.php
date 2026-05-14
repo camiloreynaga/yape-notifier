@@ -78,12 +78,25 @@ class PinAuthController extends Controller
                     'user_id' => $user->id,
                     'user_name' => $user->name,
                 ]);
-                
+
                 return response()->json([
                     'message' => 'Usuario no asociado a un comercio',
                 ], 403);
             }
-            
+
+            // PIN login is for captadores only — admins/super_admins use
+            // email + password on the web dashboard.
+            if ($user->role !== 'captador') {
+                Log::warning('Non-captador attempted PIN login', [
+                    'user_id' => $user->id,
+                    'role' => $user->role,
+                ]);
+
+                return response()->json([
+                    'message' => 'Este acceso es solo para captadores. Usa tu correo y contraseña.',
+                ], 403);
+            }
+
             // Clear rate limiting on successful login
             Cache::forget($cacheKey);
 

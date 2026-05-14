@@ -90,4 +90,29 @@ class RoleSecurityTest extends TestCase
             'role' => 'admin',
         ])->assertStatus(201);
     }
+
+    public function test_admin_cannot_login_with_pin(): void
+    {
+        [$admin, $commerce] = $this->commerceWithOwner('admin');
+        // give the admin a PIN directly (legacy data scenario)
+        $admin->update(['pin' => '4321', 'is_active' => true]);
+
+        $this->postJson('/api/auth/login-pin', ['pin' => '4321'])
+            ->assertStatus(403);
+    }
+
+    public function test_captador_can_login_with_pin(): void
+    {
+        [$admin, $commerce] = $this->commerceWithOwner('admin');
+        $captador = User::factory()->create([
+            'role' => 'captador',
+            'commerce_id' => $commerce->id,
+            'pin' => '8765',
+            'is_active' => true,
+        ]);
+
+        $this->postJson('/api/auth/login-pin', ['pin' => '8765'])
+            ->assertOk()
+            ->assertJsonPath('user.role', 'captador');
+    }
 }
