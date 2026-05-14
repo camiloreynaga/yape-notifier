@@ -85,16 +85,29 @@ export default function NotificationsTable({
 
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-      <table className="min-w-full divide-y divide-slate-200">
+      <table className="w-full divide-y divide-slate-200 table-fixed">
+        <colgroup>
+          <col className="w-1" />
+          <col className="w-[88px]" />
+          <col className="w-[64px]" />
+          <col className="w-[220px]" />
+          {/* bloque clave: instancia · monto · código */}
+          <col className="w-[120px]" />
+          <col className="w-[120px]" />
+          <col className="w-[104px]" />
+          <col className="w-[112px]" />
+          <col className="w-[156px]" />
+        </colgroup>
         <thead className="bg-slate-50">
           <tr className="text-left">
-            <th className="w-1 px-0" aria-hidden></th>
+            <th className="px-0" aria-hidden></th>
             <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Hora</th>
             <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">App</th>
-            <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Instancia</th>
             <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Pagador</th>
-            <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 text-right">Monto</th>
-            <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Código</th>
+            {/* Bloque clave — fondo sutil que une instancia/monto/código */}
+            <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 bg-slate-100/70 border-l border-slate-200">Instancia</th>
+            <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 bg-slate-100/70 text-right">Monto</th>
+            <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 bg-slate-100/70 border-r border-slate-200">Código</th>
             <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Estado</th>
             <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 text-right">Acción</th>
           </tr>
@@ -120,6 +133,14 @@ export default function NotificationsTable({
               ? 'bg-accent-50/40 hover:bg-accent-50'
               : 'hover:bg-slate-50';
 
+            // Key-block columns get a faint background so the eye reads
+            // "instancia · monto · código" as a single unit.
+            const keyCellBg = isValidated
+              ? ''
+              : recent
+              ? 'bg-accent-50/30'
+              : 'bg-slate-50/60 group-hover:bg-slate-100/60';
+
             return (
               <tr key={n.id} className={`group ${rowClass}`}>
                 <td className="relative w-1 p-0">
@@ -127,7 +148,7 @@ export default function NotificationsTable({
                     <span className={`absolute inset-y-1 left-0 w-1 rounded-r ${indicatorClass}`} aria-hidden />
                   )}
                 </td>
-                <td className="px-3 py-3 text-xs font-mono text-slate-600 whitespace-nowrap tabular-nums">
+                <td className="px-3 py-3 text-xs font-mono text-slate-600 whitespace-nowrap tabular-nums align-top">
                   {format(new Date(n.created_at), 'dd/MM HH:mm')}
                   {recent && (
                     <div className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-bold uppercase text-emerald-700">
@@ -135,11 +156,8 @@ export default function NotificationsTable({
                     </div>
                   )}
                 </td>
-                <td className="px-3 py-3">{appBadge(n.source_app)}</td>
-                <td className="px-3 py-3">
-                  {instanceBadge(n.app_instance?.instance_label, n.app_instance?.id ?? n.app_instance_id)}
-                </td>
-                <td className="px-3 py-3 max-w-[200px]">
+                <td className="px-3 py-3 align-top">{appBadge(n.source_app)}</td>
+                <td className="px-3 py-3 align-top">
                   <div className="text-sm text-slate-900 truncate" title={n.payer_name ?? ''}>
                     {n.payer_name ?? '—'}
                   </div>
@@ -147,14 +165,21 @@ export default function NotificationsTable({
                     {n.device?.alias ?? n.device?.name ?? ''}
                   </div>
                 </td>
-                <td className="px-3 py-3 text-right whitespace-nowrap">
-                  <div className="text-base font-semibold text-slate-900 tabular-nums">
+
+                {/* ── Bloque clave: Instancia ── */}
+                <td className={`px-3 py-3 align-top border-l border-slate-200 ${keyCellBg}`}>
+                  {instanceBadge(n.app_instance?.instance_label, n.app_instance?.id ?? n.app_instance_id)}
+                </td>
+                {/* ── Bloque clave: Monto ── */}
+                <td className={`px-3 py-3 text-right whitespace-nowrap align-top ${keyCellBg}`}>
+                  <div className="text-base font-bold text-slate-900 tabular-nums">
                     S/ {Number(n.amount ?? 0).toFixed(2)}
                   </div>
                 </td>
-                <td className="px-3 py-3">
+                {/* ── Bloque clave: Código ── */}
+                <td className={`px-3 py-3 align-top border-r border-slate-200 ${keyCellBg}`}>
                   {n.security_code ? (
-                    <span className="inline-flex items-center font-mono text-sm font-bold rounded-md bg-accent-100 text-primary-800 px-2.5 py-1 tabular-nums">
+                    <span className="inline-flex items-center justify-center font-mono text-lg font-bold rounded-md bg-white border border-indigo-200 text-indigo-700 px-2 py-0.5 tabular-nums tracking-wide">
                       {n.security_code}
                     </span>
                   ) : (
@@ -164,12 +189,13 @@ export default function NotificationsTable({
                   )}
                   {dup && (
                     <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-amber-700">
-                      ⚠ Posible duplicado
+                      ⚠ Duplicado
                     </div>
                   )}
                 </td>
-                <td className="px-3 py-3"><StatusBadge status={n.status} /></td>
-                <td className="px-3 py-3 text-right whitespace-nowrap">
+
+                <td className="px-3 py-3 align-top"><StatusBadge status={n.status} /></td>
+                <td className="px-3 py-3 text-right whitespace-nowrap align-top">
                   <div className="inline-flex gap-1.5">
                     {isPending && (
                       <Button

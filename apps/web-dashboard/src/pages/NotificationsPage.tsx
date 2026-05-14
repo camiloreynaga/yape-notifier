@@ -164,7 +164,9 @@ export default function NotificationsPage() {
   const validatedChipCount = stats?.by_status?.validated ?? 0;
 
   return (
-    <div className="space-y-5" onBlur={updateUrl}>
+    // Constrain width so the table doesn't stretch across the full 1600px
+    // layout — keeps columns compact and removes the dead lateral space.
+    <div className="space-y-5 max-w-[1240px]" onBlur={updateUrl}>
       <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Centro de Validación</h1>
