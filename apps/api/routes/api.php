@@ -76,9 +76,12 @@ Route::middleware(['auth:sanctum', 'commerce.active'])->group(function () {
     Route::get('/commerces/me', [CommerceController::class, 'show']);
     Route::get('/commerces/check', [CommerceController::class, 'check']);
 
-    // User/Employee routes (admin only)
-    Route::apiResource('users', UserController::class);
-    Route::post('/users/{id}/regenerate-pin', [UserController::class, 'regeneratePin']);
+    // Employee management — only admins / super admins
+    Route::middleware('require_admin')->group(function () {
+        Route::apiResource('users', UserController::class);
+        Route::post('/users/{id}/regenerate-pin', [UserController::class, 'regeneratePin']);
+        Route::post('/users/{id}/regenerate-password', [UserController::class, 'regeneratePassword']);
+    });
 });
 
 // Device linking endpoint (REQUIRES authentication with PIN)
