@@ -59,4 +59,35 @@ class RoleSecurityTest extends TestCase
         $this->actingAs($admin, 'sanctum');
         $this->getJson('/api/users')->assertOk();
     }
+
+    public function test_system_role_is_rejected_on_create(): void
+    {
+        [$admin] = $this->commerceWithOwner('admin');
+        $this->actingAs($admin, 'sanctum');
+
+        $this->postJson('/api/users', [
+            'name' => 'Sys User',
+            'email' => 'sys@test.com',
+            'role' => 'system',
+        ])->assertStatus(422)
+          ->assertJsonValidationErrors('role');
+    }
+
+    public function test_admin_and_captador_roles_are_accepted_on_create(): void
+    {
+        [$admin] = $this->commerceWithOwner('admin');
+        $this->actingAs($admin, 'sanctum');
+
+        $this->postJson('/api/users', [
+            'name' => 'Captador Uno',
+            'email' => 'cap1@test.com',
+            'role' => 'captador',
+        ])->assertStatus(201);
+
+        $this->postJson('/api/users', [
+            'name' => 'Admin Dos',
+            'email' => 'adm2@test.com',
+            'role' => 'admin',
+        ])->assertStatus(201);
+    }
 }

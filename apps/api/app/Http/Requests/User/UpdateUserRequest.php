@@ -35,7 +35,7 @@ class UpdateUserRequest extends FormRequest
                 'max:255',
                 Rule::unique('users', 'email')->ignore($userId),
             ],
-            'role' => ['sometimes', 'required', 'string', Rule::in(['admin', 'captador', 'system'])],
+            'role' => ['sometimes', 'required', 'string', Rule::in(['admin', 'captador'])],
             'is_active' => ['sometimes', 'nullable', 'boolean'],
         ];
     }
@@ -53,7 +53,7 @@ class UpdateUserRequest extends FormRequest
             'email.email' => 'El correo electrónico debe ser válido.',
             'email.unique' => 'Este correo electrónico ya está registrado.',
             'role.required' => 'El rol es requerido.',
-            'role.in' => 'El rol debe ser: admin, captador o system.',
+            'role.in' => 'El rol debe ser: admin o captador.',
         ];
     }
 }

@@ -32,7 +32,7 @@ class CreateUserRequest extends FormRequest
                 'max:255',
                 Rule::unique('users', 'email'),
             ],
-            'role' => ['required', 'string', Rule::in(['admin', 'captador', 'system'])],
+            'role' => ['required', 'string', Rule::in(['admin', 'captador'])],
             'is_active' => ['nullable', 'boolean'],
         ];
     }
@@ -50,7 +50,7 @@ class CreateUserRequest extends FormRequest
             'email.email' => 'El correo electrónico debe ser válido.',
             'email.unique' => 'Este correo electrónico ya está registrado.',
             'role.required' => 'El rol es requerido.',
-            'role.in' => 'El rol debe ser: admin, captador o system.',
+            'role.in' => 'El rol debe ser: admin o captador.',
         ];
     }
 
