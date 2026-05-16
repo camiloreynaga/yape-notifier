@@ -23,6 +23,7 @@ class CreateCommerceRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
+            'referral_code' => ['nullable', 'string', 'max:30'],
         ];
     }
 }

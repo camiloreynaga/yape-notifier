@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Commerce;
 use App\Models\Plan;
 use App\Models\User;
+use Illuminate\Support\Facades\Log;
 
 class CommerceService
 {
@@ -21,6 +22,20 @@ class CommerceService
             'status'        => 'pending',
             'plan_id'       => $starterPlan?->id,
         ]);
+
+        if (! empty($data['referral_code'])) {
+            $referrer = Commerce::where('referral_code', $data['referral_code'])->first();
+            if ($referrer && $referrer->owner_user_id !== $owner->id) {
+                $commerce->referred_by_commerce_id = $referrer->id;
+                $commerce->save();
+            } else {
+                Log::warning('Referral code rejected on commerce creation', [
+                    'reason' => $referrer ? 'self_referral' : 'not_found',
+                    'code' => $data['referral_code'],
+                    'user_id' => $owner->id,
+                ]);
+            }
+        }
 
         // Assign commerce to owner. Preserve super_admin role — those users
         // own the platform, not the commerce, and should never be downgraded.
