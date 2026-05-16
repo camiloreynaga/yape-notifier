@@ -25,7 +25,8 @@ function isValidTab(tab: string | null): tab is TabValue {
     tab === 'devices' ||
     tab === 'employees' ||
     tab === 'logs' ||
-    tab === 'settings'
+    tab === 'settings' ||
+    tab === 'referrals'
   );
 }
 

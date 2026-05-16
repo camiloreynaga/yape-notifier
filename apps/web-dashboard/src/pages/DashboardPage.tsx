@@ -6,6 +6,7 @@ import DevicesPage from './DevicesPage';
 import EmployeesPage from './EmployeesPage';
 import DeviceLogsPage from './DeviceLogsPage';
 import MonitoredAppsPage from './MonitoredAppsPage';
+import ReferralsPage from './ReferralsPage';
 
 export default function DashboardPage() {
   const renderTabContent = (activeTab: TabValue) => {
@@ -44,6 +45,12 @@ export default function DashboardPage() {
         return (
           <ErrorBoundary>
             <MonitoredAppsPage />
+          </ErrorBoundary>
+        );
+      case 'referrals':
+        return (
+          <ErrorBoundary>
+            <ReferralsPage />
           </ErrorBoundary>
         );
       default:
