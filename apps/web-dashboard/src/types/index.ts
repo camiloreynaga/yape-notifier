@@ -79,6 +79,8 @@ export interface Commerce {
   name: string;
   owner_user_id: number;
   status: 'pending' | 'active' | 'suspended';
+  referral_code: string;
+  referred_by_commerce_id: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -250,4 +252,62 @@ export interface NotificationsByInstanceRow {
   pending: number;
   inconsistent: number;
   amount_total: string; // backend returns formatted decimal as string
+}
+
+export interface PayoutAccount {
+  payout_bank: string | null;
+  payout_account_type: 'corriente' | 'ahorros' | 'cci' | null;
+  payout_account_number: string | null;
+  payout_account_holder: string | null;
+  payout_account_holder_doc: string | null;
+  is_complete: boolean;
+}
+
+export interface ReferralStats {
+  month_earnings: number;
+  pending_balance: number;
+  lifetime_paid: number;
+  active_referrals_count: number;
+  referral_code: string;
+}
+
+export type CommissionStatus = 'pending' | 'approved' | 'paid' | 'void';
+
+export interface ReferralCommission {
+  id: number;
+  referrer_commerce_id: number;
+  referred_commerce_id: number;
+  commerce_renewal_id: number | null;
+  base_amount: string;
+  commission_rate: string;
+  amount: string;
+  status: CommissionStatus;
+  paid_at: string | null;
+  payout_reference: string | null;
+  voided_reason: string | null;
+  approved_by_user_id: number | null;
+  paid_by_user_id: number | null;
+  created_at: string;
+  updated_at: string;
+  referred?: { id: number; name: string };
+  referrer?: {
+    id: number;
+    name: string;
+    payout_bank?: string | null;
+    payout_account_type?: string | null;
+    payout_account_holder?: string | null;
+    payout_account_holder_doc?: string | null;
+  };
+  renewal?: { id: number; new_expires_at: string; amount_paid: string } | null;
+}
+
+export interface ReferralCommerceRow {
+  id: number;
+  name: string;
+  status: 'pending' | 'active' | 'suspended';
+  plan_id: number | null;
+  plan_expires_at: string | null;
+  total_paid: number | null;
+  created_at: string;
+  plan?: Pick<Plan, 'id' | 'name' | 'price'> | null;
 }

@@ -2,7 +2,7 @@ import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig, AxiosResp
 import { API_BASE_URL, API_ENDPOINTS } from '@/config/api';
 import { logger } from './logger';
 import { apiCircuitBreaker, devicesCircuitBreaker, appInstancesCircuitBreaker } from './circuitBreaker';
-import type { AuthResponse, User, Device, Notification, NotificationFilters, NotificationStatistics, PaginatedResponse, ApiError, Commerce, AppInstance, MonitorPackage, DeviceLog, DeviceLogsSummary } from '@/types';
+import type { AuthResponse, User, Device, Notification, NotificationFilters, NotificationStatistics, PaginatedResponse, ApiError, Commerce, AppInstance, MonitorPackage, DeviceLog, DeviceLogsSummary, PayoutAccount, ReferralStats, ReferralCommission, ReferralCommerceRow } from '@/types';
 
 class ApiService {
   private client: AxiosInstance;
@@ -297,10 +297,12 @@ class ApiService {
   }
 
   // Commerce methods
-  async createCommerce(name: string): Promise<Commerce> {
+  async createCommerce(name: string, referral_code?: string): Promise<Commerce> {
+    const payload: { name: string; referral_code?: string } = { name };
+    if (referral_code) payload.referral_code = referral_code;
     const response = await this.client.post<{ commerce: Commerce }>(
       API_ENDPOINTS.commerces.create,
-      { name }
+      payload
     );
     return response.data.commerce;
   }
@@ -588,6 +590,77 @@ class ApiService {
       { params: { hours } }
     );
     return response.data;
+  }
+  async getReferralStats(): Promise<ReferralStats> {
+    const { data } = await this.client.get<ReferralStats>(API_ENDPOINTS.referrals.stats);
+    return data;
+  }
+
+  async getReferrals(): Promise<{ data: ReferralCommerceRow[] }> {
+    const { data } = await this.client.get<{ data: ReferralCommerceRow[] }>(API_ENDPOINTS.referrals.list);
+    return data;
+  }
+
+  async getMyCommissions(params?: { status?: string; page?: number }): Promise<PaginatedResponse<ReferralCommission>> {
+    const { data } = await this.client.get<PaginatedResponse<ReferralCommission>>(
+      API_ENDPOINTS.referrals.commissions,
+      { params }
+    );
+    return data;
+  }
+
+  async getPayoutAccount(): Promise<PayoutAccount> {
+    const { data } = await this.client.get<PayoutAccount>(API_ENDPOINTS.referrals.payoutAccount);
+    return data;
+  }
+
+  async updatePayoutAccount(payload: {
+    payout_bank: string;
+    payout_account_type: 'corriente' | 'ahorros' | 'cci';
+    payout_account_number: string;
+    payout_account_holder: string;
+    payout_account_holder_doc: string;
+  }): Promise<{ message: string; is_complete: boolean }> {
+    const { data } = await this.client.put<{ message: string; is_complete: boolean }>(
+      API_ENDPOINTS.referrals.payoutAccount,
+      payload
+    );
+    return data;
+  }
+
+  async listAllCommissions(params?: {
+    status?: string;
+    month?: string;
+    referrer_id?: number;
+    referred_id?: number;
+    page?: number;
+  }): Promise<PaginatedResponse<ReferralCommission>> {
+    const { data } = await this.client.get<PaginatedResponse<ReferralCommission>>(
+      API_ENDPOINTS.admin.commissions,
+      { params }
+    );
+    return data;
+  }
+
+  async approveCommission(id: number): Promise<ReferralCommission> {
+    const { data } = await this.client.post<ReferralCommission>(API_ENDPOINTS.admin.commissionApprove(id));
+    return data;
+  }
+
+  async payCommission(id: number, payout_reference: string): Promise<ReferralCommission> {
+    const { data } = await this.client.post<ReferralCommission>(
+      API_ENDPOINTS.admin.commissionPay(id),
+      { payout_reference }
+    );
+    return data;
+  }
+
+  async voidCommission(id: number, reason: string): Promise<ReferralCommission> {
+    const { data } = await this.client.post<ReferralCommission>(
+      API_ENDPOINTS.admin.commissionVoid(id),
+      { reason }
+    );
+    return data;
   }
 }
 

@@ -67,6 +67,12 @@ export const API_ENDPOINTS = {
     summary: "/api/device-logs/summary",
     device: (deviceId: number) => `/api/devices/${deviceId}/logs`,
   },
+  referrals: {
+    stats: '/api/referrals/stats',
+    list: '/api/referrals/referrals',
+    commissions: '/api/referrals/commissions',
+    payoutAccount: '/api/commerces/me/payout-account',
+  },
   admin: {
     commerces: '/api/admin/commerces',
     commerce: (id: number) => `/api/admin/commerces/${id}`,
@@ -78,5 +84,9 @@ export const API_ENDPOINTS = {
     plans: '/api/admin/plans',
     plan: (id: number) => `/api/admin/plans/${id}`,
     dashboardKpis: '/api/admin/dashboard/kpis',
+    commissions: '/api/admin/commissions',
+    commissionApprove: (id: number) => `/api/admin/commissions/${id}/approve`,
+    commissionPay: (id: number) => `/api/admin/commissions/${id}/pay`,
+    commissionVoid: (id: number) => `/api/admin/commissions/${id}/void`,
   },
 } as const;
