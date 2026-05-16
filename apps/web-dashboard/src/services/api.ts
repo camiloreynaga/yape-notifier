@@ -628,6 +628,17 @@ class ApiService {
     return data;
   }
 
+  async customizeReferralCode(referral_code: string): Promise<{
+    referral_code: string;
+    referral_code_customized_at: string;
+  }> {
+    const { data } = await this.client.patch<{
+      referral_code: string;
+      referral_code_customized_at: string;
+    }>(API_ENDPOINTS.referrals.customizeCode, { referral_code });
+    return data;
+  }
+
   async listAllCommissions(params?: {
     status?: string;
     month?: string;

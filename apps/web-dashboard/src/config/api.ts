@@ -72,6 +72,7 @@ export const API_ENDPOINTS = {
     list: '/api/referrals/referrals',
     commissions: '/api/referrals/commissions',
     payoutAccount: '/api/commerces/me/payout-account',
+    customizeCode: '/api/referrals/code',
   },
   admin: {
     commerces: '/api/admin/commerces',

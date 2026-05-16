@@ -10,7 +10,7 @@ import type {
 } from '@/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Copy, Check, Share2, Banknote, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Copy, Check, Share2, Banknote, CheckCircle2, AlertCircle, Pencil } from 'lucide-react';
 
 const currencyFormatter = new Intl.NumberFormat('es-PE', {
   style: 'currency',
@@ -89,6 +89,15 @@ export default function ReferralsPage() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [page, setPage] = useState(1);
+
+  // Customize code modal state
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+  const [customizeInput, setCustomizeInput] = useState('');
+  const [customizeError, setCustomizeError] = useState<string | null>(null);
+  const [customizeConfirm, setCustomizeConfirm] = useState(false);
+  const [customizeSaving, setCustomizeSaving] = useState(false);
+  const [customizeBackendError, setCustomizeBackendError] = useState<string | null>(null);
+  const [customizeToast, setCustomizeToast] = useState(false);
 
   // Payout form state
   const [payoutForm, setPayoutForm] = useState({
@@ -213,6 +222,59 @@ export default function ReferralsPage() {
     }
   };
 
+  // Customize code helpers
+  const validateCode = (val: string): string | null => {
+    if (val.length < 4 || val.length > 20) return 'Debe tener entre 4 y 20 caracteres.';
+    if (!/^[a-z0-9-]+$/.test(val)) return 'Solo letras minúsculas, números y guiones.';
+    if (!/[0-9-]/.test(val)) return 'Debe incluir al menos un guión o un dígito.';
+    return null;
+  };
+
+  const handleCustomizeOpen = () => {
+    setCustomizeInput(stats?.referral_code ?? '');
+    setCustomizeError(null);
+    setCustomizeConfirm(false);
+    setCustomizeBackendError(null);
+    setCustomizeOpen(true);
+  };
+
+  const handleCustomizeClose = () => {
+    setCustomizeOpen(false);
+    setCustomizeConfirm(false);
+    setCustomizeBackendError(null);
+  };
+
+  const handleCustomizeChange = (val: string) => {
+    setCustomizeInput(val);
+    setCustomizeError(validateCode(val));
+    setCustomizeBackendError(null);
+  };
+
+  const handleCustomizeConfirm = async () => {
+    setCustomizeSaving(true);
+    setCustomizeBackendError(null);
+    try {
+      await apiService.customizeReferralCode(customizeInput);
+      handleCustomizeClose();
+      // Refetch stats
+      const updated = await apiService.getReferralStats();
+      setStats(updated);
+      // Toast
+      setCustomizeToast(true);
+      setTimeout(() => setCustomizeToast(false), 2000);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } };
+      const msg =
+        e.response?.data?.errors?.referral_code?.[0] ||
+        e.response?.data?.message ||
+        'Error al guardar el código.';
+      setCustomizeBackendError(msg);
+      setCustomizeConfirm(false);
+    } finally {
+      setCustomizeSaving(false);
+    }
+  };
+
   // --- RENDER ---
 
   if (loadingMain) {
@@ -232,6 +294,90 @@ export default function ReferralsPage() {
 
   return (
     <div className="space-y-6 p-6">
+      {/* Customize code success toast */}
+      {customizeToast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white px-5 py-2.5 rounded-lg shadow-lg text-sm font-medium">
+          Código actualizado
+        </div>
+      )}
+
+      {/* Customize code modal */}
+      {customizeOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Personalizar tu código de referido</h3>
+            <p className="text-sm text-slate-600 mb-4">
+              Esta acción es <strong>definitiva</strong>: solo puedes cambiarlo una vez. Después quedará congelado.
+            </p>
+
+            {customizeBackendError && (
+              <div className="mb-4 bg-red-50 border border-red-200 text-red-800 p-3 rounded text-sm">
+                {customizeBackendError}
+              </div>
+            )}
+
+            {!customizeConfirm ? (
+              <>
+                <div className="mb-4">
+                  <input
+                    type="text"
+                    value={customizeInput}
+                    onChange={(e) => handleCustomizeChange(e.target.value)}
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm"
+                    placeholder="tu-codigo-123"
+                    autoFocus
+                  />
+                  {customizeError ? (
+                    <p className="mt-1 text-xs text-red-600">{customizeError}</p>
+                  ) : (
+                    <p className="mt-1 text-xs text-slate-500">
+                      Solo letras minúsculas, números y guiones. 4-20 caracteres. Debe incluir al menos un guión o un dígito.
+                    </p>
+                  )}
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={handleCustomizeClose}
+                    className="px-4 py-2 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={() => setCustomizeConfirm(true)}
+                    disabled={!!customizeError || customizeInput.length === 0}
+                    className="px-4 py-2 rounded-md bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-50 transition-colors"
+                  >
+                    Guardar
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-gray-700 mb-5">
+                  ¿Confirmar? No podrás cambiarlo después.
+                </p>
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => setCustomizeConfirm(false)}
+                    disabled={customizeSaving}
+                    className="px-4 py-2 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleCustomizeConfirm}
+                    disabled={customizeSaving}
+                    className="px-4 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors"
+                  >
+                    {customizeSaving ? 'Guardando...' : 'Confirmar definitivamente'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Top error banner */}
       {mainError && (
         <div className="bg-red-50 border border-red-200 text-red-800 p-3 rounded flex items-center gap-2">
@@ -262,6 +408,17 @@ export default function ReferralsPage() {
               <span className="font-mono text-2xl tracking-wider font-bold text-primary-700 bg-primary-50 px-4 py-2 rounded-lg inline-block">
                 {stats.referral_code}
               </span>
+              {stats.referral_code_customized_at === null && (
+                <div className="mt-2">
+                  <button
+                    onClick={handleCustomizeOpen}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-slate-300 text-slate-600 text-xs font-medium hover:bg-slate-50 transition-colors"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    Personalizar (una sola vez)
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2">

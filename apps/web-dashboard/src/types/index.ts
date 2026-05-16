@@ -269,6 +269,7 @@ export interface ReferralStats {
   lifetime_paid: number;
   active_referrals_count: number;
   referral_code: string;
+  referral_code_customized_at: string | null;
 }
 
 export type CommissionStatus = 'pending' | 'approved' | 'paid' | 'void';
