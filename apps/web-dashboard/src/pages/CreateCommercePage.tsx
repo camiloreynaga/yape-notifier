@@ -10,6 +10,7 @@ export default function CreateCommercePage() {
   const navigate = useNavigate();
   const { checkCommerce, hasCommerce, commerce } = useAuth();
   const [name, setName] = useState('');
+  const [referralCode, setReferralCode] = useState<string>(() => sessionStorage.getItem('referral_code') ?? '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -66,7 +67,8 @@ export default function CreateCommercePage() {
     setLoading(true);
 
     try {
-      await apiService.createCommerce(name.trim());
+      await apiService.createCommerce(name.trim(), referralCode.trim() || undefined);
+      sessionStorage.removeItem('referral_code');
       // Refresca el estado en AuthContext. El comercio nace en 'pending',
       // así que mandamos a la pantalla de estado, no al dashboard
       // (el dashboard rebotaría igual por el middleware commerce.active).
@@ -139,7 +141,7 @@ export default function CreateCommercePage() {
               disabled={loading}
               className={`
                 appearance-none relative block w-full px-3 py-2 border rounded-md
-                placeholder-gray-400 text-gray-900 focus:outline-none focus:ring-primary-500 
+                placeholder-gray-400 text-gray-900 focus:outline-none focus:ring-primary-500
                 focus:border-primary-500 focus:z-10 sm:text-sm
                 ${validationError || error
                   ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
@@ -159,6 +161,27 @@ export default function CreateCommercePage() {
             <p className="mt-1 text-xs text-gray-500">
               Mínimo 3 caracteres, máximo 100 caracteres
             </p>
+          </div>
+          <div>
+            <label htmlFor="referral_code" className="block text-sm font-medium text-gray-700 mb-1">
+              Código de referido (opcional)
+            </label>
+            <input
+              id="referral_code"
+              name="referral_code"
+              type="text"
+              value={referralCode}
+              onChange={(e) => setReferralCode(e.target.value)}
+              disabled={loading}
+              className="appearance-none relative block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 text-gray-900 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm bg-white"
+              placeholder="Ej: karol-7x2z"
+              autoComplete="off"
+            />
+            {referralCode && (
+              <p className="mt-1 text-xs text-emerald-700">
+                Tienes un código de referido aplicado. Si lo dejas vacío, se ignora.
+              </p>
+            )}
           </div>
           <div>
             <button

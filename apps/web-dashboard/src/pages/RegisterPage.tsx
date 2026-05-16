@@ -1,9 +1,10 @@
-import { useState, FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, FormEvent, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserPlus, Mail, Phone, Lock, Eye, EyeOff, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export default function RegisterPage() {
+  const [searchParams] = useSearchParams();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -14,6 +15,14 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
+
+  // Capture referral code from URL parameter
+  useEffect(() => {
+    const ref = searchParams.get('ref');
+    if (ref) {
+      sessionStorage.setItem('referral_code', ref);
+    }
+  }, [searchParams]);
 
   // Real-time validations
   const passwordsMatch = password.length === 0 || password === passwordConfirmation;
