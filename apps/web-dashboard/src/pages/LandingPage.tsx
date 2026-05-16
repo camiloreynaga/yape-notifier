@@ -21,6 +21,13 @@ import {
   BarChart3,
   Layers,
   LockKeyhole,
+  Quote,
+  ChevronDown,
+  MessageCircle,
+  Gift,
+  Instagram,
+  Facebook,
+  Linkedin,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -919,6 +926,391 @@ function DemoSection() {
   );
 }
 
+// ─── Pricing Section ─────────────────────────────────────────────────────────
+
+function PricingSection() {
+  return (
+    <section id="precios" className="py-24 bg-gradient-to-b from-white to-primary-50">
+      <div className="max-w-6xl mx-auto px-6 text-center">
+        <p className="text-primary-700 uppercase tracking-widest text-sm font-semibold">Precios</p>
+        <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mt-3">
+          Tarifa fija. Sin comisión por transacción. Para siempre.
+        </h2>
+        <p className="text-lg text-slate-600 mt-4 max-w-2xl mx-auto">
+          Elige el plan según cuántos dispositivos necesites conectar. Cancela cuando quieras.
+        </p>
+
+        <div className="mt-12 grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          {/* Starter */}
+          <div className="bg-white rounded-3xl p-8 ring-1 ring-slate-200 flex flex-col">
+            <h3 className="text-xl font-bold text-slate-900">Starter</h3>
+            <p className="text-slate-500 text-sm mt-1">Para empezar</p>
+            <div className="flex items-baseline mt-6">
+              <span className="text-5xl font-extrabold text-slate-900">S/ 49</span>
+              <span className="text-slate-500 ml-2 text-sm">/mes</span>
+            </div>
+            <div className="border-t border-slate-200 my-6" />
+            <ul className="space-y-3 flex-1 text-left">
+              {[
+                '1 dispositivo Android conectado',
+                'Hasta 500 Yapes/mes',
+                '2 captadores',
+                'Multi-cuenta Yape',
+                'Reportes básicos',
+                'Soporte por email',
+              ].map((f) => (
+                <li key={f} className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-accent-500 shrink-0" />
+                  <span className="text-sm text-slate-700">{f}</span>
+                </li>
+              ))}
+            </ul>
+            <Link
+              to="/register"
+              className="mt-6 w-full py-3 rounded-full font-semibold text-center border border-primary-600 text-primary-700 hover:bg-primary-50 transition block"
+            >
+              Empezar gratis 7 días
+            </Link>
+          </div>
+
+          {/* Pro */}
+          <div className="bg-white rounded-3xl p-8 ring-2 ring-primary-600 lg:scale-105 relative flex flex-col">
+            <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary-600 text-white text-xs font-semibold px-3 py-1 rounded-full">
+              MÁS POPULAR
+            </span>
+            <h3 className="text-xl font-bold text-slate-900">Pro</h3>
+            <p className="text-slate-500 text-sm mt-1">El más usado</p>
+            <div className="flex items-baseline mt-6">
+              <span className="text-5xl font-extrabold text-slate-900">S/ 99</span>
+              <span className="text-slate-500 ml-2 text-sm">/mes</span>
+            </div>
+            <div className="border-t border-slate-200 my-6" />
+            <ul className="space-y-3 flex-1 text-left">
+              {[
+                'Hasta 5 dispositivos',
+                'Yapes ilimitados',
+                'Captadores ilimitados',
+                'Multi-cuenta Yape',
+                'Reportes avanzados + exportación',
+                'Programa de afiliados activo',
+                'Soporte prioritario',
+              ].map((f) => (
+                <li key={f} className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-accent-500 shrink-0" />
+                  <span className="text-sm text-slate-700">{f}</span>
+                </li>
+              ))}
+            </ul>
+            <Link
+              to="/register"
+              className="mt-6 w-full py-3 rounded-full font-semibold text-center bg-accent-500 text-primary-900 hover:bg-accent-400 transition block"
+            >
+              Probar Pro 7 días
+            </Link>
+          </div>
+
+          {/* Empresa */}
+          <div className="bg-white rounded-3xl p-8 ring-1 ring-slate-200 flex flex-col">
+            <h3 className="text-xl font-bold text-slate-900">Empresa</h3>
+            <p className="text-slate-500 text-sm mt-1">Para cadenas</p>
+            <div className="flex items-baseline mt-6">
+              <span className="text-5xl font-extrabold text-slate-900">A medida</span>
+            </div>
+            <div className="border-t border-slate-200 my-6" />
+            <ul className="space-y-3 flex-1 text-left">
+              {[
+                'Dispositivos ilimitados',
+                'Yapes ilimitados',
+                'Reportes consolidados multi-sede',
+                'API + integraciones',
+                'SLA dedicado',
+                'Onboarding personalizado',
+              ].map((f) => (
+                <li key={f} className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-accent-500 shrink-0" />
+                  <span className="text-sm text-slate-700">{f}</span>
+                </li>
+              ))}
+            </ul>
+            <a
+              href="mailto:ventas@yape-notifier.com"
+              className="mt-6 w-full py-3 rounded-full font-semibold text-center bg-primary-700 text-white hover:bg-primary-800 transition block"
+            >
+              Hablar con ventas
+            </a>
+          </div>
+        </div>
+
+        <p className="mt-8 text-center text-sm text-slate-500">
+          Sin tarjeta de crédito durante el trial. Cancela en 1 click.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+// ─── Afiliados Section ────────────────────────────────────────────────────────
+
+function AfiliadosSection() {
+  return (
+    <section id="afiliados" className="py-20">
+      <div className="max-w-4xl mx-auto px-6">
+        <div className="bg-gradient-to-br from-primary-700 via-primary-600 to-accent-700 text-white rounded-3xl p-10 md:p-14 relative overflow-hidden">
+          <Gift className="absolute top-6 right-6 opacity-10 w-32 h-32" />
+          <p className="text-sm font-semibold uppercase tracking-widest text-primary-100">
+            Programa de Afiliados
+          </p>
+          <h3 className="text-3xl md:text-4xl font-bold mt-2 max-w-2xl">
+            Refiere otros comercios y gana 20% recurrente.
+          </h3>
+          <p className="text-primary-100/80 mt-4 max-w-2xl">
+            Por cada negocio que se registre con tu link, recibes el 20% de su tarifa mensual
+            mientras siga activo. Sin tope. Sin letra chica.
+          </p>
+          <Link
+            to="/register"
+            className="mt-6 inline-flex items-center gap-2 bg-accent-500 text-primary-900 px-6 py-3 rounded-full font-semibold hover:bg-accent-400 transition"
+          >
+            Conocer el programa
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Testimonios Section ──────────────────────────────────────────────────────
+
+function TestimoniosSection() {
+  const testimonios = [
+    {
+      text: 'Antes pagaba 4% en comisiones por las pasarelas. Ahora pago una tarifa fija y duermo tranquilo.',
+      name: 'Próximamente',
+      business: '—',
+    },
+    {
+      text: 'Cambié 3 cajas registradoras por Yape Notifier. Mis 4 captadores nunca tocan mi celular.',
+      name: 'Próximamente',
+      business: '—',
+    },
+    {
+      text: 'Detectamos S/ 1,200 en pagos falsos el primer mes. La inversión se justificó sola.',
+      name: 'Próximamente',
+      business: '—',
+    },
+  ];
+
+  return (
+    <section className="py-24 bg-surface-warm">
+      <div className="max-w-6xl mx-auto px-6 text-center">
+        <p className="text-primary-700 uppercase tracking-widest text-sm font-semibold">Lo que dicen</p>
+        <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mt-3">
+          Negocios reales que ya cerraron la fuga.
+        </h2>
+        <p className="mt-2 text-sm text-slate-500 max-w-xl mx-auto">
+          Estamos preparando testimonios reales de los primeros usuarios. Mientras tanto, los casos
+          abajo son ejemplos representativos del valor que el producto entrega.
+        </p>
+
+        <div className="mt-12 grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          {testimonios.map((t, i) => (
+            <div key={i} className="bg-white rounded-2xl p-6 ring-1 ring-slate-200 flex flex-col text-left">
+              <Quote className="text-primary-300 h-8 w-8" />
+              <p className="mt-4 text-slate-700 text-sm leading-relaxed flex-1">"{t.text}"</p>
+              <div className="mt-6 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-slate-200 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">{t.name}</p>
+                  <p className="text-xs text-slate-500">{t.business}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── FAQ Section ──────────────────────────────────────────────────────────────
+
+function FAQSection() {
+  const faqs = [
+    {
+      q: '¿Es seguro? ¿Pueden ver mi cuenta de Yape?',
+      a: 'No. Tus captadores nunca tienen acceso a tu app de Yape ni a tus saldos. Solo ven las notificaciones de pagos entrantes en una vista limitada, autenticada con un PIN de 4 dígitos. Tu celular con Yape se queda contigo.',
+    },
+    {
+      q: '¿Funciona con cualquier celular Android?',
+      a: 'Sí. Yape Notifier funciona en cualquier Android con la app de Yape instalada (versión 6.0 o superior). No requiere root, ni permisos especiales de banco.',
+    },
+    {
+      q: '¿Cuántas cuentas Yape puedo conectar?',
+      a: 'Todas las que necesites. Puedes tener Yape personal + Yape negocio en el mismo celular (Android multi-user) y el sistema las diferencia automáticamente. Si tienes varios celulares con Yape, los conectas todos al mismo dashboard.',
+    },
+    {
+      q: '¿Qué pasa si un captador renuncia?',
+      a: 'Desactivas su PIN en 2 clicks desde tu dashboard. No tienes que cambiar contraseñas, recuperar dispositivos ni preocuparte por accesos olvidados. Es así de simple.',
+    },
+    {
+      q: '¿Puedo cancelar cuando quiera?',
+      a: 'Sí. No hay permanencia ni costos por cancelar. Si decides irte, exportas todos tus datos en CSV y cierras la cuenta en 1 click. Sin preguntas.',
+    },
+    {
+      q: '¿Cuánto demora la instalación?',
+      a: 'Menos de 10 minutos. Te enviamos el instructivo paso a paso al registrarte. Si necesitas ayuda, nuestro equipo te guía por WhatsApp sin costo durante el trial.',
+    },
+  ];
+
+  return (
+    <section id="faq" className="py-24 bg-white">
+      <div className="max-w-6xl mx-auto px-6 text-center">
+        <p className="text-primary-700 uppercase tracking-widest text-sm font-semibold">
+          Preguntas frecuentes
+        </p>
+        <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mt-3">
+          Lo que la gente se pregunta antes de empezar.
+        </h2>
+
+        <div className="mt-10 max-w-3xl mx-auto space-y-3 text-left">
+          {faqs.map((item, i) => (
+            <details key={i} className="group rounded-2xl bg-slate-50 ring-1 ring-slate-200 px-6 py-4">
+              <summary className="cursor-pointer list-none flex items-center justify-between font-semibold text-slate-900">
+                <span>{item.q}</span>
+                <ChevronDown className="h-5 w-5 transition-transform group-open:rotate-180 shrink-0 ml-4" />
+              </summary>
+              <p className="mt-3 text-slate-600 text-sm leading-relaxed">{item.a}</p>
+            </details>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── CTA Final Section ────────────────────────────────────────────────────────
+
+function CTAFinalSection() {
+  return (
+    <section className="py-32 bg-gradient-to-br from-primary-900 via-primary-800 to-accent-900 text-white text-center relative overflow-hidden">
+      <LockKeyhole className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-5 w-[500px] h-[500px]" />
+      <div className="relative z-10 max-w-6xl mx-auto px-6">
+        <h2 className="text-5xl md:text-7xl font-extrabold leading-[1.05] max-w-3xl mx-auto">
+          Empieza hoy. Sin tarjeta. Sin riesgo.
+        </h2>
+        <p className="text-lg text-primary-100/80 mt-6 max-w-xl mx-auto">
+          7 días gratis. Cancela cuando quieras. Sin tarjeta de crédito durante el trial.
+        </p>
+        <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
+          <Link
+            to="/register"
+            className="bg-accent-500 text-primary-900 px-8 py-4 rounded-full font-bold text-lg hover:bg-accent-400 transition inline-flex items-center gap-2 justify-center"
+          >
+            Empezar mi prueba gratis
+            <ArrowRight className="h-5 w-5" />
+          </Link>
+          <a
+            href="mailto:soporte@yape-notifier.com"
+            className="text-primary-100 hover:text-white px-6 py-4 inline-flex items-center gap-2 justify-center transition"
+          >
+            Hablar con un humano
+            <MessageCircle className="h-5 w-5" />
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Footer ───────────────────────────────────────────────────────────────────
+
+function Footer() {
+  return (
+    <footer className="text-primary-200 py-16" style={{ backgroundColor: '#1E0840' }}>
+      <div className="max-w-6xl mx-auto px-6">
+        <div className="grid md:grid-cols-4 gap-12">
+          {/* Brand */}
+          <div>
+            <p className="text-white font-bold text-2xl">Yape Notifier</p>
+            <p className="mt-3 text-sm text-primary-300 max-w-xs">
+              El control de tus Yapes, sin riesgos. Una herramienta para negocios que quieren crecer
+              sin perder en el camino.
+            </p>
+          </div>
+
+          {/* Producto */}
+          <div>
+            <h4 className="text-white font-semibold mb-4 text-sm uppercase tracking-wider">Producto</h4>
+            <ul className="space-y-2">
+              {[
+                { label: 'Características', href: '#producto' },
+                { label: 'Precios', href: '#precios' },
+                { label: 'Multi-Yape', href: '#multi-yape' },
+                { label: 'Programa de Afiliados', href: '#afiliados' },
+                { label: 'FAQ', href: '#faq' },
+              ].map((l) => (
+                <li key={l.label}>
+                  <a href={l.href} className="text-sm hover:text-white transition">
+                    {l.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Empresa */}
+          <div>
+            <h4 className="text-white font-semibold mb-4 text-sm uppercase tracking-wider">Empresa</h4>
+            <ul className="space-y-2">
+              <li><a href="#" className="text-sm hover:text-white transition">Sobre nosotros</a></li>
+              <li>
+                <a href="mailto:hola@yape-notifier.com" className="text-sm hover:text-white transition">
+                  Contacto
+                </a>
+              </li>
+              <li><a href="#" className="text-sm hover:text-white transition">Blog</a></li>
+              <li><a href="#" className="text-sm hover:text-white transition">Trabaja con nosotros</a></li>
+            </ul>
+          </div>
+
+          {/* Legal */}
+          <div>
+            <h4 className="text-white font-semibold mb-4 text-sm uppercase tracking-wider">Legal</h4>
+            <ul className="space-y-2">
+              <li><a href="#" className="text-sm hover:text-white transition">Términos y condiciones</a></li>
+              <li><a href="#" className="text-sm hover:text-white transition">Política de privacidad</a></li>
+              <li><a href="#" className="text-sm hover:text-white transition">Política de cookies</a></li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Bottom row */}
+        <div className="mt-12 pt-8 border-t border-primary-700/50 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <p className="text-xs text-primary-400">
+            © {new Date().getFullYear()} Yape Notifier. Todos los derechos reservados.
+          </p>
+          <div className="flex items-center gap-4">
+            <a href="#" aria-label="Instagram" className="hover:text-white transition">
+              <Instagram className="w-5 h-5" />
+            </a>
+            <a href="#" aria-label="Facebook" className="hover:text-white transition">
+              <Facebook className="w-5 h-5" />
+            </a>
+            <a href="#" aria-label="LinkedIn" className="hover:text-white transition">
+              <Linkedin className="w-5 h-5" />
+            </a>
+          </div>
+        </div>
+
+        <p className="mt-6 text-xs text-primary-500 text-center">
+          Yape es una marca registrada de BCP. Yape Notifier no está afiliado oficialmente con BCP ni
+          con Yape. Esta herramienta opera leyendo notificaciones del sistema operativo Android.
+        </p>
+      </div>
+    </footer>
+  );
+}
+
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
@@ -933,6 +1325,12 @@ export default function LandingPage() {
       <LossCalculatorSection />
       <FeaturesBentoSection />
       <DemoSection />
+      <PricingSection />
+      <AfiliadosSection />
+      <TestimoniosSection />
+      <FAQSection />
+      <CTAFinalSection />
+      <Footer />
     </div>
   );
 }
