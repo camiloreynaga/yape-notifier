@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Crypt;
 
 class Commerce extends Model
 {
@@ -22,7 +24,16 @@ class Commerce extends Model
         'plan_expires_at',
         'approved_at',
         'approved_by',
+        'referral_code',
+        'referred_by_commerce_id',
+        'payout_bank',
+        'payout_account_type',
+        'payout_account_number',
+        'payout_account_holder',
+        'payout_account_holder_doc',
     ];
+
+    protected $hidden = ['payout_account_number'];
 
     protected function casts(): array
     {
@@ -30,6 +41,14 @@ class Commerce extends Model
             'approved_at' => 'datetime',
             'plan_expires_at' => 'datetime',
         ];
+    }
+
+    protected function payoutAccountNumber(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value) => $value === null ? null : Crypt::decryptString($value),
+            set: fn ($value) => $value === null ? null : Crypt::encryptString($value),
+        );
     }
 
     public function isActive(): bool
@@ -125,9 +144,33 @@ class Commerce extends Model
         return (int) round(now()->diffInDays($this->plan_expires_at, false));
     }
 
+    public function hasPayoutAccount(): bool
+    {
+        return filled($this->payout_bank)
+            && filled($this->payout_account_type)
+            && filled($this->payout_account_number)
+            && filled($this->payout_account_holder)
+            && filled($this->payout_account_holder_doc);
+    }
+
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_user_id');
+    }
+
+    public function referrer(): BelongsTo
+    {
+        return $this->belongsTo(Commerce::class, 'referred_by_commerce_id');
+    }
+
+    public function referrals(): HasMany
+    {
+        return $this->hasMany(Commerce::class, 'referred_by_commerce_id');
+    }
+
+    public function referralCommissionsEarned(): HasMany
+    {
+        return $this->hasMany(ReferralCommission::class, 'referrer_commerce_id');
     }
 
     public function plan(): BelongsTo
