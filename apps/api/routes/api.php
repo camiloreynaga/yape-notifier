@@ -12,6 +12,7 @@ use App\Http\Controllers\MonitorPackageController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PinAuthController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\PayoutAccountController;
 use App\Http\Controllers\SuperAdmin\CommerceManagementController;
 use App\Http\Controllers\SuperAdmin\DashboardController;
 use App\Http\Controllers\SuperAdmin\PlanController;
@@ -85,6 +86,9 @@ Route::middleware(['auth:sanctum', 'commerce.active'])->group(function () {
         Route::apiResource('users', UserController::class);
         Route::post('/users/{id}/regenerate-pin', [UserController::class, 'regeneratePin']);
         Route::post('/users/{id}/regenerate-password', [UserController::class, 'regeneratePassword']);
+
+        Route::get('/commerces/me/payout-account', [PayoutAccountController::class, 'show']);
+        Route::put('/commerces/me/payout-account', [PayoutAccountController::class, 'update']);
     });
 });
 
