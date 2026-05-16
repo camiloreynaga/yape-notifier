@@ -14,6 +14,7 @@ use App\Http\Controllers\PinAuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\PayoutAccountController;
 use App\Http\Controllers\SuperAdmin\CommerceManagementController;
+use App\Http\Controllers\SuperAdmin\CommissionsController;
 use App\Http\Controllers\SuperAdmin\DashboardController;
 use App\Http\Controllers\SuperAdmin\PlanController;
 use Illuminate\Support\Facades\Route;
@@ -140,4 +141,10 @@ Route::middleware(['auth:sanctum', 'super_admin'])->prefix('admin')->group(funct
 
     // Dashboard KPIs
     Route::get('/dashboard/kpis', [DashboardController::class, 'kpis']);
+
+    // Commission management
+    Route::get('/commissions', [CommissionsController::class, 'index']);
+    Route::post('/commissions/{id}/approve', [CommissionsController::class, 'approve']);
+    Route::post('/commissions/{id}/pay', [CommissionsController::class, 'pay']);
+    Route::post('/commissions/{id}/void', [CommissionsController::class, 'void']);
 });
