@@ -12,6 +12,15 @@ import {
   XCircle,
   Coins,
   LayoutGrid,
+  Check,
+  TrendingDown,
+  AlertTriangle,
+  Smartphone,
+  Users,
+  Copy,
+  BarChart3,
+  Layers,
+  LockKeyhole,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -446,6 +455,470 @@ function SolucionSection() {
   );
 }
 
+// ─── Multi-Yape Section ──────────────────────────────────────────────────────
+
+function MultiYapeSection() {
+  const cuentas = [
+    { label: 'Bodega', amount: 'S/ 2,340', yapes: '47 Yapes hoy', borderColor: 'border-l-primary-400' },
+    { label: 'Farmacia', amount: 'S/ 5,890', yapes: '112 Yapes hoy', borderColor: 'border-l-accent-500' },
+    { label: 'Delivery', amount: 'S/ 980', yapes: '23 Yapes hoy', borderColor: 'border-l-violet-400' },
+  ];
+
+  const bullets = [
+    'Soporta Yape personal + Yape negocio en el mismo celular (Android multi-user)',
+    'Detecta automáticamente de qué cuenta vino cada pago',
+    'Reportes consolidados o filtrados por cuenta',
+  ];
+
+  return (
+    <section id="multi-yape" className="py-24 bg-gradient-to-br from-primary-50 via-white to-accent-50">
+      <div className="max-w-7xl mx-auto px-6">
+        {/* Header */}
+        <p className="text-primary-700 uppercase tracking-widest text-sm font-medium">El feature que nadie más tiene</p>
+        <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mt-3 max-w-3xl leading-tight">
+          ¿Tienes 2, 3 o 5 cuentas Yape? Las controlas todas desde la misma pantalla.
+        </h2>
+        <p className="text-lg text-slate-600 mt-4 max-w-2xl leading-relaxed">
+          Yape de la bodega + Yape de la farmacia + Yape de delivery. En un solo lugar,
+          separados por instancia, con KPIs individuales.
+        </p>
+
+        {/* Diagram */}
+        <div className="mt-16 flex flex-col lg:flex-row items-center gap-10 lg:gap-8">
+          {/* Left: stacked phones */}
+          <div className="relative flex items-center justify-center w-72 h-64 shrink-0">
+            {/* Phone 3 — back */}
+            <div className="absolute top-0 left-4 w-36 h-60 bg-slate-900 rounded-[22px] shadow-lg ring-1 ring-white/10 transform rotate-[-6deg] translate-y-2">
+              <div className="m-1.5 h-full bg-white rounded-[18px] overflow-hidden">
+                <div className="bg-primary-700 px-3 py-2">
+                  <p className="text-white text-[10px] font-bold leading-tight">Yape · Delivery</p>
+                </div>
+              </div>
+            </div>
+            {/* Phone 2 — middle */}
+            <div className="absolute top-3 left-14 w-36 h-60 bg-slate-900 rounded-[22px] shadow-xl ring-1 ring-white/10 transform rotate-[-2deg]">
+              <div className="m-1.5 h-full bg-white rounded-[18px] overflow-hidden">
+                <div className="bg-primary-700 px-3 py-2">
+                  <p className="text-white text-[10px] font-bold leading-tight">Yape · Farmacia</p>
+                </div>
+              </div>
+            </div>
+            {/* Phone 1 — front */}
+            <div className="absolute top-6 left-24 w-36 h-60 bg-slate-900 rounded-[22px] shadow-2xl ring-1 ring-white/10 transform rotate-[3deg]">
+              <div className="m-1.5 h-full bg-white rounded-[18px] overflow-hidden">
+                <div className="bg-primary-700 px-3 py-2">
+                  <p className="text-white text-[10px] font-bold leading-tight">Yape · Bodega</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Arrow */}
+          <div className="flex flex-col lg:flex-row items-center gap-2 shrink-0">
+            <ArrowRight className="h-12 w-12 text-primary-500 hidden lg:block" />
+            <ArrowRight className="h-8 w-8 text-primary-500 rotate-90 lg:hidden" />
+          </div>
+
+          {/* Right: dashboard card */}
+          <div className="flex-1 bg-white rounded-3xl shadow-xl ring-1 ring-slate-200 p-6 min-w-0">
+            <div className="flex items-center justify-between mb-5">
+              <p className="text-xs text-slate-400 uppercase tracking-widest font-medium">Dashboard Yape Notifier</p>
+              <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                En vivo
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              {cuentas.map((c) => (
+                <div
+                  key={c.label}
+                  className={`border-l-4 ${c.borderColor} pl-4 py-2`}
+                >
+                  <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">{c.label}</p>
+                  <p className="text-2xl font-extrabold text-slate-900 mt-1 font-mono tabular-nums">{c.amount}</p>
+                  <p className="text-xs text-slate-500 mt-1">{c.yapes}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Bullet points */}
+        <ul className="mt-12 flex flex-col sm:flex-row gap-4 sm:gap-8">
+          {bullets.map((b) => (
+            <li key={b} className="flex items-start gap-2.5">
+              <Check className="w-5 h-5 text-accent-500 shrink-0 mt-0.5" />
+              <span className="text-slate-700 text-sm leading-relaxed">{b}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+// ─── Loss Calculator Section ─────────────────────────────────────────────────
+
+function LossCalculatorSection() {
+  const [yapesPerMonth, setYapesPerMonth] = useState(300);
+  const [avgTicket, setAvgTicket] = useState(50);
+  const [employees, setEmployees] = useState(3);
+
+  const annualYapes = yapesPerMonth * 12;
+  const falsosLoss = annualYapes * avgTicket * 0.02;
+  const skimmingLoss = employees * 100 * 12;
+  const totalLoss = falsosLoss + skimmingLoss;
+
+  const fmt = (n: number) =>
+    new Intl.NumberFormat('es-PE', { maximumFractionDigits: 0 }).format(n);
+
+  type SliderProps = {
+    label: string;
+    value: number;
+    min: number;
+    max: number;
+    step: number;
+    onChange: (v: number) => void;
+    suffix?: string;
+  };
+
+  function Slider({ label, value, min, max, step, onChange, suffix = '' }: SliderProps) {
+    return (
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-primary-100/80">{label}</span>
+          <span className="bg-white/10 text-white text-sm font-semibold px-3 py-0.5 rounded-full tabular-nums">
+            {value}{suffix}
+          </span>
+        </div>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="w-full h-2 rounded-full appearance-none cursor-pointer bg-white/10"
+          style={{ accentColor: '#1FD4D4' }}
+        />
+        <div className="flex justify-between text-xs text-primary-100/40">
+          <span>{min}{suffix}</span>
+          <span>{max}{suffix}</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <section id="calculadora" className="py-24 bg-gradient-to-b from-primary-900 to-[#1E0840] text-white">
+      <div className="max-w-7xl mx-auto px-6">
+        {/* Header */}
+        <p className="text-accent-400 uppercase tracking-widest text-sm font-medium">El costo de no controlarlo</p>
+        <h2 className="text-4xl md:text-5xl font-bold mt-3 max-w-3xl leading-tight">
+          ¿Cuánto te está costando ahora mismo?
+        </h2>
+        <p className="text-primary-100/70 mt-4 max-w-2xl text-lg leading-relaxed">
+          Ajusta los valores y mira cuánto pierdes al año por pagos falsos y robo sistemático.
+          Spoiler: más que la suscripción.
+        </p>
+
+        {/* Two-column layout */}
+        <div className="mt-12 grid lg:grid-cols-2 gap-12 items-start">
+          {/* Left: sliders */}
+          <div className="flex flex-col gap-8">
+            <Slider
+              label="Yapes que recibes al mes"
+              value={yapesPerMonth}
+              min={50}
+              max={2000}
+              step={50}
+              onChange={setYapesPerMonth}
+            />
+            <Slider
+              label="Ticket promedio (S/)"
+              value={avgTicket}
+              min={10}
+              max={500}
+              step={5}
+              onChange={setAvgTicket}
+              suffix=" S/"
+            />
+            <Slider
+              label="Trabajadores que manejan Yape"
+              value={employees}
+              min={1}
+              max={15}
+              step={1}
+              onChange={setEmployees}
+            />
+          </div>
+
+          {/* Right: results card */}
+          <div className="bg-white/5 ring-1 ring-white/10 rounded-3xl p-8 backdrop-blur-sm">
+            {/* Row 1: pagos falsos */}
+            <div className="flex items-start gap-4 pb-5 border-b border-white/10">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/20 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-rose-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-primary-100/70">Pagos falsos sin detectar (2% est.)</p>
+                <p className="text-2xl font-bold text-rose-300 mt-1 tabular-nums">
+                  S/ {fmt(falsosLoss)}/año
+                </p>
+              </div>
+            </div>
+
+            {/* Row 2: skimming */}
+            <div className="flex items-start gap-4 py-5 border-b border-white/10">
+              <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center shrink-0">
+                <TrendingDown className="w-5 h-5 text-orange-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-primary-100/70">Gota a gota de cajeros (~S/ 100/mes por trabajador)</p>
+                <p className="text-2xl font-bold text-orange-300 mt-1 tabular-nums">
+                  S/ {fmt(skimmingLoss)}/año
+                </p>
+              </div>
+            </div>
+
+            {/* Total */}
+            <div className="pt-6">
+              <p className="text-xs text-primary-100/40 uppercase tracking-widest font-medium">Total que estás perdiendo</p>
+              <p className="text-5xl md:text-6xl font-extrabold text-rose-400 mt-2 tabular-nums leading-none">
+                S/ {fmt(totalLoss)}/año
+              </p>
+              <p className="text-accent-300 mt-6 text-lg">
+                Recuperas todo eso por solo{' '}
+                <strong className="text-accent-200">S/ 49 al mes</strong>.
+              </p>
+              <Link
+                to="/register"
+                className="bg-accent-500 text-primary-900 px-6 py-3 rounded-full font-semibold mt-6 inline-flex items-center gap-2 hover:bg-accent-400 transition"
+              >
+                Cerrar la fuga ahora
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Features Bento Grid ─────────────────────────────────────────────────────
+
+function FeaturesBentoSection() {
+  return (
+    <section id="producto" className="py-24 bg-surface-warm">
+      <div className="max-w-7xl mx-auto px-6">
+        {/* Header */}
+        <p className="text-primary-700 uppercase tracking-widest text-sm font-medium">
+          Todo lo que necesitas, nada que estorbe
+        </p>
+        <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mt-3 leading-tight">
+          Diseñado para negocios reales.
+        </h2>
+
+        {/* Bento grid */}
+        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Cell 1 — 2 cols */}
+          <div className="md:col-span-2 bg-white rounded-3xl p-8 ring-1 ring-slate-200 flex flex-col justify-between">
+            <div>
+              <div className="w-10 h-10 rounded-xl bg-primary-50 text-primary-700 flex items-center justify-center">
+                <Smartphone className="w-5 h-5" />
+              </div>
+              <h3 className="text-xl font-semibold text-slate-900 mt-4">Multi-dispositivo Android</h3>
+              <p className="text-slate-600 mt-2 text-sm leading-relaxed">
+                Conecta 1, 5 o 50 celulares al mismo dashboard. Cada uno reporta sus Yapes en
+                tiempo real. Sin límite de captadores.
+              </p>
+            </div>
+            {/* Mini visual: 3 phone icons */}
+            <div className="flex items-end gap-3 mt-8 opacity-80">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="bg-primary-50 rounded-xl p-3 ring-1 ring-primary-100 flex flex-col items-center gap-1"
+                  style={{ transform: `scale(${0.85 + i * 0.075})` }}
+                >
+                  <Smartphone className="w-5 h-5 text-primary-600" />
+                  <span className="text-[10px] text-primary-500 font-medium">Captador {i + 1}</span>
+                </div>
+              ))}
+              <div className="ml-auto text-xs text-slate-400 italic self-center">+ más</div>
+            </div>
+          </div>
+
+          {/* Cell 2 */}
+          <div className="bg-white rounded-3xl p-8 ring-1 ring-slate-200">
+            <div className="w-10 h-10 rounded-xl bg-primary-50 text-primary-700 flex items-center justify-center">
+              <Users className="w-5 h-5" />
+            </div>
+            <h3 className="text-xl font-semibold text-slate-900 mt-4">Roles y permisos</h3>
+            <p className="text-slate-600 mt-2 text-sm leading-relaxed">
+              Admin gestiona, captador solo valida. PIN de 4 dígitos, sin contraseñas que se filtren.
+            </p>
+          </div>
+
+          {/* Cell 3 */}
+          <div className="bg-white rounded-3xl p-8 ring-1 ring-slate-200">
+            <div className="w-10 h-10 rounded-xl bg-primary-50 text-primary-700 flex items-center justify-center">
+              <Copy className="w-5 h-5" />
+            </div>
+            <h3 className="text-xl font-semibold text-slate-900 mt-4">Detección de duplicados</h3>
+            <p className="text-slate-600 mt-2 text-sm leading-relaxed">
+              Si el mismo Yape llega dos veces, lo marcamos. Si una captura no coincide con un Yape
+              real, también.
+            </p>
+          </div>
+
+          {/* Cell 4 */}
+          <div className="bg-white rounded-3xl p-8 ring-1 ring-slate-200">
+            <div className="w-10 h-10 rounded-xl bg-primary-50 text-primary-700 flex items-center justify-center">
+              <BarChart3 className="w-5 h-5" />
+            </div>
+            <h3 className="text-xl font-semibold text-slate-900 mt-4">Reportes en tiempo real</h3>
+            <p className="text-slate-600 mt-2 text-sm leading-relaxed">
+              KPIs por día, semana, mes. Por captador. Por cuenta Yape. Exportables a Excel.
+            </p>
+          </div>
+
+          {/* Cell 5 */}
+          <div className="bg-white rounded-3xl p-8 ring-1 ring-slate-200">
+            <div className="w-10 h-10 rounded-xl bg-primary-50 text-primary-700 flex items-center justify-center">
+              <Layers className="w-5 h-5" />
+            </div>
+            <h3 className="text-xl font-semibold text-slate-900 mt-4">Multi-app Yape</h3>
+            <p className="text-slate-600 mt-2 text-sm leading-relaxed">
+              Yape Personal + Yape Negocio en el mismo celular (Android multi-user). Cada Yape se
+              diferencia automáticamente.
+            </p>
+          </div>
+
+          {/* Cell 6 — 3 cols, feature destacado */}
+          <div className="md:col-span-3 bg-gradient-to-br from-primary-50 to-accent-50 rounded-3xl p-8 ring-1 ring-primary-100 flex flex-col md:flex-row items-start md:items-center gap-6">
+            <div className="w-12 h-12 rounded-2xl bg-primary-100 text-primary-700 flex items-center justify-center shrink-0">
+              <LockKeyhole className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-xl font-semibold text-slate-900">Tu cuenta Yape nunca sale de tus manos</h3>
+              <p className="text-slate-600 mt-2 text-sm leading-relaxed max-w-3xl">
+                Tus trabajadores ven solo lo necesario para validar un cobro. Cero acceso a saldos,
+                transferencias o contactos. Cuando un empleado renuncia, simplemente desactivas su
+                PIN — no tienes que cambiar nada en tu app de Yape.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Demo Visual Section ──────────────────────────────────────────────────────
+
+function DemoSection() {
+  type TxStatus = 'Validado' | 'Duplicado' | 'Pendiente' | 'Inconsistente';
+
+  const statusStyle: Record<TxStatus, string> = {
+    Validado: 'bg-emerald-50 text-emerald-700',
+    Duplicado: 'bg-rose-50 text-rose-700',
+    Pendiente: 'bg-amber-50 text-amber-700',
+    Inconsistente: 'bg-violet-50 text-violet-700',
+  };
+
+  const rows: { name: string; amount: string; time: string; status: TxStatus }[] = [
+    { name: 'Karol Mendoza',       amount: 'S/ 49.00',  time: '10:03',  status: 'Validado' },
+    { name: 'José Pérez',          amount: 'S/ 18.50',  time: '10:07',  status: 'Validado' },
+    { name: 'Cliente anónimo',     amount: 'S/ 200.00', time: '10:12',  status: 'Duplicado' },
+    { name: 'Ana Torres',          amount: 'S/ 35.00',  time: '10:15',  status: 'Validado' },
+    { name: 'Luis Quispe',         amount: 'S/ 80.00',  time: '10:21',  status: 'Pendiente' },
+    { name: 'María Flores',        amount: 'S/ 120.00', time: '10:28',  status: 'Validado' },
+    { name: 'Cliente anónimo',     amount: 'S/ 50.00',  time: '10:34',  status: 'Inconsistente' },
+    { name: 'Roberto Ccopa',       amount: 'S/ 25.00',  time: '10:41',  status: 'Validado' },
+  ];
+
+  return (
+    <section className="py-24 bg-white">
+      <div className="max-w-7xl mx-auto px-6">
+        {/* Header */}
+        <p className="text-primary-700 uppercase tracking-widest text-sm font-medium">Así se ve</p>
+        <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mt-3 leading-tight">
+          El Centro de Validación, en acción.
+        </h2>
+        <p className="text-slate-600 mt-4 max-w-2xl text-lg leading-relaxed">
+          Cada pago, validado o sospechoso, en una sola pantalla. Tus captadores trabajan sin
+          fricción. Tú duermes tranquilo.
+        </p>
+
+        {/* Big mockup */}
+        <div className="mt-12 max-w-5xl mx-auto bg-white rounded-3xl shadow-2xl ring-1 ring-slate-200 p-6 overflow-x-auto">
+          {/* Toolbar header */}
+          <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+            <div>
+              <p className="text-xs text-slate-400 uppercase tracking-widest font-medium">Centro de Validación</p>
+              <p className="text-sm font-semibold text-slate-700 mt-0.5">
+                Hoy · 47 operaciones
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                En vivo
+              </span>
+              <span className="text-xs text-slate-400 bg-slate-100 px-3 py-1 rounded-full">Hoy</span>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="min-w-[480px]">
+            {/* Header row */}
+            <div className="grid grid-cols-4 px-4 py-2 bg-slate-50 rounded-xl mb-1">
+              <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Enviado por</span>
+              <span className="text-xs text-slate-400 font-medium uppercase tracking-wider text-center">Monto</span>
+              <span className="text-xs text-slate-400 font-medium uppercase tracking-wider text-center">Hora</span>
+              <span className="text-xs text-slate-400 font-medium uppercase tracking-wider text-right">Estado</span>
+            </div>
+            {/* Data rows */}
+            {rows.map((row, i) => (
+              <div
+                key={i}
+                className={`grid grid-cols-4 px-4 py-3 items-center rounded-lg ${
+                  i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'
+                } hover:bg-primary-50/30 transition-colors`}
+              >
+                <span className="text-sm font-medium text-slate-800 truncate pr-2">{row.name}</span>
+                <span className="text-sm font-mono tabular-nums text-slate-700 text-center">{row.amount}</span>
+                <span className="text-xs text-slate-400 text-center font-mono">{row.time}</span>
+                <div className="flex justify-end">
+                  <span
+                    className={`inline-flex text-xs font-semibold px-2.5 py-1 rounded-full ${
+                      statusStyle[row.status]
+                    }`}
+                  >
+                    {row.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Captions */}
+        <div className="mt-8 flex flex-col sm:flex-row gap-3 text-sm text-slate-600 max-w-5xl mx-auto">
+          <span className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-full">
+            🟢 Verde = validado y registrado.
+          </span>
+          <span className="bg-rose-50 text-rose-700 px-4 py-2 rounded-full">
+            🌸 Rosa = duplicado o falso detectado automáticamente.
+          </span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
@@ -456,6 +929,10 @@ export default function LandingPage() {
       <BeneficiosSection />
       <ProblemaSection />
       <SolucionSection />
+      <MultiYapeSection />
+      <LossCalculatorSection />
+      <FeaturesBentoSection />
+      <DemoSection />
     </div>
   );
 }
