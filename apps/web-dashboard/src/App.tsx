@@ -23,6 +23,7 @@ const SuperAdminPage = lazy(() => import('./pages/SuperAdminPage'));
 const SuperAdminCommercesTab = lazy(() => import('./pages/SuperAdminCommercesTab'));
 const SuperAdminPlansTab = lazy(() => import('./pages/SuperAdminPlansTab'));
 const SuperAdminCommissionsTab = lazy(() => import('./pages/SuperAdminCommissionsTab'));
+const LandingPage = lazy(() => import('./pages/LandingPage'));
 
 // Configurar React Query Client
 const queryClient = new QueryClient({
@@ -134,12 +135,12 @@ function AppRoutes() {
             <Route path="commissions" element={<SuperAdminCommissionsTab />} />
           </Route>
         </Route>
-        <Route path="/" element={
+        <Route path="/" element={<LandingPage />} />
+        <Route element={
           <PrivateRoute requireCommerce={true}>
             <AppLayout />
           </PrivateRoute>
         }>
-          <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
           {/* Rutas individuales para deep linking */}
           <Route path="notifications" element={<Navigate to="/dashboard?tab=notifications" replace />} />
