@@ -1,5 +1,5 @@
 import { Outlet, NavLink } from 'react-router-dom';
-import { Building2, CreditCard, Shield } from 'lucide-react';
+import { Building2, CreditCard, Shield, Banknote } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function SuperAdminPage() {
@@ -34,6 +34,14 @@ export default function SuperAdminPage() {
             }
           >
             <CreditCard className="h-4 w-4" /> Planes
+          </NavLink>
+          <NavLink
+            to="/super-admin/commissions"
+            className={({ isActive }) =>
+              `flex items-center gap-2 border-b-2 py-3 px-1 text-sm font-medium ${isActive ? 'border-primary-600 text-primary-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`
+            }
+          >
+            <Banknote className="h-4 w-4" /> Comisiones
           </NavLink>
         </nav>
       </div>

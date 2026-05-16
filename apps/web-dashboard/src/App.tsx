@@ -22,6 +22,7 @@ const CommerceStatusPage = lazy(() => import('./pages/CommerceStatusPage'));
 const SuperAdminPage = lazy(() => import('./pages/SuperAdminPage'));
 const SuperAdminCommercesTab = lazy(() => import('./pages/SuperAdminCommercesTab'));
 const SuperAdminPlansTab = lazy(() => import('./pages/SuperAdminPlansTab'));
+const SuperAdminCommissionsTab = lazy(() => import('./pages/SuperAdminCommissionsTab'));
 
 // Configurar React Query Client
 const queryClient = new QueryClient({
@@ -130,6 +131,7 @@ function AppRoutes() {
             <Route index element={<Navigate to="/super-admin/commerces" replace />} />
             <Route path="commerces" element={<SuperAdminCommercesTab />} />
             <Route path="plans" element={<SuperAdminPlansTab />} />
+            <Route path="commissions" element={<SuperAdminCommissionsTab />} />
           </Route>
         </Route>
         <Route path="/" element={
