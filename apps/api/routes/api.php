@@ -89,6 +89,10 @@ Route::middleware(['auth:sanctum', 'commerce.active'])->group(function () {
 
         Route::get('/commerces/me/payout-account', [PayoutAccountController::class, 'show']);
         Route::put('/commerces/me/payout-account', [PayoutAccountController::class, 'update']);
+
+        Route::get('/referrals/stats', [\App\Http\Controllers\ReferralController::class, 'stats']);
+        Route::get('/referrals/referrals', [\App\Http\Controllers\ReferralController::class, 'referrals']);
+        Route::get('/referrals/commissions', [\App\Http\Controllers\ReferralController::class, 'commissions']);
     });
 });
 
