@@ -8,6 +8,7 @@ import {
   Settings,
   LogOut,
   Shield,
+  Gift,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -24,6 +25,7 @@ const NAV: NavItem[] = [
   { to: '/dashboard?tab=devices',           tab: 'devices',        label: 'Dispositivos',   icon: Smartphone },
   { to: '/dashboard?tab=employees',         tab: 'employees',      label: 'Empleados',      icon: Users },
   { to: '/dashboard?tab=logs',              tab: 'logs',           label: 'Logs',           icon: ScrollText },
+  { to: '/dashboard?tab=referrals',         tab: 'referrals',      label: 'Referidos',      icon: Gift },
   { to: '/dashboard?tab=settings',          tab: 'settings',       label: 'Configuracion',  icon: Settings },
 ];
 
