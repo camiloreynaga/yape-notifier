@@ -36,6 +36,7 @@ class ReferralController extends Controller
             'lifetime_paid' => round((float) $lifetimePaid, 2),
             'active_referrals_count' => $activeReferralsCount,
             'referral_code' => $commerce->referral_code,
+            'referral_code_customized_at' => $commerce->referral_code_customized_at,
         ]);
     }
 
@@ -62,6 +63,26 @@ class ReferralController extends Controller
             $q->where('status', $status);
         }
         return response()->json($q->paginate(20));
+    }
+
+    public function customizeCode(\App\Http\Requests\Commerce\CustomizeReferralCodeRequest $request): JsonResponse
+    {
+        $commerce = $this->resolveCommerce($request);
+        abort_if(
+            $commerce->referral_code_customized_at !== null,
+            422,
+            'Ya personalizaste tu código y no se puede cambiar'
+        );
+
+        $commerce->update([
+            'referral_code' => $request->input('referral_code'),
+            'referral_code_customized_at' => now(),
+        ]);
+
+        return response()->json([
+            'referral_code' => $commerce->referral_code,
+            'referral_code_customized_at' => $commerce->referral_code_customized_at,
+        ]);
     }
 
     private function resolveCommerce(Request $request): Commerce

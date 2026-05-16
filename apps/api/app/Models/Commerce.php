@@ -25,6 +25,7 @@ class Commerce extends Model
         'approved_at',
         'approved_by',
         'referral_code',
+        'referral_code_customized_at',
         'referred_by_commerce_id',
         'payout_bank',
         'payout_account_type',
@@ -40,6 +41,7 @@ class Commerce extends Model
         return [
             'approved_at' => 'datetime',
             'plan_expires_at' => 'datetime',
+            'referral_code_customized_at' => 'datetime',
         ];
     }
 

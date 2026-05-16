@@ -94,6 +94,7 @@ Route::middleware(['auth:sanctum', 'commerce.active'])->group(function () {
         Route::get('/referrals/stats', [\App\Http\Controllers\ReferralController::class, 'stats']);
         Route::get('/referrals/referrals', [\App\Http\Controllers\ReferralController::class, 'referrals']);
         Route::get('/referrals/commissions', [\App\Http\Controllers\ReferralController::class, 'commissions']);
+        Route::patch('/referrals/code', [\App\Http\Controllers\ReferralController::class, 'customizeCode']);
     });
 });
 
