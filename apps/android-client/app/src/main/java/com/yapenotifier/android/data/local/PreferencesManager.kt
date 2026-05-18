@@ -28,7 +28,8 @@ class PreferencesManager(private val context: Context) {
         private val WIZARD_COMPLETED_KEY = booleanPreferencesKey("wizard_completed")
         private val SELECTED_MONITORED_PACKAGES_KEY = stringSetPreferencesKey("selected_monitored_packages")
         private val HEARTBEAT_INTERVAL_MINUTES_KEY = intPreferencesKey("heartbeat_interval_minutes")
-        
+        private val AWAITING_LOGIN_KEY = booleanPreferencesKey("awaiting_login")
+
         // Default heartbeat interval: 15 minutes
         // Professional practice: Reasonable default that balances battery life and connection status accuracy
         const val DEFAULT_HEARTBEAT_INTERVAL_MINUTES = 15
@@ -38,6 +39,15 @@ class PreferencesManager(private val context: Context) {
 
     val authToken: Flow<String?> = context.dataStore.data.map { preferences ->
         preferences[AUTH_TOKEN_KEY]
+    }
+
+    /**
+     * True when the app is waiting for the user to re-login after a 401.
+     * Set by AuthSessionManager.handleTokenExpired, cleared by handleLoginSucceeded.
+     * Source of truth for the SendNotificationWorker guard.
+     */
+    val awaitingLogin: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[AWAITING_LOGIN_KEY] ?: false
     }
 
     val isAdminMode: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -170,6 +180,12 @@ class PreferencesManager(private val context: Context) {
     suspend fun clearAuthToken() {
         context.dataStore.edit { preferences ->
             preferences.remove(AUTH_TOKEN_KEY)
+        }
+    }
+
+    suspend fun setAwaitingLogin(value: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[AWAITING_LOGIN_KEY] = value
         }
     }
 
