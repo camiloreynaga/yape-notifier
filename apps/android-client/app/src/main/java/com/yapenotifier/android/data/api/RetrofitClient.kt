@@ -82,8 +82,19 @@ object RetrofitClient {
                 requestBuilder.addHeader("Authorization", "Bearer $it")
             }
 
-            val request = requestBuilder.build()
-            chain.proceed(request)
+            val response = chain.proceed(requestBuilder.build())
+
+            // Detect 401 ONLY if we actually sent a token (avoid loops on anonymous requests).
+            // AuthSessionManager handles the rest asynchronously — never blocks the interceptor.
+            if (response.code == 401 && token != null) {
+                Timber.tag("RetrofitClient").w("401 on ${originalRequest.url.encodedPath} — dispatching to AuthSessionManager")
+                com.yapenotifier.android.data.auth.AuthSessionManager.handleTokenExpiredAsync(
+                    context = context,
+                    endpoint = originalRequest.url.encodedPath,
+                )
+            }
+
+            response
         }
 
         val okHttpClient = OkHttpClient.Builder()
