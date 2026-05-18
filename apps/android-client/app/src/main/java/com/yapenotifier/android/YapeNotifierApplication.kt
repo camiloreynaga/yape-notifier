@@ -51,6 +51,12 @@ class YapeNotifierApplication : Application() {
         // and any other code that reads ServiceStatusManager.isServiceConnected().
         ServiceStatusManager.init(this)
 
+        // CRITICAL: Initialize AuthSessionManager synchronously. Registers appContext,
+        // appScope and initialized=true immediately. Hydrates the awaitingLogin mirror
+        // from DataStore in background. Must run before any code that may trigger a 401
+        // (e.g. bootstrap, watchdog, etc.).
+        com.yapenotifier.android.data.auth.AuthSessionManager.initialize(this, applicationScope)
+
         Timber.tag("YapeNotifierApplication").d("Application created. API URL: ${BuildConfig.API_BASE_URL}")
         
         // Create notification channels (required for Android 8.0+)
