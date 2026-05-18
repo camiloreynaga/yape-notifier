@@ -31,6 +31,7 @@ import com.yapenotifier.android.ui.viewmodel.StatisticsState
 import com.yapenotifier.android.ui.viewmodel.StatisticsViewModel
 import android.util.Log
 import com.yapenotifier.android.util.NotificationAccessChecker
+import com.yapenotifier.android.util.OemDetection
 import com.yapenotifier.android.util.PaymentNotificationParser
 import com.yapenotifier.android.util.ServiceStatusManager
 import com.yapenotifier.android.ui.model.AppStatus
@@ -80,9 +81,24 @@ class MainActivity : AppCompatActivity() {
         setupUI()
         setupObservers()
         setupClickListeners()
+        setupRecoveryCard()
         loadUserInfo()
         updateAllPermissionStatus()
         createNotificationChannel()
+    }
+
+    private fun setupRecoveryCard() {
+        // Show OEM-specific hint if available
+        OemDetection.extraHint()?.let { hint ->
+            binding.tvRecoveryOemHint.text = hint
+            binding.tvRecoveryOemHint.visibility = android.view.View.VISIBLE
+        }
+        binding.btnRecoveryOpenSettings.setOnClickListener {
+            val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            startActivity(intent)
+        }
     }
 
     private fun setupUI() {
@@ -211,6 +227,10 @@ class MainActivity : AppCompatActivity() {
      * 'CapturingOK' is never shown when awaitingLogin == true.
      */
     private fun updateCaptureStatusFromAppStatus(status: AppStatus) {
+        val isDeadManual = status is AppStatus.ListenerDeadManualNeeded
+        binding.cardRecovery.visibility =
+            if (isDeadManual) android.view.View.VISIBLE else android.view.View.GONE
+
         when (status) {
             is AppStatus.TokenExpired -> {
                 updateCaptureStatus("⚠️ Sesión expirada — toca para iniciar sesión", Color.parseColor("#F44336"))
@@ -227,11 +247,8 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             is AppStatus.ListenerDeadManualNeeded -> {
-                // Full recovery card UI comes in Task 2.3; minimal banner for now
-                updateCaptureStatus("⚠️ Acción requerida: reactiva el permiso de notificaciones", Color.parseColor("#FF9800"))
-                binding.cardCaptureStatus.setOnClickListener {
-                    NotificationAccessChecker.openNotificationListenerSettings(this)
-                }
+                updateCaptureStatus("⚠️ Servicio detenido", Color.parseColor("#FF9800"))
+                binding.cardCaptureStatus.setOnClickListener(null)
             }
             is AppStatus.ListenerReconnecting -> {
                 updateCaptureStatus("🔄 Reconectando servicio...", Color.parseColor("#FF9800"))
@@ -379,17 +396,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateAllPermissionStatus() {
-        lifecycleScope.launch {
-            val notificationAccessEnabled = withContext(Dispatchers.IO) {
-                NotificationAccessChecker.isNotificationAccessEnabled(this@MainActivity)
-            }
-            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-            val isIgnoringOptimizations = withContext(Dispatchers.IO) {
-                powerManager.isIgnoringBatteryOptimizations(packageName)
-            }
-            updateNotificationPermissionStatus(notificationAccessEnabled)
-            updateBatteryOptimizationStatus(isIgnoringOptimizations)
-        }
+        // Task 2.4 fix: isNotificationAccessEnabled and isIgnoringBatteryOptimizations are
+        // synchronous calls that are safe to call on the main thread. By calling them directly
+        // (without Dispatchers.IO), the permission rows are populated immediately on every
+        // onResume — preventing the "Permisos del Sistema vacíos" bug observed on MIUI/Phone 1
+        // where the coroutine dispatch delay left the section empty until the first emission.
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        val notificationAccessEnabled =
+            NotificationAccessChecker.isNotificationAccessEnabled(this)
+        val isIgnoringOptimizations =
+            powerManager.isIgnoringBatteryOptimizations(packageName)
+        updateNotificationPermissionStatus(notificationAccessEnabled)
+        updateBatteryOptimizationStatus(isIgnoringOptimizations)
     }
 
     private fun updateNotificationPermissionStatus(isGranted: Boolean) {

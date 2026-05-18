@@ -333,15 +333,27 @@ class ServiceWatchdogWorker(appContext: Context, workerParams: WorkerParameters)
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
+            val bigText = buildString {
+                append("El servicio no pudo reconectarse automáticamente.\n\n")
+                append("Pasos para reactivar:\n")
+                append("1. Toca esta notificación.\n")
+                append("2. Busca NotiCentral en la lista.\n")
+                append("3. Apaga el switch.\n")
+                append("4. Espera 2 segundos.\n")
+                append("5. Vuélvelo a prender.\n")
+                com.yapenotifier.android.util.OemDetection.extraHint()?.let {
+                    append("\n")
+                    append(it)
+                }
+            }
+
             val notification = NotificationCompat.Builder(
                 applicationContext,
                 YapeNotifierApplication.ALERT_CHANNEL_ID
             )
-                .setContentTitle("NotiCentral necesita atención")
-                .setContentText("Servicio desconectado. Toca para reactivar permiso de notificaciones.")
-                .setStyle(NotificationCompat.BigTextStyle()
-                    .bigText("El servicio no pudo reconectarse automáticamente. " +
-                        "Toca para abrir Ajustes y desactiva/reactiva el permiso de NotiCentral."))
+                .setContentTitle("NotiCentral · Servicio detenido")
+                .setContentText("Apaga y prende el permiso para reactivar el servicio.")
+                .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
                 .setSmallIcon(R.drawable.ic_bell_notification)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setContentIntent(pendingIntent)

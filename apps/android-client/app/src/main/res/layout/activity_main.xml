@@ -153,6 +153,111 @@
                 </androidx.constraintlayout.widget.ConstraintLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- ========== RECOVERY CARD (ListenerDeadManualNeeded) ========== -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardRecovery"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:visibility="gone"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="8dp"
+                app:strokeWidth="2dp"
+                app:strokeColor="#F59E0B"
+                app:cardBackgroundColor="#FFFBEB">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <!-- Title -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="&#9888;&#65039; Servicio detenido — necesita atención"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="#B45309" />
+
+                    <!-- Description -->
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="Android suspendió la captura de notificaciones. Reactiva siguiendo estos pasos:"
+                        android:textSize="14sp"
+                        android:textColor="#78350F" />
+
+                    <!-- Steps -->
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="1. Toca el botón de abajo"
+                        android:textSize="14sp"
+                        android:textColor="#92400E" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="2. Busca &quot;NotiCentral&quot; en la lista"
+                        android:textSize="14sp"
+                        android:textColor="#92400E" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="3. Apaga el switch del permiso"
+                        android:textSize="14sp"
+                        android:textColor="#92400E" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="4. Espera 2 segundos"
+                        android:textSize="14sp"
+                        android:textColor="#92400E" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="5. Vuelve a prender el switch"
+                        android:textSize="14sp"
+                        android:textColor="#92400E" />
+
+                    <!-- OEM hint (shown dynamically from code when extraHint() != null) -->
+                    <TextView
+                        android:id="@+id/tvRecoveryOemHint"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:textSize="12sp"
+                        android:textColor="#9CA3AF"
+                        android:visibility="gone" />
+
+                    <!-- Action button -->
+                    <Button
+                        android:id="@+id/btnRecoveryOpenSettings"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:layout_marginTop="16dp"
+                        android:background="@drawable/bg_button_primary"
+                        android:text="ABRIR AJUSTES DEL PERMISO"
+                        android:textColor="@android:color/white"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textAllCaps="true"
+                        android:stateListAnimator="@null" />
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
             <!-- ========== STATISTICS SECTION ========== -->
             <TextView
                 android:id="@+id/tvStatisticsTitle"
