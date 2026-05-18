@@ -1,16 +1,16 @@
 # Android — Manejo de token expirado y recuperación del servicio en MIUI
 
-> **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development o superpowers:executing-plans. Tareas con checkbox `- [ ]` para tracking. Backend con TDD vía PHPUnit; Android sin tests automáticos por convención del repo — verificación con build + run manual.
+> **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development. Tareas con checkbox `- [ ]` para tracking. Android sin tests automáticos en este repo — verificación con build + smoke manual. Backend solo investigación (no cambios obligatorios).
 
 **Goal:** Eliminar dos bugs operacionales reportados por usuarios reales:
 - (A) Token de Sanctum expira y la app queda enviando 401 indefinidamente con notificaciones varadas — sin avisar al usuario.
 - (B) En MIUI/Xiaomi (y otros OEMs agresivos), Android mata el binding al `NotificationListenerService` y `requestRebind()` no logra reactivarlo. El usuario debe ir a Ajustes y togglear el permiso manualmente — proceso engorroso y sin guía visual.
 
-**Architecture:** Dos fixes paralelos e independientes. (A) cambia el flujo del worker de envío + storage del token + agrega un canal de notificación de "sesión expirada" que abre `MainActivity` (que ya rutea a login si no hay token). (B) refuerza la UX del `MainActivity` y del `ServiceWatchdogWorker`: mensajes específicos por OEM, shortcut directo al toggle, opcionalmente un wizard de auto-recuperación que abre la pantalla del permiso y muestra instrucciones overlay.
+**Architecture:** Un `AuthSessionManager` idempotente, autoritativo, con DataStore como fuente única de verdad para `awaitingLogin`. El bus de eventos queda como complemento de UI, no como pieza crítica. El interceptor real (lambda inline en `RetrofitClient.kt`) detecta 401 y dispara el manager por la versión async (sin `runBlocking`). Las 3 login VMs invocan `AuthSessionManager.handleLoginSucceeded()` en lugar de `saveAuthToken()` directo. El worker chequea `awaitingLogin` al inicio y termina rápido sin tocar la red. Para MIUI, UX guiada con estado terminal explícito (`MANUAL_ACTION_REQUIRED`).
 
-**Tech stack:** Android Kotlin + Hilt-less manual DI (estilo del repo) + WorkManager + Retrofit/OkHttp + SharedPreferences (`PreferencesManager`) + Laravel Sanctum (lado servidor — solo se diagnostica, no se cambia en este plan a menos que se confirme un bug de config).
+**Tech stack:** Android Kotlin + manual DI estilo del repo + WorkManager + Retrofit/OkHttp + DataStore (`PreferencesManager`) + Room (`CapturedNotificationDao`). Backend: Laravel Sanctum (lado servidor — solo se diagnostica).
 
-**Spec:** este mismo documento incluye spec + plan (alcance pequeño, no amerita doc separado).
+**Spec:** este documento incluye spec + plan; alcance limitado, no amerita doc separado.
 
 **Evidencia que sustenta el plan:**
 - Audit log [`service_log (2).txt`](service_log (2).txt) — 5 días, 0 AUTH_ERROR pero 171 RECONNECT con muchos falsos positivos.
@@ -21,23 +21,53 @@
 
 ---
 
+## Hechos verificados del codebase (antes de tocar nada)
+
+Cada uno con file:line para que cualquier subagent encuentre el contexto sin re-investigar.
+
+| Hecho | Verificado en |
+|---|---|
+| `AuthInterceptor.kt` class **es código muerto**: nunca se instancia. | [`AuthInterceptor.kt`](apps/android-client/app/src/main/java/com/yapenotifier/android/data/api/AuthInterceptor.kt) (existe pero no se importa) |
+| El interceptor real es un lambda inline con `tokenCache: AtomicReference<String?>`. | [`RetrofitClient.kt:69-87`](apps/android-client/app/src/main/java/com/yapenotifier/android/data/api/RetrofitClient.kt#L69-L87) |
+| Cache se mantiene sincronizado con DataStore vía `observeTokenChanges()`. | [`RetrofitClient.kt:135-146`](apps/android-client/app/src/main/java/com/yapenotifier/android/data/api/RetrofitClient.kt#L135-L146) |
+| `RetrofitClient.clearTokenCache()` existe y vacía el `AtomicReference`. | [`RetrofitClient.kt:151-154`](apps/android-client/app/src/main/java/com/yapenotifier/android/data/api/RetrofitClient.kt#L151-L154) |
+| `SendNotificationWorker` solo marca `status="SENT"` dentro de `SendResult.Success`. En 401 → `break`, no toca DB. | [`SendNotificationWorker.kt:154-169`](apps/android-client/app/src/main/java/com/yapenotifier/android/worker/SendNotificationWorker.kt#L154-L169) |
+| El worker se encola **sin nombre único** desde 3 lugares (listener, login, captured-list), todos OneTime. | [`PaymentNotificationListenerService.kt:349`](apps/android-client/app/src/main/java/com/yapenotifier/android/service/PaymentNotificationListenerService.kt#L349), [`LoginViewModel.kt:200`](apps/android-client/app/src/main/java/com/yapenotifier/android/ui/viewmodel/LoginViewModel.kt#L200), [`CapturedNotificationsViewModel.kt:86`](apps/android-client/app/src/main/java/com/yapenotifier/android/ui/viewmodel/CapturedNotificationsViewModel.kt#L86) |
+| Cola pendiente en Room (`captured_notifications`), columna `status`. | [`CapturedNotificationDao.kt`](apps/android-client/app/src/main/java/com/yapenotifier/android/data/local/db/CapturedNotificationDao.kt) |
+| `rebindAttempts` y demás timestamps **ya persisten** en SharedPreferences vía `ServiceStatusManager`. | [`ServiceStatusManager.kt:13-25,186-195`](apps/android-client/app/src/main/java/com/yapenotifier/android/util/ServiceStatusManager.kt#L13-L25) |
+| Las 3 login VMs (capturer, PIN, admin) usan exactamente `preferencesManager.saveAuthToken(token)`. | [`LoginViewModel.kt:59`](apps/android-client/app/src/main/java/com/yapenotifier/android/ui/viewmodel/LoginViewModel.kt#L59), [`PinLoginViewModel.kt:43`](apps/android-client/app/src/main/java/com/yapenotifier/android/ui/viewmodel/PinLoginViewModel.kt#L43), [`AdminLoginViewModel.kt:76`](apps/android-client/app/src/main/java/com/yapenotifier/android/ui/admin/viewmodel/AdminLoginViewModel.kt#L76) |
+| `targetSdk = 34`. `POST_NOTIFICATIONS` ya declarado en manifest. | [`build.gradle.kts:36`](apps/android-client/app/build.gradle.kts#L36), [`AndroidManifest.xml:8`](apps/android-client/app/src/main/AndroidManifest.xml#L8) |
+| Nombre visible al usuario en notificaciones: **"NotiCentral"** (confirmado en [`ServiceWatchdogWorker.kt:276,318`](apps/android-client/app/src/main/java/com/yapenotifier/android/worker/ServiceWatchdogWorker.kt#L276)). | Mantener consistencia: NotiCentral siempre. |
+
+---
+
+## Reglas de diseño no negociables (las 6 condiciones)
+
+1. **No `runBlocking` dentro del interceptor OkHttp.** Trabajo I/O = `applicationScope.launch(Dispatchers.IO)`.
+2. **`AuthSessionManager` expone dos formas:**
+   - `fun handleTokenExpiredAsync(context, endpoint)` — fire-and-forget desde el interceptor.
+   - `suspend fun handleTokenExpired(context, endpoint)` — para callers ya en coroutine.
+   - `suspend fun handleLoginSucceeded(context, token)` — siempre suspendida; las VMs ya están en `viewModelScope`.
+3. **Fuente de verdad de `awaitingLogin` = DataStore** (`PreferencesManager.awaitingLogin: Flow<Boolean>`). El mirror en memoria es opcional, **inicializado** explícitamente al arrancar.
+4. **`AuthSessionManager.initialize(context)`** llamado desde `YapeNotifierApplication.onCreate()` antes que cualquier otra cosa que dependa del estado.
+5. **"NotiCentral"** es el nombre visible en TODA la UX (notif, banner, card, instrucciones OEM). El identifier técnico `Yape Notifier` solo se queda en `AndroidManifest.xml`, copyright y wordmark del landing.
+6. **Worker nunca marca SENT en 401.** Ya está así en el código — solo verificar que el rewrite no lo rompa.
+
+---
+
 ## Problema A — Token expirado sin recuperación
 
-### A.1 Diagnóstico
+### A.1 Diagnóstico (sintetizado)
 
-#### Síntomas visibles para el usuario
-- Pantalla principal muestra "Capturando OK" en verde — todo parece bien.
-- Activity log muestra "API FAIL: 401" y "Token expirado - Inicia sesión nuevamente".
-- Card "Pendientes" sube (0 → 1 → 2 → ... → 11) sin que el usuario sepa.
-- No hay flujo guiado para volver a loguearse. Las notificaciones se acumulan indefinidamente.
+**Síntomas:**
+- UI muestra "Capturando OK" en verde mientras el log dice "Token expirado".
+- Pendientes sube (0 → 11) sin alerta visible al usuario.
+- No hay flujo guiado para re-login. 11 Yapes varados al final del log.
 
-#### Comportamiento actual del código
-
-[`SendNotificationWorker.kt:159-169`](apps/android-client/app/src/main/java/com/yapenotifier/android/worker/SendNotificationWorker.kt#L159-L169) al recibir 401:
+**Comportamiento actual ([`SendNotificationWorker.kt:159-169`](apps/android-client/app/src/main/java/com/yapenotifier/android/worker/SendNotificationWorker.kt#L159-L169)):**
 
 ```kotlin
 if (sendResult.isAuthError) {
-    Timber.e("Error de autenticación (${sendResult.httpCode})... Token puede haber expirado. Deteniendo batch.")
     ServiceStatusManager.updateStatus("⚠️ Token expirado - Inicia sesión nuevamente")
     FileLogger.log("SEND", "AUTH_ERROR: http=${sendResult.httpCode}, notifId=${notification.id} - batch stopped, login required", "error")
     authFailed = true
@@ -45,99 +75,244 @@ if (sendResult.isAuthError) {
 }
 ```
 
-Lo que hace:
-- ✅ Logea el error.
-- ✅ Actualiza el banner en memoria de `ServiceStatusManager` (volátil — se pierde al matar el proceso).
-- ✅ Termina el batch (no reintenta).
+Lo que falta:
+- Limpiar el token del DataStore (cascadea al tokenCache automáticamente).
+- Persistir `awaitingLogin=true` (no hay flag).
+- Mostrar system notification persistente con CTA → `SplashActivity` (que ya rutea a login si `authToken==null`).
+- Bloquear nuevos batches mientras `awaitingLogin=true` (circuit breaker).
+- Drenar pendientes al re-login.
 
-Lo que **no** hace:
-- ❌ Llamar `preferencesManager.clearAuthToken()` (la función existe en [`PreferencesManager.kt:170`](apps/android-client/app/src/main/java/com/yapenotifier/android/data/local/PreferencesManager.kt#L170)).
-- ❌ Llamar `authInterceptor.clearToken()` para invalidar el cache en memoria del [`AuthInterceptor`](apps/android-client/app/src/main/java/com/yapenotifier/android/data/api/AuthInterceptor.kt) — la app sigue enviando el mismo Bearer expirado.
-- ❌ Mostrar una system notification persistente con CTA a re-login.
-- ❌ Suspender futuros SEND (circuit breaker). Cada nuevo Yape capturado dispara otro SEND → otro 401 → desgaste de batería / datos / logs.
-- ❌ Drenar la cola pendiente al re-loguearse (porque no hay un punto donde reaccionar al re-login).
+**Causa raíz del expiro:** queda en Task 0.1 (lectura). El fix de la app debe ser robusto independiente de la causa.
 
-#### Causa raíz del expiro
-
-El token de Sanctum normalmente **no expira** salvo que se configure. Posibles fuentes:
-
-1. **`config/sanctum.php` con `expiration` no null**. Revisar el valor en `apps/api/config/sanctum.php` y comparar con minutos transcurridos entre login y primer 401.
-2. **Un deploy con `php artisan migrate:fresh`** o un drop de `personal_access_tokens` que revoca todos los tokens viejos. Revisar `git log` y deploy log alrededor del 2026-05-16.
-3. **Logout intencional desde otro dispositivo** (admin desvincula al captador, o el captador hace logout en otra parte y el backend revoca el token). Revisar el endpoint `/api/devices/{id}/unlink` o cualquier mutación que dispare `tokens()->delete()`.
-4. **Token rotation** por parte de `sanctum.expire_on_revoke`.
-
-**Decisión de scope:** el fix de la app debe ser robusto independiente de la causa raíz. Investigar la causa es Task 1 (no bloqueante para el fix).
-
-### A.2 Solución técnica
-
-#### Principios
-
-1. **Detectar 401 a nivel HTTP (no solo en el worker)**: agregar un `AuthExpiredInterceptor` o ampliar el `AuthInterceptor` para reaccionar al `Response.code == 401` y disparar el flujo global de "logout forzado". Así cubre cualquier endpoint, no solo el envío de notificaciones.
-2. **Estado global de auth**: una `MutableStateFlow<Boolean>` o un evento broadcast/SharedFlow que cualquier capa pueda observar (`ViewModel`, `Worker`, `Service`).
-3. **Limpiar token local atómicamente**: borrar de SharedPreferences + limpiar cache del interceptor + cancelar el WorkManager job de SEND.
-4. **Notificar al usuario**: system notification persistente con tap → `MainActivity` (que ya rutea a login si `authToken == null`).
-5. **Suspender SEND**: el worker chequea un flag `awaitingLogin` antes de cada batch. Si está en true, retorna `Result.success()` sin tocar la red.
-6. **Drenar al re-login**: al login exitoso, encolar un SEND job para procesar los pendientes acumulados.
-
-#### Diseño de componentes
+### A.2 Arquitectura aprobada
 
 ```
-┌───────────────────────────────────────────────────────────────────┐
-│  HTTP layer                                                        │
-│   ┌─────────────────────┐                                          │
-│   │  AuthInterceptor    │  ── intercepta 401 ──▶  AuthEventBus     │
-│   └─────────────────────┘                          │               │
-│                                                    ▼               │
-│   ┌─────────────────────────────────────────────────────┐          │
-│   │  AuthEventBus (singleton SharedFlow<AuthEvent>)     │          │
-│   │     emit(AuthEvent.TokenExpired)                    │          │
-│   └─────────────────────────────────────────────────────┘          │
-│                                ▲                ▲                  │
-│                                │                │                  │
-│         observa │       observa │                                  │
-│   ┌────────────────┐    ┌──────────────────┐                       │
-│   │ AuthExpiryHandler│  │ MainViewModel    │                       │
-│   │ (Application-    │  │ (UI live)        │                       │
-│   │  level)          │  └──────────────────┘                       │
-│   │  · clearToken    │                                             │
-│   │  · clearAuthCache│                                             │
-│   │  · cancelSendJobs│                                             │
-│   │  · showNotif     │                                             │
-│   │  · set awaitFlag │                                             │
-│   └──────────────────┘                                             │
-└───────────────────────────────────────────────────────────────────┘
-
-┌───────────────────────────────────────────────────────────────────┐
-│  SendNotificationWorker.doWork()                                   │
-│    if (PreferencesManager.awaitingLogin) return Result.success()   │
-│    ... envía batch ...                                             │
-│    if (401) → AuthEventBus.emit(TokenExpired); break               │
-└───────────────────────────────────────────────────────────────────┘
-
-┌───────────────────────────────────────────────────────────────────┐
-│  LoginViewModel / PinLoginViewModel onLoginSuccess()               │
-│    PreferencesManager.setAwaitingLogin(false)                      │
-│    PreferencesManager.saveAuthToken(newToken)                      │
-│    AuthInterceptor.updateToken(newToken)                           │
-│    WorkManager.enqueueUniqueWork("send_pending", ...) ◀── drena    │
-└───────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│  PreferencesManager (DataStore — SOURCE OF TRUTH)                    │
+│    val authToken: Flow<String?>                                       │
+│    val awaitingLogin: Flow<Boolean>     ◀── verdad autoritativa       │
+│    suspend fun saveAuthToken(t)                                       │
+│    suspend fun clearAuthToken()                                       │
+│    suspend fun setAwaitingLogin(b)                                    │
+│    fun awaitingLoginBlocking(): Boolean (helper sólo para Worker)     │
+└──────────────────────────────────────────────────────────────────────┘
+            ▲                                ▲
+            │ read/write                     │ read/write
+            │                                │
+┌───────────────────────┐         ┌────────────────────────────────────┐
+│  RetrofitClient       │         │  AuthSessionManager                 │
+│  (interceptor lambda) │         │  (idempotente, autoritativo)        │
+│   if (401 && tok!=nul)│ async── │   handleTokenExpiredAsync(ctx, ep)  │
+│     authSession       │ ──────▶ │   suspend handleTokenExpired(...)   │
+│       .handleTokenExp │         │   suspend handleLoginSucceeded(...) │
+│       Async(...)      │         │   initialize(ctx)                   │
+└───────────────────────┘         └────────────────────────────────────┘
+                                              ▲
+                  ┌───────────────────────────┼───────────────────────┐
+                  │                           │                       │
+       SendNotificationWorker       3 login VMs                AuthEventBus
+       (chequea awaitingLogin       (llaman handleLogin       (solo UI live —
+        al inicio; salta batch)      Succeeded en lugar       NO crítico)
+                                     de saveAuthToken)
 ```
 
-#### Estados del flag `awaitingLogin`
+### A.3 Diseño concreto del `AuthSessionManager`
 
-| Evento | Flag pasa a | Quién lo escribe |
-|---|---|---|
-| App fresh install / first login | `false` | LoginViewModel |
-| 401 detectado | `true` | AuthExpiryHandler |
-| Login exitoso | `false` | LoginViewModel / PinLoginViewModel |
-| Logout manual (botón "Desvincular dispositivo") | `true` o reset general | MainViewModel |
+```kotlin
+object AuthSessionManager {
 
-#### Edge cases
+    // Mirror en memoria SOLO para optimizar lecturas síncronas desde Worker.
+    // La fuente de verdad sigue siendo PreferencesManager.awaitingLogin (Flow).
+    @Volatile private var mirrorAwaitingLogin: Boolean = false
+    @Volatile private var initialized: Boolean = false
 
-- **Race condition de varios 401 paralelos**: el `AuthEventBus` debe ser idempotente. Si ya hay un evento `TokenExpired` en vuelo (flag `awaitingLogin=true`), nuevos 401 no disparan acciones duplicadas.
-- **Re-login con token diferente al expirado**: drenar cola al login exitoso, no antes. El SEND worker debe leer el token fresh de prefs.
-- **El usuario nunca abre la app**: la system notification queda persistente (`setOngoing(true)` + `setAutoCancel(false)` + sin TTL). El usuario eventualmente la verá.
-- **Push notification interceptada por el OS**: probar con `NotificationCompat.PRIORITY_HIGH` + canal de alta importancia (reusar `ALERT_CHANNEL_ID` del `YapeNotifierApplication`).
+    private val mutex = Mutex()
+    private lateinit var appScope: CoroutineScope
+
+    /** Llamar desde YapeNotifierApplication.onCreate() ANTES que cualquier otro init. */
+    suspend fun initialize(context: Context, scope: CoroutineScope) {
+        appScope = scope
+        // Hidratar mirror desde DataStore
+        val prefs = PreferencesManager(context)
+        mirrorAwaitingLogin = prefs.awaitingLogin.first()
+        initialized = true
+        FileLogger.log("AUTH", "AuthSessionManager initialized: awaitingLogin=$mirrorAwaitingLogin", "info")
+
+        // Observar cambios futuros del DataStore para mantener el mirror sincronizado
+        prefs.awaitingLogin
+            .onEach { mirrorAwaitingLogin = it }
+            .launchIn(appScope)
+    }
+
+    /** Fire-and-forget para callers no-coroutine (interceptor OkHttp). */
+    fun handleTokenExpiredAsync(context: Context, endpoint: String) {
+        if (!initialized) return  // antes del init, no hay nada que hacer
+        appScope.launch(Dispatchers.IO) {
+            handleTokenExpired(context, endpoint)
+        }
+    }
+
+    /** Variante suspend para callers ya en coroutine (Worker si lo decide, futuros). */
+    suspend fun handleTokenExpired(context: Context, endpoint: String) {
+        mutex.withLock {
+            // Idempotente: si ya estamos esperando login, no repetir efectos secundarios
+            val prefs = PreferencesManager(context)
+            if (prefs.awaitingLogin.first()) {
+                FileLogger.log("AUTH", "TOKEN_EXPIRED on $endpoint - already awaiting login, ignored", "info")
+                return
+            }
+
+            FileLogger.log("AUTH", "TOKEN_EXPIRED on $endpoint - clearing local state", "error")
+            prefs.setAwaitingLogin(true)
+            prefs.clearAuthToken()          // cascadea: observeTokenChanges → tokenCache=null
+            RetrofitClient.clearTokenCache() // defensa en profundidad (cache se invalida ya, pero por seguridad)
+
+            ServiceStatusManager.updateStatus("⚠️ Sesión expirada - Inicia sesión nuevamente")
+            showLoginRequiredNotification(context)
+            AuthEventBus.emit(AuthEvent.TokenExpired) // solo para UI live, NO es la pieza crítica
+        }
+    }
+
+    /** Llamado por las 3 login VMs en lugar de PreferencesManager.saveAuthToken(). */
+    suspend fun handleLoginSucceeded(context: Context, token: String) {
+        mutex.withLock {
+            val prefs = PreferencesManager(context)
+            prefs.saveAuthToken(token)
+            prefs.setAwaitingLogin(false)
+            // tokenCache se rehidrata solo vía observeTokenChanges
+
+            cancelLoginRequiredNotification(context)
+            FileLogger.log("AUTH", "LOGIN_OK - drenando pendientes", "info")
+            AuthEventBus.emit(AuthEvent.LoginSucceeded)
+
+            // El SendNotificationWorker chequea awaitingLogin al inicio. Ya está en false.
+            // Encolamos uno explícito para drenar lo que quedó pendiente.
+            scheduleSendWorker(context)
+        }
+    }
+
+    /** Helper para Worker: lectura síncrona desde mirror. Si no inicializado, fallback a false. */
+    fun isAwaitingLogin(): Boolean = mirrorAwaitingLogin
+
+    // ... showLoginRequiredNotification, cancelLoginRequiredNotification, scheduleSendWorker
+}
+```
+
+**Notas:**
+- `mutex.withLock` garantiza atomicidad: si llegan 5 × 401 paralelos, solo el primero corre el bloque completo. Los otros ven `awaitingLogin=true` y salen.
+- `mirrorAwaitingLogin` solo se lee desde `isAwaitingLogin()`, que el Worker usa para evitar arrancar batches innecesarios. El Worker no escribe nunca al mirror.
+- El `AuthEventBus` queda como complemento — la UI puede escucharlo para actualizar banners en tiempo real, pero si se pierde un evento la verdad sigue en DataStore.
+- **No hay `runBlocking` en ningún punto**. El interceptor llama `handleTokenExpiredAsync` que internamente lanza coroutine.
+
+### A.4 Cambios en `RetrofitClient.kt`
+
+El lambda actual se queda intacto en el flujo de request. **Solo se agrega un check post-response:**
+
+```kotlin
+val authInterceptor = okhttp3.Interceptor { chain ->
+    val originalRequest = chain.request()
+    val token = tokenCache.get()
+
+    val requestBuilder = originalRequest.newBuilder()
+        .addHeader("Accept", "application/json")
+        .addHeader("Content-Type", "application/json")
+    token?.let { requestBuilder.addHeader("Authorization", "Bearer $it") }
+
+    val response = chain.proceed(requestBuilder.build())
+
+    // Detección 401 SOLO si llevaba token (evita loops con requests anónimos)
+    if (response.code == 401 && token != null) {
+        AuthSessionManager.handleTokenExpiredAsync(
+            context = context,
+            endpoint = originalRequest.url.encodedPath,
+        )
+    }
+
+    response
+}
+```
+
+`context` ya está disponible en el scope de `createApiService(context)` — solo capturarlo en la closure del lambda.
+
+`AuthInterceptor.kt` (class) se elimina como dead code.
+
+### A.5 Cambios en `SendNotificationWorker.kt`
+
+**Inicio del `doWork()`:**
+
+```kotlin
+override suspend fun doWork(): Result {
+    if (AuthSessionManager.isAwaitingLogin()) {
+        FileLogger.log("SEND", "Skipped batch: awaitingLogin=true (post-401, pre-login)", "info")
+        return Result.success()
+    }
+    // ... resto igual
+}
+```
+
+**Handler de 401 simplificado:**
+
+```kotlin
+if (sendResult.isAuthError) {
+    AuthSessionManager.handleTokenExpiredAsync(
+        context = applicationContext,
+        endpoint = "/api/notifications", // o el endpoint real
+    )
+    authFailed = true
+    break
+}
+```
+
+No tocar nada más del worker. La línea `notificationDao.updateStatus(notification.id, "SENT")` queda solo en `SendResult.Success` (no la modifiquemos).
+
+**Importante:** NO introducir `WORK_NAME` ni `cancelUniqueWork`. El guard `isAwaitingLogin()` es suficiente. Si llegan nuevos Yapes mientras esperamos login, el worker se encola, chequea el flag, retorna `success` sin tocar la red. Limpio, sin race conditions con WorkManager.
+
+### A.6 Cambios en las 3 login VMs
+
+Patrón uniforme. En cada VM, reemplazar:
+
+```kotlin
+preferencesManager.saveAuthToken(authResponse.token)
+```
+
+por:
+
+```kotlin
+AuthSessionManager.handleLoginSucceeded(context, authResponse.token)
+```
+
+Las 3 VMs ya están en `viewModelScope.launch` → es legal llamar suspend. `context` se obtiene vía `application: Application` que ya inyectan (verificar en cada VM).
+
+### A.7 Banner UI con jerarquía explícita
+
+En el VM que alimenta `MainActivity` (probablemente `MainViewModel`):
+
+```kotlin
+sealed class AppStatus {
+    object TokenExpired : AppStatus()              // prioridad máxima
+    object PermissionRevoked : AppStatus()
+    object ListenerDeadManualNeeded : AppStatus()   // rebindAttempts >= 3
+    object ListenerReconnecting : AppStatus()
+    object CapturingOK : AppStatus()
+}
+
+val status: StateFlow<AppStatus> = combine(
+    preferencesManager.awaitingLogin,                              // 1. token
+    permissionFlow,                                                // 2. permiso
+    serviceConnectedFlow,                                          // 3. listener
+    rebindAttemptsFlow,                                             // 4. recovery mode
+) { awaiting, hasPermission, connected, attempts ->
+    when {
+        awaiting -> AppStatus.TokenExpired
+        !hasPermission -> AppStatus.PermissionRevoked
+        !connected && attempts >= 3 -> AppStatus.ListenerDeadManualNeeded
+        !connected -> AppStatus.ListenerReconnecting
+        else -> AppStatus.CapturingOK
+    }
+}.stateIn(viewModelScope, SharingStarted.Eagerly, AppStatus.CapturingOK)
+```
+
+La UI mapea cada estado a un banner. **Si `awaiting=true`, NUNCA se muestra "Capturando OK"**, aunque el listener esté activo.
 
 ---
 
@@ -145,54 +320,106 @@ El token de Sanctum normalmente **no expira** salvo que se configure. Posibles f
 
 ### B.1 Diagnóstico
 
-#### Síntomas visibles
-- App dice "⚠️ Conectando... si no conecta, reactiva el permiso".
-- Activity log muestra "Intentando conectar servicio..." cada ~15 min.
-- Card "Permisos del Sistema" vacía o sin items renderizados (Phone 1 — bug aparte).
-- Botón "ABRIR AJUSTES DE PERMISO" con punto rojo de alerta.
-- **El switch en Settings sigue en ON**. Pero el binding está muerto a nivel de sistema.
-- Único recovery confiable: toggle off → toggle on en Settings → `onListenerConnected()` se vuelve a llamar.
+Ya cubierto: en MIUI, Redmi, POCO, EMUI y otros con battery savers agresivos, el sistema mata el binding sin matar el proceso. `requestRebind()` se ignora silenciosamente. Único recovery confiable: toggle off + on del permiso en Settings.
 
-#### Por qué falla `requestRebind()`
-
-`requestRebind()` es una llamada al sistema que pide reconectar al `NotificationListenerService`. En AOSP funciona. **En MIUI, OnePlus OxygenOS, Huawei EMUI y otros OEMs con "battery savers" agresivos**, el sistema puede:
-
-1. Matar el proceso de la app sin notificar.
-2. Mantener el "permiso" como concedido en Settings pero el binding NO se reestablece.
-3. Ignorar silenciosamente las llamadas a `requestRebind()`.
-4. Solo respetar un toggle manual del permiso porque eso fuerza un re-bind a nivel de framework.
-
-El [`ServiceWatchdogWorker`](apps/android-client/app/src/main/java/com/yapenotifier/android/worker/ServiceWatchdogWorker.kt) ya intenta lo correcto:
-- ✅ Verifica permiso → si está revocado, muestra notificación.
-- ✅ Verifica `isServiceConnected()` (recency-based, 20min — buena lógica).
-- ✅ Llama `ServiceRebinder.rebindNotificationListener()` que internamente hace `requestRebind()`.
-- ✅ Después de 3 intentos fallidos + `hasRealDisconnect=true`, muestra una "actionable notification" que abre `ACTION_NOTIFICATION_LISTENER_SETTINGS`.
+El watchdog actual ya hace lo correcto a nivel programático ([`ServiceWatchdogWorker.kt`](apps/android-client/app/src/main/java/com/yapenotifier/android/worker/ServiceWatchdogWorker.kt)):
+- ✅ Reintenta rebind hasta 3 veces.
+- ✅ Después de 3 fallos + `hasRealDisconnect`, muestra notificación al usuario.
+- ✅ La notif abre `ACTION_NOTIFICATION_LISTENER_SETTINGS`.
 
 Lo que falta:
-- ❌ La pantalla de Settings que abre es genérica — no instruye al usuario sobre **qué hacer** ahí. El usuario ve un listado de apps con switches y no sabe que tiene que togglear off → on.
-- ❌ No detecta el OEM. En MIUI sería razonable mostrar pasos específicos.
-- ❌ En la UI principal de la app, el banner "Conectando..." es ambiguo. No diferencia entre "está intentando recuperarse" (transitorio) vs. "los rebinds programáticos fallaron, requiere acción manual del usuario" (terminal sin intervención).
-- ❌ La sección "Permisos del Sistema" en `MainActivity` parece no renderizar items en algunos casos (Phone 1) — bug aparte que vale la pena revisar.
+- ❌ Instrucciones claras de qué hacer en la pantalla de Settings (toggle off → on).
+- ❌ Mensajes específicos por OEM.
+- ❌ Card destacada en `MainActivity` cuando se entra en estado terminal.
+- ❌ Investigar bug aparte de "Permisos del Sistema vacíos" en Phone 1.
 
-### B.2 Solución técnica
+### B.2 Cambios
 
-#### Estrategia
+#### B.2.1 — Helper `OemDetection`
 
-No podemos vencer al framework de Android — si MIUI mata el binding, **no hay** llamada API que lo resucite sin intervención del usuario. La solución es **mejorar el camino crítico** para que tome 5 segundos en lugar de "engorroso":
+```kotlin
+object OemDetection {
+    enum class Oem { XIAOMI, HUAWEI, OPPO, VIVO, ONEPLUS, SAMSUNG, OTHER }
 
-1. **Detectar el caso terminal**: si tras N intentos de rebind (`rebindAttempts >= 3` + sin actividad reciente + `hasRealDisconnect=true`), declaramos "modo recovery manual".
-2. **Mostrar instrucciones claras** en la UI principal y en la system notification: 
-   - "Toca **abrir ajustes**, busca **NotiCentral** en la lista, **apaga** el switch y vuélvelo a **prender**."
-   - Incluir una mini-imagen GIF/PNG con la animación si es posible.
-3. **Detección de OEM**: `Build.MANUFACTURER` para Xiaomi/Redmi/Poco → mensaje extra "MIUI hace esto con frecuencia. Activa **Autoinicio** y **Sin restricción de batería** para NotiCentral en Ajustes para evitarlo a futuro."
-4. **Shortcut explícito al permiso correcto**: ya se usa `ACTION_NOTIFICATION_LISTENER_SETTINGS` (correcto). En OEMs específicos también se puede llevar al usuario a la pantalla de "Autoinicio" (`MIUI` tiene `MiuiAutoStartManager`).
-5. **Bug aparte — Permisos del Sistema vacíos**: revisar `MainActivity` por qué no renderiza los items en la card. Sospecho una condición de carrera al cargar `NotificationAccessChecker` antes de que `appContext` esté listo, o el state-flow que alimenta esa sección no emite.
+    fun current(): Oem {
+        val mfr = Build.MANUFACTURER.lowercase()
+        val brand = Build.BRAND.lowercase()
+        val model = Build.MODEL.lowercase()
 
-#### Lo que NO se hace en este plan
+        return when {
+            "xiaomi" in mfr || "redmi" in brand || "poco" in brand || "redmi" in model || "poco" in model -> Oem.XIAOMI
+            "huawei" in mfr || "honor" in brand -> Oem.HUAWEI
+            "oppo" in mfr || "realme" in brand -> Oem.OPPO
+            "vivo" in mfr -> Oem.VIVO
+            "oneplus" in mfr -> Oem.ONEPLUS
+            "samsung" in mfr -> Oem.SAMSUNG
+            else -> Oem.OTHER
+        }
+    }
 
-- **No** se programa un toggle automático del permiso vía `AccessibilityService` — requiere otro permiso poderoso, levanta sospechas de seguridad y los OEMs lo bloquean también.
-- **No** se intenta `START_STICKY` redux o foreground service "indestructible" — eso está fuera del control de la app en MIUI.
-- **No** se hace fix de `START_FOREGROUND_SERVICE_REASON` para vencer Doze mode — el foreground service ya existe; el problema es el binding del listener específicamente.
+    fun hasAggressiveBatterySaver(): Boolean = current() in setOf(
+        Oem.XIAOMI, Oem.HUAWEI, Oem.OPPO, Oem.VIVO,
+    )
+
+    fun extraHint(): String? = when (current()) {
+        Oem.XIAOMI -> "En MIUI también activa Autoinicio y Sin restricción de batería para NotiCentral."
+        Oem.HUAWEI -> "En EMUI también permite Autoinicio para NotiCentral en Ajustes."
+        Oem.OPPO, Oem.VIVO -> "Permite Autoinicio y desactiva la optimización de batería para NotiCentral."
+        else -> null
+    }
+}
+```
+
+#### B.2.2 — Notificación con instrucciones planas (sin markdown)
+
+Reemplazar el `bigText` actual en `ServiceWatchdogWorker.showServiceDisconnectedNotification()`:
+
+```kotlin
+val bigText = buildString {
+    append("El servicio no pudo reconectarse automáticamente.\n\n")
+    append("Pasos para reactivar:\n")
+    append("1. Toca esta notificación.\n")
+    append("2. Busca NotiCentral en la lista.\n")
+    append("3. Apaga el switch.\n")
+    append("4. Espera 2 segundos.\n")
+    append("5. Vuélvelo a prender.\n")
+    OemDetection.extraHint()?.let {
+        append("\n")
+        append(it)
+    }
+}
+```
+
+#### B.2.3 — Card de recovery en `MainActivity`
+
+Cuando `AppStatus.ListenerDeadManualNeeded`:
+
+```
+┌──────────────────────────────────────────────────────┐
+│ ⚠️  Servicio detenido — necesita atención            │
+│                                                      │
+│ Android suspendió la captura de notificaciones.      │
+│ Reactiva siguiendo estos pasos:                      │
+│                                                      │
+│  ① Toca el botón abajo                               │
+│  ② Busca "NotiCentral" en la lista                   │
+│  ③ Apaga el switch del permiso                       │
+│  ④ Espera 2 segundos                                 │
+│  ⑤ Vuelve a prender el switch                        │
+│                                                      │
+│ [ ABRIR AJUSTES DEL PERMISO ]                        │
+│                                                      │
+│ <expandible> ¿Por qué pasa esto?                     │
+└──────────────────────────────────────────────────────┘
+```
+
+El "¿Por qué pasa esto?" es un `<details>`-style expandible que explica brevemente que MIUI/EMUI suspenden servicios en background, y muestra `OemDetection.extraHint()` si aplica.
+
+Cuando `AppStatus.ListenerReconnecting`: card amber actual con "Intentando reconectar... (rebind $N de 3)".
+
+#### B.2.4 — Bug "Permisos del Sistema vacíos" (investigación)
+
+Task aparte. Hipótesis: la card en Phone 1 estaba vacía porque el `StateFlow` que la alimenta tenía `initialValue=null` y nunca recibió emisión válida. Investigar en `MainActivity`/`MainViewModel`.
 
 ---
 
@@ -200,563 +427,297 @@ No podemos vencer al framework de Android — si MIUI mata el binding, **no hay*
 
 ### Fase 0 — Diagnóstico backend (no bloqueante)
 
-#### Task 0.1 — Identificar la causa del expiro del token (solo informe)
+#### Task 0.1 — Identificar causa del expiro de token (solo informe)
 
-**Files:** ninguno modificado. Solo lectura.
+**Files:** ninguno modificado.
 
 - [ ] **Paso 1: Revisar `apps/api/config/sanctum.php`**
    ```bash
    grep -n "expiration" apps/api/config/sanctum.php
    ```
-   Reportar: ¿`expiration` es `null` (no expira), o un número (minutos)? Si es número, ese es probablemente el culpable.
-
 - [ ] **Paso 2: Verificar deploys del 2026-05-16**
    ```bash
    git log --oneline --since="2026-05-15" --until="2026-05-17" -- apps/api/
    ```
-   Reportar: ¿hubo cambio en `personal_access_tokens` schema, en `RouteServiceProvider`, o un `migrate:fresh`?
-
 - [ ] **Paso 3: Buscar revokes en código**
    ```bash
-   grep -rn "tokens()->delete()\|tokens()->where" apps/api/app/
+   grep -rn "tokens()->delete()" apps/api/app/
    ```
-   Reportar: ¿qué endpoints revocan tokens? ¿Alguno se llama desde el panel del super admin al desvincular dispositivos?
-
-- [ ] **Paso 4: Conclusión**
-   Tres outputs posibles:
-   - (a) `expiration` configurado a N minutos → considerar bajar/subir o eliminar el expiration. El fix de la app sigue siendo necesario.
-   - (b) Algún endpoint revoca tokens cuando no debería → arreglar el endpoint.
-   - (c) Nada obvio → mantener fix de la app y agregar log más detallado en backend para próximas ocurrencias.
-
-**Output esperado:** un comment en este plan documentando la causa, o un issue/PR si requiere fix backend.
+- [ ] **Paso 4: Reportar causa o "no determinable"**. El fix de la app no depende de esto.
 
 ---
 
 ### Fase 1 — Fix Problema A (token expirado)
 
-#### Task 1.1 — `PreferencesManager` agrega flag `awaitingLogin`
+#### Task 1.1 — `PreferencesManager` agrega `awaitingLogin`
 
 **Files:**
-- Modify: [`apps/android-client/app/src/main/java/com/yapenotifier/android/data/local/PreferencesManager.kt`](apps/android-client/app/src/main/java/com/yapenotifier/android/data/local/PreferencesManager.kt)
+- Modify: [`PreferencesManager.kt`](apps/android-client/app/src/main/java/com/yapenotifier/android/data/local/PreferencesManager.kt)
 
-- [ ] **Paso 1: Agregar la key + lector + setter**
-
-```kotlin
-private val AWAITING_LOGIN_KEY = booleanPreferencesKey("awaiting_login")
-
-val awaitingLogin: Flow<Boolean> = context.dataStore.data.map { it[AWAITING_LOGIN_KEY] ?: false }
-
-suspend fun setAwaitingLogin(value: Boolean) {
-    context.dataStore.edit { it[AWAITING_LOGIN_KEY] = value }
-}
-
-// Helper sync (para llamar desde el Worker sin coroutine si hace falta)
-fun awaitingLoginBlocking(): Boolean = runBlocking { awaitingLogin.first() }
-```
-
-- [ ] **Paso 2: Verificar que `clearAll()` resetee el flag**
-- [ ] **Paso 3: Verificar build** — `cd apps/android-client && ./gradlew :app:compileDebugKotlin`
-- [ ] **Paso 4: Commit**
+- [ ] **Paso 1:** Agregar key + flow + setter:
+   ```kotlin
+   private val AWAITING_LOGIN_KEY = booleanPreferencesKey("awaiting_login")
+   val awaitingLogin: Flow<Boolean> = context.dataStore.data.map { it[AWAITING_LOGIN_KEY] ?: false }
+   suspend fun setAwaitingLogin(value: Boolean) {
+       context.dataStore.edit { it[AWAITING_LOGIN_KEY] = value }
+   }
    ```
-   git commit -m "feat(android): add awaitingLogin flag to PreferencesManager"
-   ```
+- [ ] **Paso 2:** Confirmar que `clearAll()` también resetea este flag.
+- [ ] **Paso 3:** Build: `./gradlew :app:compileDebugKotlin`.
+- [ ] **Paso 4:** Commit.
 
-#### Task 1.2 — `AuthEventBus` para emitir eventos de auth a nivel proceso
+#### Task 1.2 — `AuthEvent` + `AuthEventBus` (solo para UI live)
 
 **Files:**
 - Create: `apps/android-client/app/src/main/java/com/yapenotifier/android/data/auth/AuthEventBus.kt`
 
-- [ ] **Paso 1: Implementar**
+- [ ] **Paso 1:** Implementar `AuthEvent` sealed class y `AuthEventBus` object con `MutableSharedFlow(extraBufferCapacity=8, onBufferOverflow=DROP_OLDEST)`. Es complemento, no fuente de verdad.
+- [ ] **Paso 2:** Build + commit.
 
-```kotlin
-package com.yapenotifier.android.data.auth
-
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
-
-sealed class AuthEvent {
-    object TokenExpired : AuthEvent()
-    object ManualLogout : AuthEvent()
-    object LoginSucceeded : AuthEvent()
-}
-
-object AuthEventBus {
-    private val _events = MutableSharedFlow<AuthEvent>(
-        replay = 0,
-        extraBufferCapacity = 8,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST,
-    )
-    val events: SharedFlow<AuthEvent> = _events.asSharedFlow()
-
-    fun emit(event: AuthEvent) {
-        _events.tryEmit(event)
-    }
-}
-```
-
-- [ ] **Paso 2: Build + commit**
-
-#### Task 1.3 — `AuthExpiryHandler` central que reacciona a `TokenExpired`
+#### Task 1.3 — `AuthSessionManager` (pieza autoritativa)
 
 **Files:**
-- Create: `apps/android-client/app/src/main/java/com/yapenotifier/android/data/auth/AuthExpiryHandler.kt`
-- Modify: [`YapeNotifierApplication.kt`](apps/android-client/app/src/main/java/com/yapenotifier/android/YapeNotifierApplication.kt) (registrar el handler en `onCreate`)
+- Create: `apps/android-client/app/src/main/java/com/yapenotifier/android/data/auth/AuthSessionManager.kt`
 
-- [ ] **Paso 1: Implementar el handler**
+- [ ] **Paso 1:** Implementar exactamente el diseño de la sección A.3. Métodos públicos:
+   - `suspend fun initialize(context, scope)` — hidrata mirror desde DataStore.
+   - `fun handleTokenExpiredAsync(context, endpoint)` — fire-and-forget para interceptor.
+   - `suspend fun handleTokenExpired(context, endpoint)` — variante para coroutines.
+   - `suspend fun handleLoginSucceeded(context, token)` — para login VMs.
+   - `fun isAwaitingLogin(): Boolean` — solo para Worker.
+- [ ] **Paso 2:** Implementar `showLoginRequiredNotification(context)` con `setOngoing(true)`, canal `ALERT_CHANNEL_ID`, intent → `SplashActivity`. Texto SIN markdown: "Sesión expirada. Toca para volver a iniciar sesión y reanudar la captura."
+- [ ] **Paso 3:** Implementar `cancelLoginRequiredNotification(context)` que cancela el ID 2003 del NotificationManager.
+- [ ] **Paso 4:** Implementar `scheduleSendWorker(context)` — un OneTimeWorkRequest simple, mismo patrón que [`PaymentNotificationListenerService.scheduleSendNotificationWorker()`](apps/android-client/app/src/main/java/com/yapenotifier/android/service/PaymentNotificationListenerService.kt#L340).
+- [ ] **Paso 5:** Build + commit.
 
-```kotlin
-package com.yapenotifier.android.data.auth
-
-import android.app.NotificationManager
-import android.app.PendingIntent
-import android.content.Context
-import android.content.Intent
-import androidx.core.app.NotificationCompat
-import androidx.work.WorkManager
-import com.yapenotifier.android.R
-import com.yapenotifier.android.YapeNotifierApplication
-import com.yapenotifier.android.data.api.AuthInterceptor
-import com.yapenotifier.android.data.local.PreferencesManager
-import com.yapenotifier.android.ui.SplashActivity
-import com.yapenotifier.android.util.FileLogger
-import com.yapenotifier.android.util.ServiceStatusManager
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.launch
-
-class AuthExpiryHandler(
-    private val context: Context,
-    private val preferencesManager: PreferencesManager,
-    private val authInterceptor: AuthInterceptor,
-    private val scope: CoroutineScope,
-) {
-    fun start() {
-        AuthEventBus.events
-            .onEach { event ->
-                when (event) {
-                    is AuthEvent.TokenExpired -> handleTokenExpired()
-                    is AuthEvent.ManualLogout -> handleManualLogout()
-                    is AuthEvent.LoginSucceeded -> handleLoginSucceeded()
-                }
-            }
-            .launchIn(scope)
-    }
-
-    private fun handleTokenExpired() {
-        scope.launch(Dispatchers.IO) {
-            // Idempotente: si ya estamos esperando login, no hacer nada
-            if (preferencesManager.awaitingLoginBlocking()) return@launch
-
-            FileLogger.log("AUTH", "Token expired - clearing local state and prompting user", "error")
-            ServiceStatusManager.updateStatus("⚠️ Token expirado - Inicia sesión nuevamente")
-
-            preferencesManager.setAwaitingLogin(true)
-            preferencesManager.clearAuthToken()
-            authInterceptor.clearToken()
-
-            // Cancela worker de SEND para que no insista contra un token muerto
-            WorkManager.getInstance(context).cancelUniqueWork(
-                com.yapenotifier.android.worker.SendNotificationWorker.WORK_NAME
-            )
-
-            showLoginRequiredNotification()
-        }
-    }
-
-    private fun handleManualLogout() {
-        // El logout manual ya limpia todo via MainViewModel; aquí solo aseguramos consistencia
-        scope.launch(Dispatchers.IO) {
-            preferencesManager.setAwaitingLogin(true)
-        }
-    }
-
-    private fun handleLoginSucceeded() {
-        scope.launch(Dispatchers.IO) {
-            preferencesManager.setAwaitingLogin(false)
-            FileLogger.log("AUTH", "Login succeeded - clearing awaitingLogin flag", "info")
-
-            // Cancela la notif persistente de "sesión expirada"
-            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            nm.cancel(LOGIN_REQUIRED_NOTIFICATION_ID)
-
-            // Encola el drain de pendientes (Worker idempotente — si no hay nada, no hace nada)
-            com.yapenotifier.android.worker.SendNotificationWorker.enqueueOneTime(context)
-        }
-    }
-
-    private fun showLoginRequiredNotification() {
-        val intent = Intent(context, SplashActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            context, LOGIN_REQUIRED_NOTIFICATION_ID, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val notif = NotificationCompat.Builder(context, YapeNotifierApplication.ALERT_CHANNEL_ID)
-            .setContentTitle("NotiCentral · Sesión expirada")
-            .setContentText("Toca para volver a iniciar sesión y reanudar la captura.")
-            .setStyle(NotificationCompat.BigTextStyle().bigText(
-                "Tu sesión expiró. Las nuevas notificaciones de Yape no se están subiendo " +
-                "hasta que vuelvas a iniciar sesión."
-            ))
-            .setSmallIcon(R.drawable.ic_bell_notification)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setOngoing(true)            // persistente
-            .setAutoCancel(false)
-            .setContentIntent(pendingIntent)
-            .build()
-
-        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.notify(LOGIN_REQUIRED_NOTIFICATION_ID, notif)
-    }
-
-    companion object {
-        private const val LOGIN_REQUIRED_NOTIFICATION_ID = 2003
-    }
-}
-```
-
-- [ ] **Paso 2: Wirear en `YapeNotifierApplication.onCreate()`**
-
-Después de inicializar `ServiceStatusManager` y `PreferencesManager`:
-
-```kotlin
-val handler = AuthExpiryHandler(
-    context = this,
-    preferencesManager = preferencesManager,
-    authInterceptor = authInterceptor,
-    scope = applicationScope,  // un CoroutineScope a nivel app — crear si no existe
-)
-handler.start()
-```
-
-Si no existe `applicationScope`, crear:
-```kotlin
-val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-```
-
-- [ ] **Paso 3: Build + commit**
-
-#### Task 1.4 — `AuthInterceptor` detecta 401 y emite evento
+#### Task 1.4 — Inicialización en `YapeNotifierApplication.onCreate()`
 
 **Files:**
-- Modify: [`apps/android-client/app/src/main/java/com/yapenotifier/android/data/api/AuthInterceptor.kt`](apps/android-client/app/src/main/java/com/yapenotifier/android/data/api/AuthInterceptor.kt)
+- Modify: [`YapeNotifierApplication.kt`](apps/android-client/app/src/main/java/com/yapenotifier/android/YapeNotifierApplication.kt)
 
-- [ ] **Paso 1: En `intercept()`, después de `chain.proceed(newRequest)`**
+- [ ] **Paso 1:** Si no existe ya, crear un `applicationScope: CoroutineScope` con `SupervisorJob() + Dispatchers.Default`.
+- [ ] **Paso 2:** En `onCreate()`, después de `ServiceStatusManager.init(this)`, lanzar:
+   ```kotlin
+   applicationScope.launch {
+       AuthSessionManager.initialize(this@YapeNotifierApplication, applicationScope)
+   }
+   ```
+- [ ] **Paso 3:** Build + commit.
 
-```kotlin
-val response = chain.proceed(newRequest)
-
-// Solo dispara para requests autenticados (token presente y se envió Bearer)
-if (response.code == 401 && token != null) {
-    AuthEventBus.emit(AuthEvent.TokenExpired)
-    // No mutamos la response. El caller decide qué hacer con el 401.
-}
-
-return response
-```
-
-- [ ] **Paso 2: Importar `AuthEventBus`, `AuthEvent`**.
-- [ ] **Paso 3: Build + commit**
-
-#### Task 1.5 — `SendNotificationWorker` respeta el flag `awaitingLogin` + helper de encolado
+#### Task 1.5 — `RetrofitClient` detecta 401 (sin `runBlocking`)
 
 **Files:**
-- Modify: [`apps/android-client/app/src/main/java/com/yapenotifier/android/worker/SendNotificationWorker.kt`](apps/android-client/app/src/main/java/com/yapenotifier/android/worker/SendNotificationWorker.kt)
+- Modify: [`RetrofitClient.kt`](apps/android-client/app/src/main/java/com/yapenotifier/android/data/api/RetrofitClient.kt)
+- Delete: [`AuthInterceptor.kt`](apps/android-client/app/src/main/java/com/yapenotifier/android/data/api/AuthInterceptor.kt) (dead code)
 
-- [ ] **Paso 1: Al inicio de `doWork()`, antes de cualquier I/O**
+- [ ] **Paso 1:** Reescribir el lambda según sección A.4 — captura `context` en closure, mantiene el `requestBuilder`, agrega check `response.code == 401 && token != null` → `AuthSessionManager.handleTokenExpiredAsync(context, request.url.encodedPath)`.
+- [ ] **Paso 2:** Eliminar `AuthInterceptor.kt` (dead code).
+- [ ] **Paso 3:** Build + commit.
 
-```kotlin
-if (preferencesManager.awaitingLoginBlocking()) {
-    Timber.i("SendNotificationWorker: awaitingLogin=true — skipping batch")
-    FileLogger.log("SEND", "Skipped batch: awaitingLogin=true", "info")
-    return Result.success()
-}
-```
-
-- [ ] **Paso 2: En el handler de `isAuthError`, ya no `break`-ear sin emitir**
-
-```kotlin
-if (sendResult.isAuthError) {
-    AuthEventBus.emit(AuthEvent.TokenExpired)
-    // El handler se encarga del resto. Aquí solo paramos el batch.
-    authFailed = true
-    break
-}
-```
-
-(El log + status update + clearToken ahora viven en `AuthExpiryHandler`.)
-
-- [ ] **Paso 3: Helper estático `enqueueOneTime(context)`** para que `AuthExpiryHandler` lo invoque al login exitoso
-
-```kotlin
-companion object {
-    const val WORK_NAME = "send_notification_worker"
-
-    fun enqueueOneTime(context: Context) {
-        val req = OneTimeWorkRequestBuilder<SendNotificationWorker>()
-            .setConstraints(Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .build())
-            .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            WORK_NAME,
-            ExistingWorkPolicy.REPLACE,
-            req,
-        )
-    }
-}
-```
-
-- [ ] **Paso 4: Build + commit**
-
-#### Task 1.6 — Login viewmodels notifican éxito al `AuthEventBus`
+#### Task 1.6 — `SendNotificationWorker` respeta `awaitingLogin`
 
 **Files:**
-- Modify: [`apps/android-client/app/src/main/java/com/yapenotifier/android/ui/viewmodel/LoginViewModel.kt`](apps/android-client/app/src/main/java/com/yapenotifier/android/ui/viewmodel/LoginViewModel.kt)
-- Modify: [`apps/android-client/app/src/main/java/com/yapenotifier/android/ui/viewmodel/PinLoginViewModel.kt`](apps/android-client/app/src/main/java/com/yapenotifier/android/ui/viewmodel/PinLoginViewModel.kt)
-- Modify: [`apps/android-client/app/src/main/java/com/yapenotifier/android/ui/admin/viewmodel/AdminLoginViewModel.kt`](apps/android-client/app/src/main/java/com/yapenotifier/android/ui/admin/viewmodel/AdminLoginViewModel.kt)
+- Modify: [`SendNotificationWorker.kt`](apps/android-client/app/src/main/java/com/yapenotifier/android/worker/SendNotificationWorker.kt)
 
-- [ ] **Paso 1: En cada VM, tras `saveAuthToken(token)` exitoso, emitir**
+- [ ] **Paso 1:** Al inicio de `doWork()`:
+   ```kotlin
+   if (AuthSessionManager.isAwaitingLogin()) {
+       FileLogger.log("SEND", "Skipped batch: awaitingLogin=true (post-401, pre-login)", "info")
+       return Result.success()
+   }
+   ```
+- [ ] **Paso 2:** En el handler `isAuthError`, simplificar — solo `handleTokenExpiredAsync(...)` + `break`. Quitar el `ServiceStatusManager.updateStatus(...)` y el log de AUTH_ERROR (ahora viven en `AuthSessionManager`).
+- [ ] **Paso 3:** **NO introducir `WORK_NAME`. NO llamar `cancelUniqueWork`.** El guard es suficiente.
+- [ ] **Paso 4:** Confirmar que `notificationDao.updateStatus(id, "SENT")` solo se llama dentro de `SendResult.Success` (debe ser intacto).
+- [ ] **Paso 5:** Build + commit.
 
-```kotlin
-AuthEventBus.emit(AuthEvent.LoginSucceeded)
-```
-
-- [ ] **Paso 2: Build + commit**
-
-#### Task 1.7 — Indicador visible en UI cuando `awaitingLogin=true`
+#### Task 1.7 — Login VMs llaman `handleLoginSucceeded`
 
 **Files:**
-- Modify: [`apps/android-client/app/src/main/java/com/yapenotifier/android/ui/MainActivity.kt`](apps/android-client/app/src/main/java/com/yapenotifier/android/ui/MainActivity.kt) y/o el viewmodel asociado.
+- Modify: [`LoginViewModel.kt:59`](apps/android-client/app/src/main/java/com/yapenotifier/android/ui/viewmodel/LoginViewModel.kt#L59)
+- Modify: [`PinLoginViewModel.kt:43`](apps/android-client/app/src/main/java/com/yapenotifier/android/ui/viewmodel/PinLoginViewModel.kt#L43)
+- Modify: [`AdminLoginViewModel.kt:76`](apps/android-client/app/src/main/java/com/yapenotifier/android/ui/admin/viewmodel/AdminLoginViewModel.kt#L76)
 
-- [ ] **Paso 1: Observar `preferencesManager.awaitingLogin` en el ViewModel**
-- [ ] **Paso 2: Si `true`, reemplazar el banner "Capturando OK" por uno rojo: "⚠️ Sesión expirada — toca para iniciar sesión"** con click → `SplashActivity` (que rutea a login). El banner muestra también `pending=N`.
-- [ ] **Paso 3: Build + commit**
+- [ ] **Paso 1:** En cada VM, reemplazar:
+   ```kotlin
+   preferencesManager.saveAuthToken(authResponse.token)
+   ```
+   por:
+   ```kotlin
+   AuthSessionManager.handleLoginSucceeded(context, authResponse.token)
+   ```
+- [ ] **Paso 2:** Verificar que `context` está disponible (todos los VMs deberían tener `Application` inyectada — si no, hacer pequeño refactor).
+- [ ] **Paso 3:** Build + commit.
 
-#### Task 1.8 — Smoke test manual del flujo A
+#### Task 1.8 — `MainViewModel` calcula `AppStatus` con jerarquía explícita
 
-- [ ] **Paso 1: Build APK debug** `cd apps/android-client && ./gradlew :app:assembleDebug`
-- [ ] **Paso 2: Instalar en dispositivo de prueba.**
-- [ ] **Paso 3: Login y dejar capturar al menos 1 Yape (verificar que sube).**
-- [ ] **Paso 4: Simular expiración**: desde el backend, revocar el token (`personal_access_tokens` → DELETE WHERE id = X) o configurar `sanctum.expiration` temporalmente a 1 minuto.
-- [ ] **Paso 5: Generar otro Yape o esperar al próximo SEND.**
-- [ ] **Paso 6: Verificar:**
-   - System notification persistente "Sesión expirada" aparece.
-   - Tap → abre Splash → login.
-   - Tras re-login, las notifs pendientes se envían (chequear `pending=0` en UI y en backend).
-- [ ] **Paso 7: Commit del smoke checklist actualizado** (documentar resultado en `docs/superpowers/smoke-tests/`).
+**Files:**
+- Modify: `MainViewModel.kt` (ubicación a confirmar)
+- Modify: [`MainActivity.kt`](apps/android-client/app/src/main/java/com/yapenotifier/android/ui/MainActivity.kt)
+
+- [ ] **Paso 1:** Crear sealed class `AppStatus` (o donde corresponda según convención del repo).
+- [ ] **Paso 2:** En el VM, crear `StateFlow<AppStatus>` combinando los 4 flows (sección A.7).
+- [ ] **Paso 3:** En `MainActivity`, observar el state y mapear cada `AppStatus` a su banner correspondiente. El banner de `TokenExpired` es rojo, clickeable, lleva al login. El banner de `ListenerDeadManualNeeded` es la card destacada de B.2.3.
+- [ ] **Paso 4:** Confirmar: cuando `TokenExpired`, NUNCA se muestra "Capturando OK".
+- [ ] **Paso 5:** Build + commit.
+
+#### Task 1.9 — Smoke test fase 1
+
+- [ ] **Paso 1:** `./gradlew :app:assembleDebug` → instalar en dispositivo.
+- [ ] **Paso 2:** Login + capturar 1 Yape (verificar upload OK).
+- [ ] **Paso 3:** Forzar expiración (revocar token desde backend o `sanctum.expiration=1`).
+- [ ] **Paso 4:** Generar otro Yape o esperar al próximo SEND.
+- [ ] **Paso 5:** Verificar:
+   - Notif persistente "NotiCentral · Sesión expirada" aparece.
+   - Banner rojo en pantalla "Sesión expirada — toca para iniciar sesión".
+   - `pending=N` visible.
+   - Tap → Splash → login.
+   - Tras re-login, pendientes se envían, banner desaparece.
+- [ ] **Paso 6:** Caso negativo: con `awaitingLogin=true`, ningún SEND llega a la red — confirmar en logs.
+- [ ] **Paso 7:** Documentar en `docs/superpowers/smoke-tests/2026-05-17-android-auth-y-recovery.md`.
 
 ---
 
-### Fase 2 — Fix Problema B (recovery del listener en MIUI)
+### Fase 2 — Fix Problema B (MIUI recovery)
 
-#### Task 2.1 — Helper `OemDetection` para detectar MIUI/Xiaomi/etc.
+#### Task 2.1 — `OemDetection`
 
 **Files:**
 - Create: `apps/android-client/app/src/main/java/com/yapenotifier/android/util/OemDetection.kt`
 
-- [ ] **Paso 1: Implementar**
+- [ ] **Paso 1:** Implementar según sección B.2.1 (MANUFACTURER + BRAND + MODEL).
+- [ ] **Paso 2:** Build + commit.
 
-```kotlin
-package com.yapenotifier.android.util
-
-import android.os.Build
-
-object OemDetection {
-    enum class Oem { XIAOMI, HUAWEI, OPPO, VIVO, ONEPLUS, SAMSUNG, OTHER }
-
-    fun current(): Oem = when (Build.MANUFACTURER.lowercase()) {
-        "xiaomi", "redmi", "poco" -> Oem.XIAOMI
-        "huawei", "honor" -> Oem.HUAWEI
-        "oppo" -> Oem.OPPO
-        "vivo" -> Oem.VIVO
-        "oneplus" -> Oem.ONEPLUS
-        "samsung" -> Oem.SAMSUNG
-        else -> Oem.OTHER
-    }
-
-    fun hasAggressiveBatterySaver(): Boolean = when (current()) {
-        Oem.XIAOMI, Oem.HUAWEI, Oem.OPPO, Oem.VIVO -> true
-        else -> false
-    }
-
-    fun recoveryInstructionsShort(): String = when (current()) {
-        Oem.XIAOMI -> "En MIUI: abre Ajustes → busca NotiCentral → apaga el switch y vuélvelo a prender."
-        Oem.HUAWEI -> "En EMUI: abre Ajustes → busca NotiCentral → apaga y vuelve a activar el permiso."
-        else -> "Abre Ajustes → busca NotiCentral → apaga y vuelve a prender el permiso de notificaciones."
-    }
-}
-```
-
-- [ ] **Paso 2: Build + commit**
-
-#### Task 2.2 — Mejorar la "actionable notification" del watchdog con instrucciones OEM-específicas
+#### Task 2.2 — Mejorar notif de watchdog (sin markdown, con OEM hint)
 
 **Files:**
-- Modify: [`apps/android-client/app/src/main/java/com/yapenotifier/android/worker/ServiceWatchdogWorker.kt`](apps/android-client/app/src/main/java/com/yapenotifier/android/worker/ServiceWatchdogWorker.kt) — método `showServiceDisconnectedNotification()`
+- Modify: [`ServiceWatchdogWorker.kt::showServiceDisconnectedNotification`](apps/android-client/app/src/main/java/com/yapenotifier/android/worker/ServiceWatchdogWorker.kt#L303)
 
-- [ ] **Paso 1: Reemplazar el `bigText` por algo OEM-aware**
+- [ ] **Paso 1:** Reemplazar el `bigText` actual con el nuevo de la sección B.2.2.
+- [ ] **Paso 2:** Cambiar el título a "NotiCentral · Servicio detenido" (consistencia).
+- [ ] **Paso 3:** Build + commit.
 
-```kotlin
-val oem = OemDetection.current()
-val bigText = buildString {
-    append("El servicio no pudo reconectarse automáticamente.\n\n")
-    append("Pasos para reactivar:\n")
-    append("1. Toca esta notificación.\n")
-    append("2. Busca \"NotiCentral\" en la lista.\n")
-    append("3. **Apaga** el switch.\n")
-    append("4. Espera 2 segundos.\n")
-    append("5. **Vuélvelo a prender**.\n")
-    if (OemDetection.hasAggressiveBatterySaver()) {
-        append("\n💡 ${OemDetection.recoveryInstructionsShort()}")
-    }
-}
-```
-
-- [ ] **Paso 2: Build + commit**
-
-#### Task 2.3 — Card en `MainActivity` con instrucciones visuales
+#### Task 2.3 — Card de recovery en MainActivity
 
 **Files:**
-- Modify: [`apps/android-client/app/src/main/java/com/yapenotifier/android/ui/MainActivity.kt`](apps/android-client/app/src/main/java/com/yapenotifier/android/ui/MainActivity.kt)
+- Modify: [`MainActivity.kt`](apps/android-client/app/src/main/java/com/yapenotifier/android/ui/MainActivity.kt)
 
-- [ ] **Paso 1: Cuando `isServiceConnected() == false` AND `rebindAttempts >= 3`** (el caso terminal donde rebinds automáticos ya fallaron), mostrar una **card destacada** (color amber/rojo) con:
-   - Título: "Servicio detenido — necesita atención"
-   - Subtítulo con instrucciones específicas del OEM (vía `OemDetection`).
-   - 3 pasos numerados grandes y claros.
-   - Botón gigante: "ABRIR AJUSTES DEL PERMISO".
-   - Opcional: pequeño link "¿Por qué pasa esto?" → expande explicación breve sobre OEMs agresivos.
+- [ ] **Paso 1:** Cuando `AppStatus.ListenerDeadManualNeeded`, renderizar la card de B.2.3 con los 5 pasos numerados.
+- [ ] **Paso 2:** Botón grande "ABRIR AJUSTES DEL PERMISO" → `Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)`.
+- [ ] **Paso 3:** Sección expandible "¿Por qué pasa esto?" — muestra `OemDetection.extraHint()` si no es null.
+- [ ] **Paso 4:** Build + commit.
 
-- [ ] **Paso 2:** Si `rebindAttempts < 3`, mostrar la card actual ("Conectando..." amber) — es transitorio.
+#### Task 2.4 — Investigar "Permisos del Sistema vacíos" (Phone 1)
 
-- [ ] **Paso 3: Build + commit**
+**Files:** TBD según investigación.
 
-#### Task 2.4 — Bug aparte: "Permisos del Sistema" vacíos en Phone 1
+- [ ] **Paso 1:** Reproducir si es posible (puede requerir dispositivo MIUI específico).
+- [ ] **Paso 2:** Agregar logs al `MainActivity.onResume()` con valor de `NotificationAccessChecker.isNotificationAccessEnabled(this)` y de `PowerManager.isIgnoringBatteryOptimizations`.
+- [ ] **Paso 3:** Si es un StateFlow con `initial=null` que nunca recibe emisión, cambiar a `StateFlow` con valor inicial síncrono.
+- [ ] **Paso 4:** Build + commit. Si no se reproduce, abrir issue para investigar después.
 
-**Files:** investigar [`MainActivity.kt`](apps/android-client/app/src/main/java/com/yapenotifier/android/ui/MainActivity.kt) y el state-flow que alimenta la card.
+#### Task 2.5 — Smoke test fase 2
 
-- [ ] **Paso 1: Reproducir** (si es posible — puede requerir un dispositivo MIUI específico).
-- [ ] **Paso 2:** Logear los valores leídos por `NotificationAccessChecker.isNotificationAccessEnabled()` y la batería al inicio de `MainActivity.onResume()`. Identificar si la card está condicionalmente oculta o si su contenido nunca se asigna.
-- [ ] **Paso 3:** Si es un race condition (initialState=empty y el observe no dispara), usar `StateFlow` con valor inicial sincrónico en lugar de Flow + initial=null.
-- [ ] **Paso 4: Build + commit con fix.**
-
-#### Task 2.5 — Smoke test manual del flujo B
-
-- [ ] **Paso 1: Build APK + instalar en dispositivo Xiaomi/Redmi.**
-- [ ] **Paso 2: Forzar el escenario:** matar la app desde "Recientes" + entrar en Battery saver.
-- [ ] **Paso 3:** Esperar 30 minutos (o forzar `WorkManager.enqueueUniqueWork(ServiceWatchdogWorker)`).
-- [ ] **Paso 4: Verificar:**
-   - Notificación con instrucciones específicas MIUI aparece tras 3 intentos.
-   - Tap → abre `Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS`.
-   - Toggle off + on → app se reconecta en < 5 segundos.
-- [ ] **Paso 5: Documentar resultado en smoke test doc.**
+- [ ] **Paso 1:** Install APK en dispositivo Xiaomi/Redmi.
+- [ ] **Paso 2:** Matar la app desde "Recientes" + battery saver activo.
+- [ ] **Paso 3:** Forzar watchdog (`WorkManager.enqueueUniqueWork(ServiceWatchdogWorker.WORK_NAME, REPLACE, ...)` desde adb o un menú debug).
+- [ ] **Paso 4:** Tras 3 intentos fallidos:
+   - Verificar notif con instrucciones específicas MIUI.
+   - Verificar card en MainActivity (sin "Capturando OK" engañoso).
+   - Tap → Settings → toggle off + on → reconecta en < 5s.
+- [ ] **Paso 5:** Documentar.
 
 ---
 
-### Fase 3 — Logging mejorado (preventivo)
+### Fase 3 — Logging mejorado
 
-#### Task 3.1 — Categoría `[AUTH]` en `FileLogger`
+#### Task 3.1 — Categoría `[AUTH]` consistente
 
 **Files:**
-- Modify: [`apps/android-client/app/src/main/java/com/yapenotifier/android/util/FileLogger.kt`](apps/android-client/app/src/main/java/com/yapenotifier/android/util/FileLogger.kt)
+- Modify: [`AuthSessionManager.kt`](apps/android-client/app/src/main/java/com/yapenotifier/android/data/auth/AuthSessionManager.kt)
+- Modify: [`RetrofitClient.kt`](apps/android-client/app/src/main/java/com/yapenotifier/android/data/api/RetrofitClient.kt)
 
-- [ ] **Paso 1: Asegurar que `FileLogger.log("AUTH", ..., level)` quede en disco con el mismo formato.** (Probablemente ya funciona; sin cambios estructurales.)
-- [ ] **Paso 2:** Agregar puntos de log:
-   - Login exitoso → `[AUTH] LOGIN_OK user=... role=...`
-   - Logout manual → `[AUTH] MANUAL_LOGOUT`
-   - 401 detectado → `[AUTH] TOKEN_EXPIRED endpoint=...`
-   - Clear de token desde handler → `[AUTH] CLEARED_LOCAL_TOKEN`
-   - Login tras expirado → `[AUTH] RECOVERED_AFTER_EXPIRY pending_count=N`
-
-- [ ] **Paso 3: Build + commit**
-
-#### Task 3.2 — Endpoint en el HTTP log
-
-**Files:** misma `AuthInterceptor.kt` o un `LoggingInterceptor` separado.
-
-- [ ] **Paso 1:** Cuando se emite `TokenExpired`, registrar también el `request.url.encodedPath` para saber en qué endpoint pasó.
-
-```kotlin
-if (response.code == 401 && token != null) {
-    FileLogger.log("AUTH", "401 on ${chain.request().url.encodedPath}", "error")
-    AuthEventBus.emit(AuthEvent.TokenExpired)
-}
-```
-
-- [ ] **Paso 2: Build + commit**
+- [ ] **Paso 1:** Agregar logs en puntos clave:
+   - `AuthSessionManager.initialize` → `[AUTH] init: awaitingLogin=X`
+   - `handleTokenExpired` → `[AUTH] TOKEN_EXPIRED endpoint=/api/...`
+   - `handleLoginSucceeded` → `[AUTH] LOGIN_OK token=***xxx (last 4 chars)`
+   - Interceptor 401 → `[AUTH] 401 on /api/...`
+- [ ] **Paso 2:** Build + commit.
 
 ---
 
 ### Fase 4 — Cierre
 
-#### Task 4.1 — Smoke test consolidado + documentación
+#### Task 4.1 — Smoke test consolidado
 
 **Files:**
 - Create: `docs/superpowers/smoke-tests/2026-05-17-android-auth-y-recovery.md`
 
-- [ ] **Paso 1:** Checklist en español con todos los casos cubiertos (token expirado, MIUI recovery, drain post-login, sin regresiones en flujo normal).
+- [ ] **Paso 1:** Checklist completo:
+   - Flujo normal (login → captura → SEND OK).
+   - Flujo 401 (token expira → notif → tap → login → drenado de pendientes).
+   - Flujo MIUI (rebind falla 3 veces → card + notif → toggle manual → recover).
+   - Caso negativo: con `awaitingLogin=true`, ningún SEND llega a red.
+   - Caso negativo: con `POST_NOTIFICATIONS` denegado, banner UI sigue visible (defensa en profundidad).
 - [ ] **Paso 2:** Commit.
 
-#### Task 4.2 — Push y release del APK
+#### Task 4.2 — Push + release APK
 
 - [ ] **Paso 1:** `git push origin benja-version`.
-- [ ] **Paso 2:** Build de release: `./gradlew :app:assembleRelease`.
-- [ ] **Paso 3:** Distribuir al usuario (canal habitual: tu propio APK; no es Play Store).
-- [ ] **Paso 4:** Pedir que los 2 captadores afectados actualicen y avisen si el problema persiste.
+- [ ] **Paso 2:** `./gradlew :app:assembleRelease`.
+- [ ] **Paso 3:** Distribuir a los 2 captadores afectados.
+- [ ] **Paso 4:** Pedir confirmación en 24-48h.
 
 ---
 
-## Riesgos y decisiones
+## Riesgos y mitigaciones
 
 | Riesgo | Mitigación |
 |---|---|
-| `AuthEventBus` como singleton estático puede causar leaks de coroutine si el handler no se cancela en process death | Como vive a nivel `Application` y el proceso es el ciclo natural, está OK. `SupervisorJob` evita cascada de cancelaciones. |
-| Múltiples 401 simultáneos (varios endpoints fallando) disparan múltiples `TokenExpired` | `AuthExpiryHandler.handleTokenExpired()` chequea `awaitingLoginBlocking()` al inicio. Idempotente. |
-| El handler corre en `Dispatchers.IO` y puede tardar — ¿se pierde el primer evento? | `SharedFlow(extraBufferCapacity = 8)` con `DROP_OLDEST` — los eventos esperan en el buffer hasta que el collector lea. |
-| El usuario ignora la system notification persistente | Es persistente (`setOngoing(true)`), siempre visible en la barra. Además el banner en la UI principal también lo grita. No más que esto sin push remoto. |
-| MIUI mata WorkManager también | Sí, puede pasar. La notif ya fue mostrada antes del kill — sobrevive porque vive en el NotificationManager del sistema, no en el proceso de la app. |
-| Cambiar `sanctum.expiration` en backend afecta tokens existentes | Si decidimos cambiarlo (Task 0.1 outcome), evaluar si invalida sesiones activas. Recomendación: dejar `expiration = null` (no expiran) y revocar manualmente cuando haga falta. |
-| El "drain" tras login podría disparar muchos uploads simultáneos | El `SendNotificationWorker` ya procesa el batch en orden con un loop. No hay paralelismo accidental. |
+| Mirror en memoria desincronizado del DataStore | `initialize()` hidrata al arrancar. `observeTokenChanges`-style flow mantiene sincronización ante cambios. La verdad última está en DataStore — el mirror solo optimiza lecturas síncronas del Worker. |
+| Múltiples 401 en paralelo | `Mutex` en `AuthSessionManager`. El primer caller ejecuta el bloque; los demás ven `awaitingLogin=true` y salen. |
+| `AuthSessionManager.initialize()` no ha corrido cuando ocurre el primer 401 | `handleTokenExpiredAsync()` chequea `initialized` al inicio y retorna sin acción. La probabilidad es muy baja (initialize corre en `Application.onCreate` antes de cualquier UI). |
+| `RetrofitClient` se crea antes que `Application.onCreate` complete | En el flujo actual, `RetrofitClient.createApiService` se llama desde `AppModule` que es lazy. `Application.onCreate` es sincrónico y completa antes que cualquier `Activity.onCreate`. Riesgo bajo. |
+| `POST_NOTIFICATIONS` denegado por el usuario | Banner UI + card en pantalla principal cubren. Notif es un canal entre varios, no el único. |
+| Cambio en config Sanctum invalida tokens existentes (si Task 0.1 detecta `expiration` mal) | Los tokens se invalidan, el flow nuevo los maneja con dignidad: notif + banner + drain post-login. Mejor que el estado actual. |
+| WorkManager mata el worker mientras chequea `isAwaitingLogin()` | El check es síncrono, dura microsegundos. WorkManager no interrumpe operaciones que vuelven `Result.success` rápido. |
+| MIUI mata WorkManager también, no se ejecuta watchdog | Sí pasa. Ya hoy. El usuario ve la pantalla al abrir la app, con el banner correcto. Cuando WorkManager se restaura, retoma. |
+| Eliminar `AuthInterceptor.kt` (dead code) rompe algún import oculto | `grep -r "AuthInterceptor"` antes de borrar. Si no aparece importado en ninguna parte productiva, eliminar limpio. |
 
 ---
 
 ## Fuera de scope
 
-- **Refresh token flow** (Sanctum no lo soporta nativamente; sería rediseño grande).
-- **Persistir el `ServiceStatusManager._statusHistory`** entre reinicios (hoy es `MutableStateFlow` en memoria — se pierde al matar el proceso).
-- **AccessibilityService para auto-toggle** del permiso (riesgoso, polémico, bloqueado por OEMs).
-- **Watchdog "indestructible" foreground service** (fuera de control de la app en MIUI).
-- **Investigación profunda del bug de "Permisos del Sistema vacíos"** más allá del Task 2.4 — si no se reproduce fácilmente, abrimos un issue aparte.
+- **Refresh token flow** (Sanctum no lo soporta nativamente).
+- **`enqueueUniqueWork("send_pending", APPEND_OR_REPLACE, ...)` para los 3 origins del worker** — mejora estructural posterior, sin urgencia ahora.
+- **Persistir `_statusHistory` entre reinicios** — hoy es Flow en memoria. Out of scope.
+- **AccessibilityService para auto-toggle del permiso** — riesgoso y bloqueado por OEMs.
+- **Foreground service "indestructible"** — fuera del control de la app en MIUI.
+- **Limpieza de archivos duplicados `CapturedNotification.kt` y DAOs paralelos** — bug aparte, no bloqueante.
 
 ---
 
 ## Tabla resumen de tareas
 
-| # | Tarea | Fase | Files key | Modelo recomendado |
+| # | Tarea | Fase | Files key | Modelo |
 |---|---|---|---|---|
 | 0.1 | Diagnóstico backend de expiro | 0 | `sanctum.php` (read-only) | haiku |
-| 1.1 | `awaitingLogin` flag en `PreferencesManager` | 1 | `PreferencesManager.kt` | haiku |
-| 1.2 | `AuthEventBus` | 1 | nuevo `AuthEventBus.kt` | haiku |
-| 1.3 | `AuthExpiryHandler` + wiring | 1 | nuevo `AuthExpiryHandler.kt`, `YapeNotifierApplication.kt` | sonnet |
-| 1.4 | `AuthInterceptor` emite 401 | 1 | `AuthInterceptor.kt` | haiku |
-| 1.5 | Worker respeta `awaitingLogin` | 1 | `SendNotificationWorker.kt` | haiku |
-| 1.6 | Login VMs emiten `LoginSucceeded` | 1 | 3 VMs | haiku |
-| 1.7 | Banner UI "Sesión expirada" | 1 | `MainActivity.kt` + VM | sonnet |
-| 1.8 | Smoke test fase 1 | 1 | doc | (manual) |
-| 2.1 | `OemDetection` | 2 | nuevo `OemDetection.kt` | haiku |
-| 2.2 | Mejorar `showServiceDisconnectedNotification` | 2 | `ServiceWatchdogWorker.kt` | haiku |
-| 2.3 | Card de recovery en `MainActivity` | 2 | `MainActivity.kt` | sonnet |
-| 2.4 | Fix "Permisos del Sistema vacíos" | 2 | `MainActivity.kt` (investigación) | sonnet |
-| 2.5 | Smoke test fase 2 | 2 | doc | (manual) |
-| 3.1 | Categoría `[AUTH]` en FileLogger | 3 | `FileLogger.kt` + callers | haiku |
-| 3.2 | Endpoint en log de 401 | 3 | `AuthInterceptor.kt` | haiku |
+| 1.1 | `awaitingLogin` en `PreferencesManager` | 1 | `PreferencesManager.kt` | haiku |
+| 1.2 | `AuthEvent` + `AuthEventBus` (UI complement) | 1 | `AuthEventBus.kt` (nuevo) | haiku |
+| 1.3 | `AuthSessionManager` (autoritativo) | 1 | `AuthSessionManager.kt` (nuevo) | sonnet |
+| 1.4 | `AuthSessionManager.initialize` en Application | 1 | `YapeNotifierApplication.kt` | haiku |
+| 1.5 | `RetrofitClient` detecta 401 + borrar `AuthInterceptor.kt` | 1 | `RetrofitClient.kt`, eliminar `AuthInterceptor.kt` | sonnet |
+| 1.6 | Worker respeta `isAwaitingLogin()` | 1 | `SendNotificationWorker.kt` | haiku |
+| 1.7 | 3 login VMs llaman `handleLoginSucceeded` | 1 | 3 VMs | haiku |
+| 1.8 | `MainViewModel` calcula `AppStatus` con jerarquía | 1 | `MainViewModel.kt`, `MainActivity.kt` | sonnet |
+| 1.9 | Smoke test fase 1 | 1 | doc | (manual) |
+| 2.1 | `OemDetection` (MANUFACTURER + BRAND + MODEL) | 2 | `OemDetection.kt` (nuevo) | haiku |
+| 2.2 | Mejorar notif del watchdog (plain text + OEM hint) | 2 | `ServiceWatchdogWorker.kt` | haiku |
+| 2.3 | Card de recovery en MainActivity | 2 | `MainActivity.kt` | sonnet |
+| 2.4 | Investigar "Permisos del Sistema vacíos" | 2 | `MainActivity.kt` | sonnet |
+| 2.5 | Smoke test fase 2 (dispositivo MIUI) | 2 | doc | (manual) |
+| 3.1 | Categoría `[AUTH]` en logs | 3 | varios | haiku |
 | 4.1 | Smoke test consolidado | 4 | doc | (manual) |
 | 4.2 | Push + release APK | 4 | n/a | (manual) |
 
-**Total: 18 tareas en 5 fases.** Backend casi sin tocar (solo lectura en Task 0.1). Todo el resto es Android nativo.
+**Total:** 18 tareas en 5 fases. **17 son código** (16 Android + 1 backend read-only). 2 son smoke tests manuales + 1 release.
