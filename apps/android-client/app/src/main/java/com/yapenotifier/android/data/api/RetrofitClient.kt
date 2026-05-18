@@ -152,4 +152,13 @@ object RetrofitClient {
         tokenCache.set(null)
         Timber.tag("RetrofitClient").d("Token cache cleared")
     }
+
+    /**
+     * Update the in-memory token cache explicitly. Used by AuthSessionManager to
+     * eliminate the race between DataStore writes and observeTokenChanges flow.
+     */
+    fun updateTokenCache(token: String?) {
+        tokenCache.set(token)
+        Timber.tag("RetrofitClient").d("Token cache updated explicitly (token present: ${token != null})")
+    }
 }
