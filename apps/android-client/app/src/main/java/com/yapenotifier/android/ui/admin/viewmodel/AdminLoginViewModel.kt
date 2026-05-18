@@ -73,7 +73,10 @@ class AdminLoginViewModel @Inject constructor(
                         }
                     }
                     
-                    preferencesManager.saveAuthToken(authResponse.token)
+                    com.yapenotifier.android.data.auth.AuthSessionManager.handleLoginSucceeded(
+                        context = getApplication(),
+                        token = authResponse.token,
+                    )
                     preferencesManager.saveUserEmail(authResponse.user.email)
                     preferencesManager.saveIsAdminMode(true) // Mark as Admin mode for session persistence
 

@@ -56,7 +56,10 @@ class LoginViewModel @Inject constructor(
             when (loginResult) {
                 is ApiResult.Success -> {
                     val authResponse = loginResult.data
-                    preferencesManager.saveAuthToken(authResponse.token)
+                    com.yapenotifier.android.data.auth.AuthSessionManager.handleLoginSucceeded(
+                        context = getApplication(),
+                        token = authResponse.token,
+                    )
                     preferencesManager.saveUserEmail(authResponse.user.email)
 
                     val deviceRegistrationResult = registerDevice()

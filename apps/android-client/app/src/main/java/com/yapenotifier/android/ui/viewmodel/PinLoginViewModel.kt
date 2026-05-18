@@ -1,11 +1,13 @@
 package com.yapenotifier.android.ui.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yapenotifier.android.data.api.ApiService
 import com.yapenotifier.android.data.local.PreferencesManager
 import com.yapenotifier.android.data.model.LoginPinRequest
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -14,6 +16,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class PinLoginViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val apiService: ApiService,
     private val preferencesManager: PreferencesManager
 ) : ViewModel() {
@@ -38,9 +41,12 @@ class PinLoginViewModel @Inject constructor(
                 
                 if (response.isSuccessful && response.body() != null) {
                     val body = response.body()!!
-                    
+
                     // Guardar token y datos del usuario
-                    preferencesManager.saveAuthToken(body.token)
+                    com.yapenotifier.android.data.auth.AuthSessionManager.handleLoginSucceeded(
+                        context = context,
+                        token = body.token,
+                    )
                     preferencesManager.saveUserId(body.user.id.toString())
                     preferencesManager.saveUserName(body.user.name)
                     preferencesManager.saveCommerceId(body.user.commerceId.toString())
