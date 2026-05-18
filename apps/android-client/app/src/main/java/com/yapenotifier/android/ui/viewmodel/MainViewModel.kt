@@ -1,15 +1,28 @@
 package com.yapenotifier.android.ui.viewmodel
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.yapenotifier.android.data.api.ApiService
 import com.yapenotifier.android.data.local.PreferencesManager
+import com.yapenotifier.android.ui.model.AppStatus
+import com.yapenotifier.android.util.NotificationAccessChecker
+import com.yapenotifier.android.util.ServiceStatusManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -25,6 +38,57 @@ class MainViewModel @Inject constructor(
 
     private val _logoutComplete = MutableLiveData<Boolean>()
     val logoutComplete: LiveData<Boolean> = _logoutComplete
+
+    // --- AppStatus streams ---
+
+    /** Polls notification-access permission every second. */
+    private val permissionFlow: StateFlow<Boolean> = flow {
+        val ctx: Context = application.applicationContext
+        while (true) {
+            val has = withContext(Dispatchers.IO) {
+                NotificationAccessChecker.isNotificationAccessEnabled(ctx)
+            }
+            emit(has)
+            delay(1_000)
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    /** Polls ServiceStatusManager.isServiceConnected() every second. */
+    private val serviceConnectedFlow: StateFlow<Boolean> = flow {
+        while (true) {
+            emit(ServiceStatusManager.isServiceConnected())
+            delay(1_000)
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    /**
+     * Stub for Task 2.0 — will be replaced with ServiceStatusManager.recoveryModeFlow
+     * once that property exists.
+     */
+    private val manualActionRequiredFlow: StateFlow<Boolean> =
+        // TODO Task 2.0: replace with ServiceStatusManager.recoveryModeFlow mapped to Boolean
+        MutableStateFlow(false)
+
+    /**
+     * Composed AppStatus with explicit priority ordering:
+     * TokenExpired > PermissionRevoked > ListenerDeadManualNeeded > ListenerReconnecting > CapturingOK.
+     *
+     * 'CapturingOK' is NEVER emitted while awaitingLogin == true.
+     */
+    val appStatus: StateFlow<AppStatus> = combine(
+        preferencesManager.awaitingLogin,
+        permissionFlow,
+        serviceConnectedFlow,
+        manualActionRequiredFlow,
+    ) { awaiting, hasPermission, connected, manualNeeded ->
+        when {
+            awaiting      -> AppStatus.TokenExpired
+            !hasPermission -> AppStatus.PermissionRevoked
+            manualNeeded  -> AppStatus.ListenerDeadManualNeeded
+            !connected    -> AppStatus.ListenerReconnecting
+            else          -> AppStatus.CapturingOK
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, AppStatus.CapturingOK)
 
     fun showMessage(message: String) {
         _statusMessage.value = message

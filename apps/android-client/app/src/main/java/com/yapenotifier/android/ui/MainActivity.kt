@@ -33,6 +33,7 @@ import android.util.Log
 import com.yapenotifier.android.util.NotificationAccessChecker
 import com.yapenotifier.android.util.PaymentNotificationParser
 import com.yapenotifier.android.util.ServiceStatusManager
+import com.yapenotifier.android.ui.model.AppStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -163,13 +164,19 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // Observe AppStatus — single source of truth for the status card
+        lifecycleScope.launch {
+            viewModel.appStatus.collectLatest { status ->
+                updateCaptureStatusFromAppStatus(status)
+            }
+        }
+
         lifecycleScope.launch {
             ServiceStatusManager.statusHistory.collectLatest { history ->
                 binding.tvServiceLog.text = history.joinToString(separator = "\n")
-                // Update capture status based on last status
+                // tvLastServiceStatus is still updated from service log for detail text
                 if (history.isNotEmpty()) {
-                    val lastStatus = history.first()
-                    updateCaptureStatusFromServiceStatus(lastStatus)
+                    binding.tvLastServiceStatus.text = history.first()
                 }
             }
         }
@@ -192,6 +199,49 @@ class MainActivity : AppCompatActivity() {
         statisticsViewModel.refreshStatistics()
         // Re-check service status in case permissions changed
         checkServiceStatus()
+    }
+
+    /**
+     * Routes [AppStatus] to the status-card UI. This is the authoritative update path;
+     * [updateCaptureStatusFromServiceStatus] is kept for backwards-compat but is no longer
+     * called from the status-card path.
+     *
+     * Priority: TokenExpired > PermissionRevoked > ListenerDeadManualNeeded >
+     *           ListenerReconnecting > CapturingOK.
+     * 'CapturingOK' is never shown when awaitingLogin == true.
+     */
+    private fun updateCaptureStatusFromAppStatus(status: AppStatus) {
+        when (status) {
+            is AppStatus.TokenExpired -> {
+                updateCaptureStatus("⚠️ Sesión expirada — toca para iniciar sesión", Color.parseColor("#F44336"))
+                binding.cardCaptureStatus.setOnClickListener {
+                    val intent = Intent(this, SplashActivity::class.java)
+                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    startActivity(intent)
+                }
+            }
+            is AppStatus.PermissionRevoked -> {
+                updateCaptureStatus("❌ Permiso de notificaciones revocado — abre ajustes para reactivar", Color.parseColor("#F44336"))
+                binding.cardCaptureStatus.setOnClickListener {
+                    NotificationAccessChecker.openNotificationListenerSettings(this)
+                }
+            }
+            is AppStatus.ListenerDeadManualNeeded -> {
+                // Full recovery card UI comes in Task 2.3; minimal banner for now
+                updateCaptureStatus("⚠️ Acción requerida: reactiva el permiso de notificaciones", Color.parseColor("#FF9800"))
+                binding.cardCaptureStatus.setOnClickListener {
+                    NotificationAccessChecker.openNotificationListenerSettings(this)
+                }
+            }
+            is AppStatus.ListenerReconnecting -> {
+                updateCaptureStatus("🔄 Reconectando servicio...", Color.parseColor("#FF9800"))
+                binding.cardCaptureStatus.setOnClickListener(null)
+            }
+            is AppStatus.CapturingOK -> {
+                updateCaptureStatus("✅ Capturando OK", Color.parseColor("#4CAF50"))
+                binding.cardCaptureStatus.setOnClickListener(null)
+            }
+        }
     }
 
     private fun updateCaptureStatusFromServiceStatus(status: String) {
