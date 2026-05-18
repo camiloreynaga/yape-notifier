@@ -34,10 +34,23 @@ class SendNotificationWorker(appContext: Context, workerParams: WorkerParameters
     override suspend fun doWork(): Result {
         Timber.d("Starting worker to send pending notifications...")
 
+        // Guard DOBLE: don't burn the network if we know auth is unusable.
+        // Source of truth = DataStore (read directly, never the AuthSessionManager mirror).
+        val awaitingLogin = preferencesManager.awaitingLogin.first()
+        val authTokenValue = preferencesManager.authToken.first()
+        if (awaitingLogin || authTokenValue.isNullOrBlank()) {
+            FileLogger.log(
+                "SEND",
+                "Skipped batch: awaitingLogin=$awaitingLogin, tokenPresent=${!authTokenValue.isNullOrBlank()}",
+                "info",
+            )
+            return Result.success()
+        }
+
         // Professional Architecture: Authentication is OPTIONAL
         // Device linking via QR is the authorization mechanism
         // If device has commerce_id (from QR), it can send notifications without user authentication
-        
+
         // Verify device is linked (has commerce_id)
         val commerceId = preferencesManager.commerceId.first()
         if (commerceId.isNullOrBlank()) {
@@ -158,12 +171,15 @@ class SendNotificationWorker(appContext: Context, workerParams: WorkerParameters
                 }
                 is SendResult.Error -> {
                     if (sendResult.isAuthError) {
-                        Timber.e("Error de autenticación (${sendResult.httpCode}) al enviar notificación ID: ${notification.id}. Token puede haber expirado. Deteniendo batch.")
-                        ServiceStatusManager.updateStatus("⚠️ Token expirado - Inicia sesión nuevamente")
+                        Timber.e("Auth error (${sendResult.httpCode}) on notifId=${notification.id}. Dispatching to AuthSessionManager.")
                         FileLogger.log(
                             "SEND",
-                            "AUTH_ERROR: http=${sendResult.httpCode}, notifId=${notification.id} - batch stopped, login required",
-                            "error"
+                            "AUTH_ERROR: http=${sendResult.httpCode}, notifId=${notification.id} - dispatched to AuthSessionManager",
+                            "error",
+                        )
+                        com.yapenotifier.android.data.auth.AuthSessionManager.handleTokenExpiredAsync(
+                            context = applicationContext,
+                            endpoint = "/api/notifications",
                         )
                         authFailed = true
                         break
