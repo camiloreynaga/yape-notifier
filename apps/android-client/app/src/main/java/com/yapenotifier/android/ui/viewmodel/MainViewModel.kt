@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -61,13 +62,10 @@ class MainViewModel @Inject constructor(
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
-    /**
-     * Stub for Task 2.0 — will be replaced with ServiceStatusManager.recoveryModeFlow
-     * once that property exists.
-     */
-    private val manualActionRequiredFlow: StateFlow<Boolean> =
-        // TODO Task 2.0: replace with ServiceStatusManager.recoveryModeFlow mapped to Boolean
-        MutableStateFlow(false)
+    private val manualActionRequiredFlow: kotlinx.coroutines.flow.Flow<Boolean> =
+        ServiceStatusManager.recoveryModeFlow.map {
+            it == ServiceStatusManager.ListenerRecoveryMode.MANUAL_ACTION_REQUIRED
+        }
 
     /**
      * Composed AppStatus with explicit priority ordering:

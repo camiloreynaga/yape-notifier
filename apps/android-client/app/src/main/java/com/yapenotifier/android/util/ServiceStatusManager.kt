@@ -3,12 +3,19 @@ package com.yapenotifier.android.util
 import android.content.Context
 import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 object ServiceStatusManager {
+
+    enum class ListenerRecoveryMode {
+        NORMAL,
+        RECONNECTING,
+        MANUAL_ACTION_REQUIRED,
+    }
 
     private const val PREFS_NAME = "service_status_prefs"
 
@@ -18,6 +25,7 @@ object ServiceStatusManager {
     private const val KEY_LAST_CAPTURED = "last_captured"
     private const val KEY_REBIND_ATTEMPTS = "rebind_attempts"
     private const val KEY_PROCESS_START_AT = "process_start_at"
+    private const val KEY_RECOVERY_MODE = "listener_recovery_mode"
 
     // Ventana máxima sin actividad para seguir considerando vivo el listener.
     // Si no hay ningún callback (onNotificationPosted/onListenerConnected) en este
@@ -46,6 +54,10 @@ object ServiceStatusManager {
     // Used by watchdog to distinguish "real disconnect" from "idle timeout".
     @Volatile private var _hasRealDisconnect: Boolean = false
 
+    @Volatile private var _recoveryMode: ListenerRecoveryMode = ListenerRecoveryMode.NORMAL
+    private val _recoveryModeFlow = MutableStateFlow(ListenerRecoveryMode.NORMAL)
+    val recoveryModeFlow: StateFlow<ListenerRecoveryMode> = _recoveryModeFlow.asStateFlow()
+
     /**
      * IMPORTANT: call this early (Application.onCreate) and also safe to call from Worker/Service.
      * It hydrates persisted state AND records the current process start timestamp.
@@ -72,6 +84,12 @@ object ServiceStatusManager {
         _lastListenerConnectedAt = p.getLongOrNull(KEY_LAST_CONNECTED)
         _lastNotificationCapturedAt = p.getLongOrNull(KEY_LAST_CAPTURED)
         _rebindAttempts = p.getInt(KEY_REBIND_ATTEMPTS, 0)
+        _recoveryMode = try {
+            p.getString(KEY_RECOVERY_MODE, null)?.let { ListenerRecoveryMode.valueOf(it) } ?: ListenerRecoveryMode.NORMAL
+        } catch (_: IllegalArgumentException) {
+            ListenerRecoveryMode.NORMAL
+        }
+        _recoveryModeFlow.value = _recoveryMode
 
         initialized = true
     }
@@ -192,6 +210,17 @@ object ServiceStatusManager {
     fun resetRebindAttempts() {
         _rebindAttempts = 0
         if (initialized) prefs().edit().putInt(KEY_REBIND_ATTEMPTS, 0).apply()
+    }
+
+    fun getListenerRecoveryMode(): ListenerRecoveryMode = _recoveryMode
+
+    fun setListenerRecoveryMode(mode: ListenerRecoveryMode) {
+        if (_recoveryMode == mode) return  // no-op si no cambia
+        _recoveryMode = mode
+        _recoveryModeFlow.value = mode
+        if (!initialized) return
+        prefs().edit().putString(KEY_RECOVERY_MODE, mode.name).apply()
+        FileLogger.log("SERVICE", "ListenerRecoveryMode=$mode", "info")
     }
 
     fun updateStatus(message: String) {

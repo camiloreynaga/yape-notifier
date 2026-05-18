@@ -247,6 +247,28 @@ class ServiceWatchdogWorker(appContext: Context, workerParams: WorkerParameters)
                 ServiceStatusManager.resetRebindAttempts()
             }
 
+            // Update recovery mode — single source of truth for the UI.
+            // MANUAL_ACTION_REQUIRED requires THREE conditions AND'd:
+            //   1) onListenerDisconnected/onDestroy actually fired (hasRealDisconnect)
+            //   2) Watchdog already retried >= NOTIFY_USER_AFTER_ATTEMPTS times
+            //   3) Last successful connection was at least SERVICE_STALE_MINUTES ago
+            // This combination avoids false positives from idle nights or counter carry-over.
+            run {
+                val attempts = ServiceStatusManager.getRebindAttempts()
+                val realDisconnect = ServiceStatusManager.hasRealDisconnect()
+                val lastConn = ServiceStatusManager.getLastListenerConnectedAt()
+                val lastConnAgeMin = lastConn?.let { (System.currentTimeMillis() - it) / 60_000L } ?: Long.MAX_VALUE
+                val nowConnected = ServiceStatusManager.isServiceConnected()
+
+                val newMode = when {
+                    nowConnected -> ServiceStatusManager.ListenerRecoveryMode.NORMAL
+                    realDisconnect && attempts >= NOTIFY_USER_AFTER_ATTEMPTS && lastConnAgeMin >= SERVICE_STALE_MINUTES ->
+                        ServiceStatusManager.ListenerRecoveryMode.MANUAL_ACTION_REQUIRED
+                    else -> ServiceStatusManager.ListenerRecoveryMode.RECONNECTING
+                }
+                ServiceStatusManager.setListenerRecoveryMode(newMode)
+            }
+
             Result.success()
         } catch (e: Exception) {
             Log.e(TAG, "Error in ServiceWatchdogWorker", e)
@@ -366,6 +388,9 @@ class ServiceWatchdogWorker(appContext: Context, workerParams: WorkerParameters)
 
         // After this many failed rebind attempts, show a notification to the user
         private const val NOTIFY_USER_AFTER_ATTEMPTS = 3
+
+        // Minimum age of last connection (minutes) before we escalate to MANUAL_ACTION_REQUIRED
+        private const val SERVICE_STALE_MINUTES = 30L
 
         // Notification IDs for user alerts
         private const val PERMISSION_LOST_NOTIFICATION_ID = 2001
