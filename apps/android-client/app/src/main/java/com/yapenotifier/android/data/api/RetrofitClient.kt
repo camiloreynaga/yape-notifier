@@ -88,6 +88,11 @@ object RetrofitClient {
             // AuthSessionManager handles the rest asynchronously — never blocks the interceptor.
             if (response.code == 401 && token != null) {
                 Timber.tag("RetrofitClient").w("401 on ${originalRequest.url.encodedPath} — dispatching to AuthSessionManager")
+                com.yapenotifier.android.util.FileLogger.log(
+                    "AUTH",
+                    "401 on ${originalRequest.url.encodedPath} (token present) — dispatched to AuthSessionManager",
+                    "error",
+                )
                 com.yapenotifier.android.data.auth.AuthSessionManager.handleTokenExpiredAsync(
                     context = context,
                     endpoint = originalRequest.url.encodedPath,
