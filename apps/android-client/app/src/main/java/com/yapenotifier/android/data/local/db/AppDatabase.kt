@@ -4,8 +4,9 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import com.yapenotifier.android.data.local.db.Migration1To2
 
-@Database(entities = [CapturedNotification::class], version = 1, exportSchema = false)
+@Database(entities = [CapturedNotification::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun capturedNotificationDao(): CapturedNotificationDao
@@ -21,7 +22,9 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "yape_notifier_database"
-                ).build()
+                )
+                .addMigrations(Migration1To2)
+                .build()
                 INSTANCE = instance
                 // return instance
                 instance

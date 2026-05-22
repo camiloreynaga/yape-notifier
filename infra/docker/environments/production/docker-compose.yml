@@ -59,6 +59,50 @@ services:
           memory: 256M
 
   # ============================================
+  # Reverb WebSocket Server
+  # ============================================
+  reverb:
+    build:
+      context: ../../../../apps/api
+      dockerfile: ../../infra/docker/dockerfiles/Dockerfile.php-fpm
+    container_name: yape-notifier-reverb-prod
+    restart: always
+    working_dir: /var/www
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    volumes:
+      - ../../configs/php/production.ini:/usr/local/etc/php/conf.d/production.ini:ro
+    env_file:
+      - .env
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - APP_URL=${APP_URL:-https://api.notificaciones.space}
+    networks:
+      - yape-network-prod
+    depends_on:
+      db:
+        condition: service_healthy
+      php-fpm:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "php -r 'exit(0);'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "com.yape-notifier.service=reverb"
+      - "com.yape-notifier.environment=production"
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+
+  # ============================================
   # Nginx Service (Web Server for API)
   # ============================================
   nginx-api:
@@ -109,7 +153,15 @@ services:
       context: ../../../../apps/web-dashboard
       dockerfile: ../../infra/docker/dockerfiles/Dockerfile.dashboard
       args:
+        # API URL (fallback to DASHBOARD_API_URL or default)
         VITE_API_BASE_URL: ${DASHBOARD_API_URL:-https://api.notificaciones.space}
+        VITE_API_URL: ${DASHBOARD_API_URL:-https://api.notificaciones.space}
+        # Reverb WebSocket configuration (from backend .env)
+        # IMPORTANT: These values must match the backend Reverb configuration
+        VITE_REVERB_APP_KEY: ${REVERB_APP_KEY:-}
+        VITE_REVERB_HOST: ${REVERB_HOST_PUBLIC:-api.notificaciones.space}
+        VITE_REVERB_PORT: ${REVERB_PORT:-8080}
+        VITE_REVERB_SCHEME: ${REVERB_SCHEME_PUBLIC:-https}
     container_name: yape-notifier-dashboard-prod
     restart: always
     volumes:
@@ -124,18 +176,13 @@ services:
       # Si falla, verificar que los archivos estáticos del dashboard estén construidos
       test:
         [
-          "CMD",
-          "wget",
-          "--quiet",
-          "--tries=1",
-          "--spider",
-          "--timeout=5",
-          "http://localhost/health",
+          "CMD-SHELL",
+          "wget --quiet --tries=1 --spider --timeout=5 http://localhost/health || exit 1",
         ]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 20s
+      retries: 5
+      start_period: 30s
     labels:
       - "com.yape-notifier.service=dashboard"
       - "com.yape-notifier.environment=production"
@@ -168,23 +215,20 @@ services:
     depends_on:
       - nginx-api
       - dashboard
+      - reverb
     healthcheck:
-      # Usar el endpoint de admin de Caddy que siempre responde en HTTP
-      # Alternativa: verificar que el proceso esté corriendo
+      # Verificar que Caddy esté corriendo y respondiendo
+      # Usar el puerto HTTP local (más confiable que el endpoint de admin que puede no estar habilitado)
+      # Si el endpoint de admin falla, verificar que el proceso esté corriendo
       test:
         [
-          "CMD",
-          "wget",
-          "--quiet",
-          "--tries=1",
-          "--spider",
-          "--timeout=5",
-          "http://localhost:2019/config/",
+          "CMD-SHELL",
+          "wget --quiet --tries=1 --spider --timeout=5 http://localhost/ || pgrep -x caddy > /dev/null || exit 1",
         ]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 10s
+      retries: 5
+      start_period: 20s
     labels:
       - "com.yape-notifier.service=caddy"
       - "com.yape-notifier.environment=production"

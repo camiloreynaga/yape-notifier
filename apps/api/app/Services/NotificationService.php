@@ -2,32 +2,131 @@
 
 namespace App\Services;
 
+use App\Events\NotificationCreated;
+use App\Models\AppInstance;
+use App\Models\Commerce;
 use App\Models\Device;
 use App\Models\Notification;
 use App\Models\User;
+use App\Services\CommerceService;
+use App\Services\PaymentNotificationValidator;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class NotificationService
 {
+    public function __construct(
+        protected ?AppInstanceService $appInstanceService = null,
+        protected ?CommerceService $commerceService = null
+    ) {
+        // Lazy load to avoid circular dependency
+        if (!$this->appInstanceService) {
+            $this->appInstanceService = app(AppInstanceService::class);
+        }
+        if (!$this->commerceService) {
+            $this->commerceService = app(CommerceService::class);
+        }
+    }
+
     /**
      * Create a notification from device data.
      */
     public function createNotification(array $data, Device $device): Notification
     {
+        // Ensure user relationship is loaded (optional - for capturer mode)
+        if (!$device->relationLoaded('user')) {
+            $device->load('user');
+        }
+
+        // Note: user is OPTIONAL in capturer mode (device linked via QR without user account)
+        // The commerce_id from device is the authorization mechanism
+
+        // Validate that this is a real payment notification (not publicity/promotion)
+        $validation = PaymentNotificationValidator::isValid($data);
+        
+        if (!$validation['valid']) {
+            Log::warning('Notification rejected by validator', [
+                'device_id' => $device->id,
+                'user_id' => $device->user_id,
+                'title' => $data['title'] ?? null,
+                'body' => $data['body'] ?? null,
+                'amount' => $data['amount'] ?? null,
+                'source_app' => $data['source_app'] ?? null,
+                'reason' => $validation['reason'],
+            ]);
+
+            // Mark as inconsistent instead of rejecting completely
+            // This allows for auditing and potential manual review
+            $data['status'] = 'inconsistent';
+        }
+
+        // Ensure device has commerce_id (from device or user)
+        // Professional approach: commerce_id can come from device (QR linking) or user
+        $commerceId = $device->commerce_id ?? $device->user?->commerce_id;
+
+        // If no commerce_id, try to ensure user has one (only if user exists)
+        if (!$commerceId && $device->user) {
+            Log::warning('Notification creation attempted without commerce_id', [
+                'device_id' => $device->id,
+                'user_id' => $device->user_id,
+            ]);
+
+            // Try to ensure user has commerce (fallback: create one)
+            $commerceId = $this->ensureUserHasCommerce($device->user);
+        }
+
+        // If still no commerce_id, reject (device must be linked via QR)
+        if (!$commerceId) {
+            Log::error('Device has no commerce_id - not linked via QR', [
+                'device_id' => $device->id,
+                'user_id' => $device->user_id,
+            ]);
+            throw new \RuntimeException('Device not linked to commerce. Please scan QR code to link device.');
+        }
+
+        // Find or create app instance if dual app identifiers are provided
+        // Only if we have a valid commerce_id
+        $appInstance = null;
+        if (isset($data['package_name']) && isset($data['android_user_id']) && $commerceId) {
+            try {
+                $appInstance = $this->appInstanceService->findOrCreate(
+                    $device,
+                    $data['package_name'],
+                    $data['android_user_id']
+                );
+            } catch (\Exception $e) {
+                Log::error('Failed to create/find app instance', [
+                    'device_id' => $device->id,
+                    'package_name' => $data['package_name'],
+                    'android_user_id' => $data['android_user_id'],
+                    'error' => $e->getMessage(),
+                ]);
+                // Continue without app instance
+            }
+        }
+
         // Check for duplicates
-        $isDuplicate = $this->checkDuplicate($data, $device);
+        $isDuplicate = $this->checkDuplicate($data, $device, $appInstance);
 
         $notification = Notification::create([
             'user_id' => $device->user_id,
+            'commerce_id' => $commerceId,
             'device_id' => $device->id,
             'source_app' => $data['source_app'],
+            'package_name' => $data['package_name'] ?? null,
+            'android_user_id' => $data['android_user_id'] ?? null,
+            'android_uid' => $data['android_uid'] ?? null,
+            'app_instance_id' => $appInstance?->id,
             'title' => $data['title'] ?? null,
             'body' => $data['body'],
             'amount' => $data['amount'] ?? null,
             'currency' => $data['currency'] ?? 'PEN',
             'payer_name' => $data['payer_name'] ?? null,
+            'security_code' => $data['security_code'] ?? null,
+            'posted_at' => isset($data['posted_at'])
+                ? Carbon::parse($data['posted_at'])
+                : null,
             'received_at' => isset($data['received_at'])
                 ? Carbon::parse($data['received_at'])
                 : now(),
@@ -42,8 +141,27 @@ class NotificationService
         if ($isDuplicate) {
             Log::info('Duplicate notification detected', [
                 'device_id' => $device->id,
-                'source_app' => $data['source_app'],
+                'package_name' => $data['package_name'] ?? null,
+                'android_user_id' => $data['android_user_id'] ?? null,
                 'received_at' => $notification->received_at,
+            ]);
+        }
+
+        // Load relationships for broadcasting
+        $notification->load(['appInstance', 'device']);
+
+        // Broadcast notification to WebSocket clients
+        try {
+            broadcast(new NotificationCreated($notification))->toOthers();
+            Log::info('Notification broadcasted via WebSocket', [
+                'notification_id' => $notification->id,
+                'commerce_id' => $notification->commerce_id,
+            ]);
+        } catch (\Exception $e) {
+            // Log error but don't fail notification creation
+            Log::warning('Failed to broadcast notification', [
+                'notification_id' => $notification->id,
+                'error' => $e->getMessage(),
             ]);
         }
 
@@ -52,40 +170,81 @@ class NotificationService
 
     /**
      * Check if a notification is a duplicate.
+     * Uses package_name + android_user_id + posted_at + body for deduplication.
      */
-    protected function checkDuplicate(array $data, Device $device): bool
+    protected function checkDuplicate(array $data, Device $device, ?AppInstance $appInstance = null): bool
     {
-        $receivedAt = isset($data['received_at'])
-            ? Carbon::parse($data['received_at'])
-            : now();
+        $postedAt = isset($data['posted_at'])
+            ? Carbon::parse($data['posted_at'])
+            : (isset($data['received_at']) ? Carbon::parse($data['received_at']) : now());
 
         // Check for duplicates within a 5-second window
-        $startTime = $receivedAt->copy()->subSeconds(5);
-        $endTime = $receivedAt->copy()->addSeconds(5);
+        $startTime = $postedAt->copy()->subSeconds(5);
+        $endTime = $postedAt->copy()->addSeconds(5);
 
-        $existing = Notification::where('device_id', $device->id)
-            ->where('source_app', $data['source_app'])
-            ->whereBetween('received_at', [$startTime, $endTime])
-            ->where('body', $data['body'])
-            ->first();
+        $query = Notification::where('device_id', $device->id)
+            ->where('body', $data['body']);
+
+        // Search in both posted_at and received_at fields
+        // This handles cases where first notification has posted_at=null but received_at is set
+        // We search in both fields because:
+        // - If existing notification has posted_at, it will match in posted_at
+        // - If existing notification has posted_at=null, it will match in received_at
+        $query->where(function ($q) use ($startTime, $endTime) {
+            $q->where(function ($subQ) use ($startTime, $endTime) {
+                // Search in posted_at field (only if not null)
+                $subQ->whereNotNull('posted_at')
+                    ->whereBetween('posted_at', [$startTime, $endTime]);
+            })->orWhere(function ($subQ) use ($startTime, $endTime) {
+                // Search in received_at field (for cases where posted_at is null or to catch duplicates)
+                $subQ->whereBetween('received_at', [$startTime, $endTime]);
+            });
+        });
+
+        // If we have dual app identifiers, use them for more precise deduplication
+        if (isset($data['package_name']) && isset($data['android_user_id'])) {
+            $query->where('package_name', $data['package_name'])
+                ->where('android_user_id', $data['android_user_id']);
+        } else {
+            // Fallback to source_app for backward compatibility
+            $query->where('source_app', $data['source_app']);
+        }
+
+        $existing = $query->first();
 
         return $existing !== null;
     }
 
     /**
      * Get notifications for a user with filters.
+     * 
+     * Professional Architecture Approach:
+     * - Prioritize commerce_id over user_id (supports capturer mode)
+     * - If user has commerce_id, show ALL notifications for that commerce
+     * - This includes notifications from devices without user_id (capturer mode)
+     * - Fallback to user_id for backward compatibility
      */
     public function getUserNotifications(
         User $user,
         array $filters = []
     ) {
-        $query = Notification::where('user_id', $user->id)
-            ->with('device')
-            ->orderBy('received_at', 'desc');
+        // Prioritize commerce_id over user_id
+        if ($user->commerce_id) {
+            // Show ALL notifications for this commerce (including capturer devices)
+            $query = Notification::where('commerce_id', $user->commerce_id)
+                ->with(['device', 'appInstance'])
+                ->orderBy('received_at', 'desc');
+        } else {
+            // Fallback: show only user's own notifications
+            $query = Notification::where('user_id', $user->id)
+                ->with(['device', 'appInstance'])
+                ->orderBy('received_at', 'desc');
+        }
 
-        // Filter by device
-        if (isset($filters['device_id'])) {
-            $query->where('device_id', $filters['device_id']);
+        // Filter by device (accepts scalar or array)
+        if (! empty($filters['device_id'])) {
+            $deviceIds = (array) $filters['device_id'];
+            $query->whereIn('device_id', $deviceIds);
         }
 
         // Filter by source app
@@ -93,13 +252,32 @@ class NotificationService
             $query->where('source_app', $filters['source_app']);
         }
 
-        // Filter by date range
+        // Filter by package name
+        if (isset($filters['package_name'])) {
+            $query->where('package_name', $filters['package_name']);
+        }
+
+        // Filter by app instance (accepts scalar or array)
+        if (! empty($filters['app_instance_id'])) {
+            $instanceIds = (array) $filters['app_instance_id'];
+            $query->whereIn('app_instance_id', $instanceIds);
+        }
+
+        // Filter by date range. Accept both 'YYYY-MM-DD' and full datetime.
         if (isset($filters['start_date'])) {
-            $query->where('received_at', '>=', $filters['start_date']);
+            $startDate = $filters['start_date'];
+            if (strlen($startDate) <= 10) {
+                $startDate .= ' 00:00:00';
+            }
+            $query->where('received_at', '>=', $startDate);
         }
 
         if (isset($filters['end_date'])) {
-            $query->where('received_at', '<=', $filters['end_date']);
+            $endDate = $filters['end_date'];
+            if (strlen($endDate) <= 10) {
+                $endDate .= ' 23:59:59';
+            }
+            $query->where('received_at', '<=', $endDate);
         }
 
         // Filter by status
@@ -117,18 +295,39 @@ class NotificationService
 
     /**
      * Get statistics for a user.
+     * 
+     * Professional Architecture Approach:
+     * - Prioritize commerce_id over user_id (supports capturer mode)
+     * - If user has commerce_id, show statistics for ALL commerce notifications
+     * - This includes notifications from devices without user_id (capturer mode)
      */
     public function getStatistics(User $user, array $filters = []): array
     {
-        $baseQuery = Notification::where('notifications.user_id', $user->id);
+        // Prioritize commerce_id over user_id
+        if ($user->commerce_id) {
+            $baseQuery = Notification::where('notifications.commerce_id', $user->commerce_id);
+        } else {
+            $baseQuery = Notification::where('notifications.user_id', $user->id);
+        }
 
-        // Apply date filters
+        // Apply date filters. The frontend may send either:
+        //   - 'YYYY-MM-DD' (date only) — we extend to start/end of day
+        //   - 'YYYY-MM-DD HH:MM:SS' (already includes time) — we use as-is
+        // Both are interpreted as UTC by PostgreSQL.
         if (isset($filters['start_date'])) {
-            $baseQuery->where('notifications.received_at', '>=', $filters['start_date']);
+            $startDate = $filters['start_date'];
+            if (strlen($startDate) <= 10) {
+                $startDate .= ' 00:00:00';
+            }
+            $baseQuery->where('notifications.received_at', '>=', $startDate);
         }
 
         if (isset($filters['end_date'])) {
-            $baseQuery->where('notifications.received_at', '<=', $filters['end_date'].' 23:59:59');
+            $endDate = $filters['end_date'];
+            if (strlen($endDate) <= 10) {
+                $endDate .= ' 23:59:59';
+            }
+            $baseQuery->where('notifications.received_at', '<=', $endDate);
         }
 
         // Total statistics (excluding duplicates)
@@ -196,5 +395,49 @@ class NotificationService
             'by_status' => $byStatus,
             'duplicates' => $duplicates,
         ];
+    }
+
+    /**
+     * Ensure user has a commerce. Creates one if missing.
+     * 
+     * @param User $user
+     * @return int|null Commerce ID or null if creation failed
+     */
+    protected function ensureUserHasCommerce(User $user): ?int
+    {
+        // Refresh user to get latest commerce_id
+        $user->refresh();
+
+        if ($user->commerce_id) {
+            return $user->commerce_id;
+        }
+
+        // Try to create commerce for user
+        try {
+            $commerce = $this->commerceService->createCommerce($user, [
+                'name' => $user->name . ' - Negocio',
+            ]);
+
+            Log::info('Commerce created automatically for user during notification', [
+                'user_id' => $user->id,
+                'commerce_id' => $commerce->id,
+            ]);
+
+            // Update device if it doesn't have commerce_id
+            if ($user->devices()->whereNull('commerce_id')->exists()) {
+                $user->devices()->whereNull('commerce_id')->update([
+                    'commerce_id' => $commerce->id,
+                ]);
+            }
+
+            return $commerce->id;
+        } catch (\Exception $e) {
+            Log::error('Failed to create commerce for user during notification', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 }

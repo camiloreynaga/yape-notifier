@@ -44,4 +44,60 @@
 
 # Keep data models
 -keep class com.yapenotifier.android.data.model.** { *; }
+-keepclassmembers class com.yapenotifier.android.data.model.** {
+    <fields>;
+    <methods>;
+}
+
+# Keep ViewModels
+-keep class com.yapenotifier.android.ui.**.viewmodel.** { *; }
+
+# Keep Activities and Fragments
+-keep class com.yapenotifier.android.ui.** { *; }
+
+# Timber
+-keep class timber.log.** { *; }
+-dontwarn timber.log.**
+
+# Room Database
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class *
+-dontwarn androidx.room.paging.**
+
+# Coroutines
+-keepnames class kotlinx.coroutines.internal.MainDispatcherFactory
+-keepnames class kotlinx.coroutines.CoroutineExceptionHandler
+-keepclassmembernames class kotlinx.** {
+    volatile <fields>;
+}
+-keepclassmembers class kotlinx.coroutines.** {
+    volatile <fields>;
+}
+
+# OkHttp
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-keepnames class okhttp3.internal.publicsuffix.PublicSuffixDatabase
+
+# ZXing
+-keep class com.google.zxing.** { *; }
+-dontwarn com.google.zxing.**
+
+# Keep BuildConfig
+-keep class com.yapenotifier.android.BuildConfig { *; }
+
+# Keep Parcelable implementations
+-keep class * implements android.os.Parcelable {
+    public static final android.os.Parcelable$Creator *;
+}
+
+# Keep Serializable
+-keepclassmembers class * implements java.io.Serializable {
+    static final long serialVersionUID;
+    private static final java.io.ObjectStreamField[] serialPersistentFields;
+    private void writeObject(java.io.ObjectOutputStream);
+    private void readObject(java.io.ObjectInputStream);
+    java.lang.Object writeReplace();
+    java.lang.Object readResolve();
+}
 

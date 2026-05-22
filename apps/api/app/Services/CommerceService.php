@@ -1,0 +1,142 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Commerce;
+use App\Models\Plan;
+use App\Models\User;
+use Illuminate\Support\Facades\Log;
+
+class CommerceService
+{
+    /**
+     * Create a new commerce in 'pending' state with the Starter plan assigned by default.
+     */
+    public function createCommerce(User $owner, array $data): Commerce
+    {
+        $starterPlan = Plan::where('slug', 'starter')->first();
+
+        $commerce = Commerce::create([
+            'name'          => $data['name'],
+            'owner_user_id' => $owner->id,
+            'status'        => 'pending',
+            'plan_id'       => $starterPlan?->id,
+        ]);
+
+        if (! empty($data['referral_code'])) {
+            $referrer = Commerce::where('referral_code', $data['referral_code'])->first();
+            if ($referrer && $referrer->owner_user_id !== $owner->id) {
+                $commerce->referred_by_commerce_id = $referrer->id;
+                $commerce->save();
+            } else {
+                Log::warning('Referral code rejected on commerce creation', [
+                    'reason' => $referrer ? 'self_referral' : 'not_found',
+                    'code' => $data['referral_code'],
+                    'user_id' => $owner->id,
+                ]);
+            }
+        }
+
+        // Assign commerce to owner. Preserve super_admin role — those users
+        // own the platform, not the commerce, and should never be downgraded.
+        $updates = ['commerce_id' => $commerce->id];
+        if (!$owner->isSuperAdmin()) {
+            $updates['role'] = 'admin';
+        }
+        $owner->update($updates);
+
+        return $commerce;
+    }
+
+    /**
+     * Get commerce for a user.
+     */
+    public function getUserCommerce(User $user): ?Commerce
+    {
+        if (!$user->commerce_id) {
+            return null;
+        }
+
+        return Commerce::with(['owner', 'devices', 'users'])
+            ->find($user->commerce_id);
+    }
+
+    /**
+     * Add user to commerce.
+     */
+    public function addUserToCommerce(Commerce $commerce, User $user, string $role = 'captador'): void
+    {
+        $user->update([
+            'commerce_id' => $commerce->id,
+            'role' => $role,
+        ]);
+    }
+
+    /**
+     * Remove user from commerce.
+     */
+    public function removeUserFromCommerce(User $user): void
+    {
+        $user->update([
+            'commerce_id' => null,
+            'role' => 'admin',
+        ]);
+    }
+
+    /**
+     * Approve a commerce: set it active, assign a plan, and set plan_expires_at to now+30 days.
+     */
+    public function approve(Commerce $commerce, Plan $plan, User $approvedBy): Commerce
+    {
+        $commerce->update([
+            'status'          => 'active',
+            'plan_id'         => $plan->id,
+            'plan_expires_at' => now()->addDays(30),
+            'approved_at'     => now(),
+            'approved_by'     => $approvedBy->id,
+        ]);
+        return $commerce->fresh();
+    }
+
+    /**
+     * Renew a commerce: extend plan_expires_at by 30 days and record renewal history.
+     */
+    public function renew(
+        Commerce $commerce,
+        Plan $plan,
+        User $renewedBy,
+        ?float $amountPaid = null,
+        ?string $notes = null
+    ): Commerce {
+        $previousExpiresAt = $commerce->plan_expires_at;
+
+        if ($commerce->status === 'suspended' || ! $previousExpiresAt || $previousExpiresAt->isPast()) {
+            $newExpiresAt = now()->addDays(30);
+        } else {
+            $newExpiresAt = $previousExpiresAt->copy()->addDays(30);
+        }
+
+        \DB::transaction(function () use ($commerce, $plan, $renewedBy, $previousExpiresAt, $newExpiresAt, $amountPaid, $notes) {
+            $commerce->update([
+                'status'          => 'active',
+                'plan_id'         => $plan->id,
+                'plan_expires_at' => $newExpiresAt,
+            ]);
+
+            \App\Models\CommerceRenewal::create([
+                'commerce_id'         => $commerce->id,
+                'plan_id'             => $plan->id,
+                'renewed_by_user_id'  => $renewedBy->id,
+                'previous_expires_at' => $previousExpiresAt,
+                'new_expires_at'      => $newExpiresAt,
+                'amount_paid'         => $amountPaid,
+                'notes'               => $notes,
+            ]);
+        });
+
+        return $commerce->fresh();
+    }
+}
+
+
+

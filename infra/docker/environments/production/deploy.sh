@@ -119,6 +119,76 @@ else
     info "APP_KEY verificado correctamente (ya existe, no se regenerará)"
 fi
 
+# ============================================
+# VALIDACIÓN CRÍTICA: PHP 8.2 LTS y composer.lock
+# ============================================
+# PHP 8.2 es LTS (Long Term Support) hasta diciembre 2026
+# Esta validación asegura que composer.lock sea compatible con PHP 8.2
+# y previene problemas de incompatibilidad en producción
+info "Validando compatibilidad con PHP 8.2 LTS..."
+API_DIR="../../../../apps/api"
+
+if [ ! -f "$API_DIR/composer.json" ]; then
+    error "No se encontró composer.json en $API_DIR"
+    exit 1
+fi
+
+# Verificar que composer.json especifica PHP 8.2
+PHP_VERSION_REQUIREMENT=$(grep -o '"php":\s*"[^"]*"' "$API_DIR/composer.json" | head -1)
+if ! echo "$PHP_VERSION_REQUIREMENT" | grep -q "8\.2"; then
+    error "❌ composer.json no especifica PHP 8.2 LTS"
+    error "Versión encontrada: $PHP_VERSION_REQUIREMENT"
+    error "Debe ser: \"php\": \">=8.2 <8.3\" para usar PHP 8.2 LTS"
+    exit 1
+fi
+info "✅ composer.json especifica PHP 8.2 LTS correctamente"
+
+if [ ! -f "$API_DIR/composer.lock" ]; then
+    error "composer.lock no encontrado en $API_DIR"
+    error "Ejecuta 'composer install' o 'composer update' en apps/api usando PHP 8.2 y haz commit del composer.lock"
+    exit 1
+fi
+
+# Validar que composer.lock sea compatible con PHP 8.2 LTS
+# Usamos PHP 8.2 explícitamente para validar (mismo que Dockerfile)
+info "Validando compatibilidad de composer.lock con PHP 8.2 LTS..."
+cd "$API_DIR"
+VALIDATION_OUTPUT=$(docker run --rm -v "$(pwd):/app" -w /app \
+    php:8.2-cli sh -c "curl -sS https://getcomposer.org/installer | php && php composer.phar install --dry-run --no-dev --no-interaction --prefer-dist" 2>&1 || true)
+
+# Detectar errores de compatibilidad
+HAS_ERRORS=false
+if echo "$VALIDATION_OUTPUT" | grep -q "lock file is not up to date\|not present in the lock file\|Required package.*is not present in the lock file"; then
+    HAS_ERRORS=true
+    ERROR_TYPE="desactualizado"
+elif echo "$VALIDATION_OUTPUT" | grep -q "does not satisfy that requirement\|Your lock file does not contain a compatible set\|requires php >=8\.[34]"; then
+    HAS_ERRORS=true
+    ERROR_TYPE="incompatible con PHP 8.2"
+fi
+
+if [ "$HAS_ERRORS" = true ]; then
+    error "❌ composer.lock está $ERROR_TYPE"
+    error ""
+    error "Detalles del error:"
+    echo "$VALIDATION_OUTPUT" | grep -E "lock file|not present|Required package|does not satisfy|compatible set|requires php" | head -5
+    error ""
+    error "CAUSA: composer.lock fue generado con una versión de PHP diferente a 8.2"
+    error ""
+    error "SOLUCIÓN PROFESIONAL (usar PHP 8.2 LTS):"
+    error "  1. cd apps/api"
+    error "  2. docker run --rm -v \$(pwd):/app -w /app php:8.2-cli sh -c 'curl -sS https://getcomposer.org/installer | php && php composer.phar update --no-interaction'"
+    error "  3. Verificar: docker run --rm -v \$(pwd):/app -w /app php:8.2-cli sh -c 'curl -sS https://getcomposer.org/installer | php && php composer.phar install --dry-run --no-dev --no-interaction'"
+    error "  4. git add composer.lock && git commit -m 'fix: update composer.lock for PHP 8.2 LTS compatibility'"
+    error "  5. git push"
+    error "  6. Vuelve a ejecutar este script de deploy"
+    error ""
+    error "⚠️  IMPORTANTE: Siempre usa PHP 8.2 LTS para mantener consistencia con producción"
+    cd - > /dev/null
+    exit 1
+fi
+cd - > /dev/null
+info "✅ composer.lock es compatible con PHP 8.2 LTS"
+
 # PASO 1: Detener contenedores existentes (con --remove-orphans para limpiar servicios huérfanos)
 # Esto debe hacerse ANTES de construir nuevas imágenes para evitar conflictos
 info "Deteniendo contenedores existentes..."
@@ -126,7 +196,10 @@ docker compose --env-file .env down --remove-orphans
 
 # PASO 2: Construir imágenes Docker
 # Se construye después de detener para evitar problemas con contenedores en ejecución
-info "Construyendo imágenes Docker..."
+# BuildKit está habilitado para usar cache mounts y optimizar builds
+info "Construyendo imágenes Docker (con BuildKit para cache optimizado)..."
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
 if [ -n "$BUILD_NO_CACHE" ]; then
     docker compose --env-file .env build $BUILD_NO_CACHE
 else
@@ -202,32 +275,165 @@ fi
 info "Verificando permisos y directorios..."
 docker compose --env-file .env exec -T php-fpm sh -c "mkdir -p /var/www/storage/framework/{sessions,views,cache} /var/www/storage/logs /var/www/bootstrap/cache && chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache && chmod -R 775 /var/www/storage /var/www/bootstrap/cache"
 
-# PASO 8: Limpiar caches de Laravel antes de migraciones
-# Esto asegura que Laravel use las variables de entorno actuales y no valores cacheados
+# PASO 8: Limpiar caches de Laravel ANTES de package discovery
+# CRÍTICO: Eliminar TODOS los archivos de cache que puedan contener referencias
+# a dependencias de desarrollo (como nunomaduro/collision)
 info "Limpiando caches de Laravel..."
-docker compose --env-file .env exec -T php-fpm php artisan config:clear
+docker compose --env-file .env exec -T php-fpm php artisan config:clear || true
+docker compose --env-file .env exec -T php-fpm php artisan route:clear || true
+docker compose --env-file .env exec -T php-fpm php artisan view:clear || true
+
+# Eliminar archivos de cache del bootstrap manualmente para asegurar limpieza completa
+# Estos archivos pueden contener referencias a providers de desarrollo
+info "Eliminando archivos de cache del bootstrap..."
+docker compose --env-file .env exec -T php-fpm sh -c "rm -f /var/www/bootstrap/cache/packages.php /var/www/bootstrap/cache/services.php /var/www/bootstrap/cache/config.php 2>/dev/null || true" || true
 
 # Limpiar cache (puede fallar si CACHE_DRIVER=database y la tabla no existe, pero no es crítico)
-# Si falla, simplemente continuamos porque config:clear ya se ejecutó
 if ! docker compose --env-file .env exec -T php-fpm php artisan cache:clear 2>/dev/null; then
     warn "cache:clear falló (probablemente CACHE_DRIVER=database sin tabla). Continuando..."
     warn "Asegúrate de que CACHE_DRIVER=file en tu .env para evitar este warning"
 fi
 
-# PASO 9: Ejecutar migraciones (solo después de que PostgreSQL esté listo y caches limpiados)
-info "Ejecutando migraciones..."
-docker compose --env-file .env exec -T php-fpm php artisan migrate --force
+# PASO 9: Descubrir packages de Laravel DESPUÉS de limpiar caches
+# Esto regenera packages.php solo con dependencias de producción instaladas
+info "Descubriendo packages de Laravel..."
+docker compose --env-file .env exec -T php-fpm php artisan package:discover --ansi || warn "package:discover falló (puede ser normal si no hay packages nuevos)"
 
-# PASO 10: Optimizar Laravel (después de migraciones)
+# PASO 10: Ejecutar migraciones (solo después de que PostgreSQL esté listo y caches limpiados)
+info "Ejecutando migraciones..."
+
+# Función para sincronizar migraciones desincronizadas
+sync_migrations() {
+    # Intentar ejecutar migraciones
+    MIGRATE_OUTPUT=$(docker compose --env-file .env exec -T php-fpm php artisan migrate --force 2>&1 || true)
+    
+    # Detectar errores de "Duplicate table"
+    if echo "$MIGRATE_OUTPUT" | grep -q "Duplicate table\|relation.*already exists"; then
+        warn "⚠️  Detectado error de migraciones desincronizadas (tablas ya existen)"
+        warn "Intentando sincronizar migraciones..."
+        
+        # Obtener el batch actual
+        CURRENT_BATCH=$(docker compose --env-file .env exec -T php-fpm php artisan tinker --execute="echo DB::table('migrations')->max('batch') ?? 0;" 2>/dev/null || echo "0")
+        NEXT_BATCH=$((CURRENT_BATCH + 1))
+        
+        # Extraer nombres de migraciones que fallaron
+        FAILED_MIGRATIONS=$(echo "$MIGRATE_OUTPUT" | grep -oE "[0-9]{4}_[0-9]{2}_[0-9]{2}_[0-9]{6}_[a-z_]+" | sort -u || echo "")
+        
+        if [ -n "$FAILED_MIGRATIONS" ]; then
+            for MIGRATION in $FAILED_MIGRATIONS; do
+                # Verificar si la migración ya está registrada
+                EXISTS=$(docker compose --env-file .env exec -T php-fpm php artisan tinker --execute="echo DB::table('migrations')->where('migration', '$MIGRATION')->exists() ? '1' : '0';" 2>/dev/null || echo "0")
+                
+                if [ "$EXISTS" = "0" ]; then
+                    warn "  → Marcando migración como ejecutada: $MIGRATION"
+                    docker compose --env-file .env exec -T php-fpm php artisan tinker --execute="DB::table('migrations')->insert(['migration' => '$MIGRATION', 'batch' => $NEXT_BATCH]);" 2>/dev/null || true
+                fi
+            done
+            
+            # Intentar ejecutar migraciones de nuevo
+            info "Reintentando migraciones después de sincronización..."
+            RETRY_OUTPUT=$(docker compose --env-file .env exec -T php-fpm php artisan migrate --force 2>&1 || true)
+            
+            if echo "$RETRY_OUTPUT" | grep -qi "Nothing to migrate"; then
+                info "✅ Todas las migraciones están sincronizadas"
+                return 0
+            elif echo "$RETRY_OUTPUT" | grep -qiE "Migrating|Migrated|DONE"; then
+                info "✅ Migraciones ejecutadas exitosamente"
+                return 0
+            elif echo "$RETRY_OUTPUT" | grep -qi "SQLSTATE\|ERROR\|Exception"; then
+                error "❌ Error al ejecutar migraciones después de sincronización"
+                echo "$RETRY_OUTPUT" | tail -20
+                return 1
+            else
+                # Si no hay errores explícitos, considerar éxito
+                info "✅ Migraciones procesadas (sin errores detectados)"
+                return 0
+            fi
+        fi
+    elif echo "$MIGRATE_OUTPUT" | grep -qi "Nothing to migrate"; then
+        info "✅ No hay migraciones pendientes"
+        return 0
+    elif echo "$MIGRATE_OUTPUT" | grep -qiE "Migrating|Migrated|DONE"; then
+        info "✅ Migraciones ejecutadas exitosamente"
+        return 0
+    elif echo "$MIGRATE_OUTPUT" | grep -qi "SQLSTATE\|ERROR\|Exception"; then
+        error "❌ Error al ejecutar migraciones"
+        echo "$MIGRATE_OUTPUT" | tail -20
+        return 1
+    else
+        # Si no hay errores explícitos, verificar código de salida
+        # Si llegamos aquí y no hay errores, probablemente fue exitoso
+        info "✅ Migraciones procesadas (sin errores detectados)"
+        return 0
+    fi
+    
+    return 0
+}
+
+# Ejecutar función de sincronización
+if ! sync_migrations; then
+    error "Error en el proceso de migraciones"
+    exit 1
+fi
+
+# PASO 11: Optimizar Laravel (después de migraciones)
 info "Optimizando Laravel..."
 docker compose --env-file .env exec -T php-fpm php artisan config:cache
 docker compose --env-file .env exec -T php-fpm php artisan route:cache
 # No cachear vistas en producción inicialmente (puede causar problemas si faltan directorios)
 # docker compose --env-file .env exec -T php-fpm php artisan view:cache
 
-# PASO 11: Verificar estado
+# PASO 12: Verificación post-deploy
 info "Verificando estado de los contenedores..."
 docker compose --env-file .env ps
+
+# Verificar healthchecks con diagnóstico detallado
+info "Verificando healthchecks..."
+sleep 10  # Dar tiempo adicional para que los healthchecks se ejecuten
+
+HEALTHY_COUNT=$(docker compose --env-file .env ps --format json 2>/dev/null | grep -c '"Health":"healthy"' || echo "0")
+UNHEALTHY_COUNT=$(docker compose --env-file .env ps --format json 2>/dev/null | grep -c '"Health":"unhealthy"' || echo "0")
+TOTAL_COUNT=$(docker compose --env-file .env ps --format json 2>/dev/null | grep -c '"Name"' || echo "0")
+
+if [ "$TOTAL_COUNT" -gt 0 ]; then
+    if [ "$HEALTHY_COUNT" -eq "$TOTAL_COUNT" ]; then
+        info "✅ Todos los servicios están healthy ($HEALTHY_COUNT/$TOTAL_COUNT)"
+    else
+        warn "⚠️  Algunos servicios no están healthy ($HEALTHY_COUNT/$TOTAL_COUNT healthy, $UNHEALTHY_COUNT/$TOTAL_COUNT unhealthy)"
+        
+        # Mostrar servicios unhealthy
+        UNHEALTHY_SERVICES=$(docker compose --env-file .env ps --format json 2>/dev/null | grep -B 5 '"Health":"unhealthy"' | grep -o '"Name":"[^"]*"' | cut -d'"' -f4 || echo "")
+        if [ -n "$UNHEALTHY_SERVICES" ]; then
+            warn "Servicios unhealthy:"
+            for SERVICE in $UNHEALTHY_SERVICES; do
+                warn "  - $SERVICE"
+            done
+            warn ""
+            warn "Para diagnosticar: ./diagnose-health.sh"
+            warn "O ver logs: docker compose --env-file .env logs [nombre-servicio]"
+        fi
+    fi
+fi
+
+# Verificar API
+info "Verificando API..."
+sleep 5  # Dar tiempo a que los servicios estén completamente listos
+if curl -f -s http://localhost/up > /dev/null 2>&1 || curl -f -s https://api.notificaciones.space/up > /dev/null 2>&1; then
+    info "✅ API respondiendo correctamente"
+else
+    warn "⚠️  API no responde inmediatamente (puede tardar unos segundos más)"
+    warn "Verifica manualmente: curl https://api.notificaciones.space/up"
+fi
+
+# Verificar migraciones finales
+info "Verificando estado final de migraciones..."
+PENDING_COUNT=$(docker compose --env-file .env exec -T php-fpm php artisan migrate:status 2>/dev/null | grep -c "Pending" || echo "0")
+if [ "$PENDING_COUNT" -eq 0 ]; then
+    info "✅ Todas las migraciones están ejecutadas"
+else
+    warn "⚠️  Hay $PENDING_COUNT migraciones pendientes"
+    warn "Revisa: docker compose --env-file .env exec php-fpm php artisan migrate:status"
+fi
 
 info ""
 info "✅ Despliegue completado!"

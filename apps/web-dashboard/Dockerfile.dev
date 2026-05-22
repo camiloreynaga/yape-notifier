@@ -1,18 +1,25 @@
 # Development Dockerfile
+# Optimizado para desarrollo con volúmenes montados (hot reload)
 FROM node:18-alpine
 
 WORKDIR /app
 
-# Install dependencies
-COPY package*.json ./
-RUN npm install
+# Instalar dependencias globales útiles para desarrollo
+RUN apk add --no-cache git
 
-# Copy source code
-COPY . .
+# Copiar solo archivos de dependencias para instalación inicial
+# El código fuente se montará como volumen para hot reload
+COPY package*.json ./
+
+# Instalar dependencias
+# En desarrollo, las dependencias se instalan en el contenedor
+# pero el código fuente se monta como volumen
+RUN npm install
 
 # Expose Vite dev server port
 EXPOSE 3000
 
-# Start development server
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+# Start development server con hot reload
+# --host 0.0.0.0 permite acceso desde fuera del contenedor
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"]
 

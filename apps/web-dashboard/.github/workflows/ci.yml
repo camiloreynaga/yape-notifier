@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: apps/web-dashboard/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/web-dashboard
+        run: npm ci
+
+      - name: Run type check
+        working-directory: apps/web-dashboard
+        run: npm run type-check
+
+      - name: Run linter
+        working-directory: apps/web-dashboard
+        run: npm run lint
+
+      - name: Run tests
+        working-directory: apps/web-dashboard
+        run: npm run test:ci
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./apps/web-dashboard/coverage/lcov.info
+          flags: web-dashboard
+          name: web-dashboard-coverage
+

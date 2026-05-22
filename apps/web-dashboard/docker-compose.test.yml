@@ -1,0 +1,14 @@
+# Docker Compose para ejecutar tests
+version: '3.8'
+
+services:
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    volumes:
+      - ./coverage:/app/coverage
+    environment:
+      - CI=true
+    command: npm run test:ci
+

@@ -1,21 +1,56 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiService } from '@/services/api';
-import type { Device } from '@/types';
-import { format } from 'date-fns';
-import { Plus, Edit, Trash2, Power, PowerOff, Smartphone } from 'lucide-react';
+import type { Device, AppInstance, Notification } from '@/types';
+import { format, formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { Plus, Edit, Trash2, Power, PowerOff, Smartphone, QrCode, Battery, Wifi, WifiOff, CheckCircle, XCircle, AlertCircle, Package, ChevronDown, ChevronUp } from 'lucide-react';
+import AppInstanceCard from '@/components/AppInstanceCard';
 
 export default function DevicesPage() {
+  const navigate = useNavigate();
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingDevice, setEditingDevice] = useState<Device | null>(null);
   const [formData, setFormData] = useState({
-    name: '',
+    alias: '',
   });
+  const [expandedDevices, setExpandedDevices] = useState<Set<number>>(new Set());
+  const [deviceInstances, setDeviceInstances] = useState<Record<number, AppInstance[]>>({});
+  const [loadingInstances, setLoadingInstances] = useState<Set<number>>(new Set());
+  const [lastNotifications, setLastNotifications] = useState<Record<number, Notification | null>>({});
 
   useEffect(() => {
     loadDevices();
   }, []);
+
+  useEffect(() => {
+    // Cargar última notificación por dispositivo
+    const loadLastNotifications = async () => {
+      for (const device of devices) {
+        try {
+          const notifications = await apiService.getNotifications({
+            device_id: device.id,
+            per_page: 1,
+            page: 1,
+          });
+          if (notifications.data.length > 0) {
+            setLastNotifications((prev) => ({
+              ...prev,
+              [device.id]: notifications.data[0],
+            }));
+          }
+        } catch (error) {
+          // Silenciar errores, no es crítico
+        }
+      }
+    };
+
+    if (devices.length > 0) {
+      loadLastNotifications();
+    }
+  }, [devices]);
 
   const loadDevices = async () => {
     setLoading(true);
@@ -31,35 +66,31 @@ export default function DevicesPage() {
 
   const handleCreate = () => {
     setEditingDevice(null);
-    setFormData({ name: '' });
+    setFormData({ alias: '' });
     setShowModal(true);
   };
 
   const handleEdit = (device: Device) => {
     setEditingDevice(device);
-    setFormData({ name: device.name });
+    setFormData({ alias: device.alias || '' });
     setShowModal(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Platform is always 'android' for now
-      const deviceData = {
-        ...formData,
-        platform: 'android',
-      };
-      
       if (editingDevice) {
-        await apiService.updateDevice(editingDevice.id, deviceData);
+        // Solo actualizar alias cuando editamos
+        await apiService.updateDevice(editingDevice.id, { alias: formData.alias });
       } else {
-        await apiService.createDevice(deviceData);
+        // Crear nuevo dispositivo con nombre y plataforma
+        await apiService.createDevice({ name: formData.alias, platform: 'android' });
       }
       setShowModal(false);
       loadDevices();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } };
-      const errorMessage = err.response?.data?.message || 
+      const errorMessage = err.response?.data?.message ||
         Object.values(err.response?.data?.errors || {}).flat().join(', ') ||
         'Error al guardar dispositivo';
       alert(errorMessage);
@@ -89,14 +120,89 @@ export default function DevicesPage() {
     }
   };
 
+  const isDeviceOnline = (device: Device): boolean => {
+    if (!device.last_heartbeat) {
+      return false;
+    }
+    const heartbeatTime = new Date(device.last_heartbeat).getTime();
+    const now = Date.now();
+    const diffMinutes = (now - heartbeatTime) / (1000 * 60);
+    return diffMinutes < 5;
+  };
+
+  const getRelativeTime = (date: string | null): string => {
+    if (!date) return 'Nunca';
+    try {
+      return formatDistanceToNow(new Date(date), {
+        addSuffix: true,
+        locale: es,
+      });
+    } catch {
+      return format(new Date(date), 'dd/MM/yyyy HH:mm');
+    }
+  };
+
+  const getLastNotificationInfo = (deviceId: number): string | null => {
+    const notification = lastNotifications[deviceId];
+    if (!notification) return null;
+    return `${notification.source_app || 'N/A'} - ${getRelativeTime(notification.received_at)}`;
+  };
+
+  const toggleDeviceExpanded = async (deviceId: number) => {
+    const isExpanded = expandedDevices.has(deviceId);
+    const newExpanded = new Set(expandedDevices);
+    
+    if (isExpanded) {
+      newExpanded.delete(deviceId);
+    } else {
+      newExpanded.add(deviceId);
+      // Cargar instancias si no están cargadas
+      if (!deviceInstances[deviceId]) {
+        await loadDeviceInstances(deviceId);
+      }
+    }
+    
+    setExpandedDevices(newExpanded);
+  };
+
+  const loadDeviceInstances = async (deviceId: number) => {
+    setLoadingInstances((prev) => new Set(prev).add(deviceId));
+    try {
+      const instances = await apiService.getDeviceAppInstances(deviceId);
+      setDeviceInstances((prev) => ({ ...prev, [deviceId]: instances }));
+    } catch (error) {
+      console.error('Error loading device instances:', error);
+      setDeviceInstances((prev) => ({ ...prev, [deviceId]: [] }));
+    } finally {
+      setLoadingInstances((prev) => {
+        const next = new Set(prev);
+        next.delete(deviceId);
+        return next;
+      });
+    }
+  };
+
+  const handleInstanceUpdate = (deviceId: number) => {
+    loadDeviceInstances(deviceId);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-900">Dispositivos</h1>
-        <button onClick={handleCreate} className="btn btn-primary flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Nuevo Dispositivo
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => navigate('/devices/add')}
+            className="btn btn-primary flex items-center gap-2"
+          >
+            <QrCode className="h-4 w-4" />
+            Agregar Dispositivo
+          </button>
+          <button onClick={handleCreate} className="btn btn-secondary flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Nuevo Dispositivo
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -113,8 +219,12 @@ export default function DevicesPage() {
                     <Smartphone className="h-6 w-6 text-primary-600" />
                   </div>
                   <div className="ml-4">
-                    <h3 className="text-lg font-semibold text-gray-900">{device.name}</h3>
-                    <p className="text-sm text-gray-500">{device.platform}</p>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {device.alias || device.name}
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      {device.alias ? device.name : device.platform}
+                    </p>
                   </div>
                 </div>
                 <button
@@ -147,12 +257,223 @@ export default function DevicesPage() {
                     {device.is_active ? 'Activo' : 'Inactivo'}
                   </span>
                 </div>
-                {device.last_seen_at && (
+                
+                {/* Health Status */}
+                <div className="pt-2 border-t border-gray-200 space-y-2">
+                  {/* Online Status */}
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-500">Última actividad:</span>
-                    <span className="text-gray-700">
-                      {format(new Date(device.last_seen_at), 'dd/MM/yyyy HH:mm')}
+                    <span className="text-gray-500 flex items-center gap-1">
+                      <Wifi className="h-3 w-3" />
+                      Conexión:
                     </span>
+                    {device.last_heartbeat && isDeviceOnline(device) ? (
+                      <span
+                        className="flex items-center gap-1 text-green-600 font-medium"
+                        title={`Último heartbeat: ${format(new Date(device.last_heartbeat), 'dd/MM/yyyy HH:mm')}`}
+                      >
+                        <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
+                        <span>En línea</span>
+                        <span className="text-xs text-gray-500">
+                          ({getRelativeTime(device.last_heartbeat)})
+                        </span>
+                      </span>
+                    ) : (
+                      <span
+                        className="flex items-center gap-1 text-red-500"
+                        title={
+                          device.last_heartbeat
+                            ? `Último heartbeat: ${format(new Date(device.last_heartbeat), 'dd/MM/yyyy HH:mm')}`
+                            : 'Nunca conectado'
+                        }
+                      >
+                        <WifiOff className="h-3 w-3" />
+                        <span>Desconectado</span>
+                        {device.last_heartbeat && (
+                          <span className="text-xs text-gray-500 ml-1">
+                            ({getRelativeTime(device.last_heartbeat)})
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Battery Level */}
+                  {device.battery_level !== null && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500 flex items-center gap-1">
+                        <Battery className="h-3 w-3" />
+                        Batería:
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${
+                              device.battery_level > 50
+                                ? 'bg-green-500'
+                                : device.battery_level > 20
+                                ? 'bg-yellow-500'
+                                : 'bg-red-500'
+                            }`}
+                            style={{ width: `${device.battery_level}%` }}
+                          />
+                        </div>
+                        <span className="text-gray-700 font-medium">{device.battery_level}%</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Battery Optimization */}
+                  {device.battery_optimization_disabled !== null && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Optimización batería:</span>
+                      {device.battery_optimization_disabled ? (
+                        <span className="flex items-center gap-1 text-green-600">
+                          <CheckCircle className="h-3 w-3" />
+                          <span>Desactivada</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-orange-600">
+                          <AlertCircle className="h-3 w-3" />
+                          <span>Activada</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Notification Permission */}
+                  {device.notification_permission_enabled !== null && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Permisos notificaciones:</span>
+                      {device.notification_permission_enabled ? (
+                        <span className="flex items-center gap-1 text-green-600">
+                          <CheckCircle className="h-3 w-3" />
+                          <span>Habilitado</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-red-600">
+                          <XCircle className="h-3 w-3" />
+                          <span>Deshabilitado</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Service Status - CRITICAL INDICATOR */}
+                  {device.notification_service_connected !== null && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Estado del servicio:</span>
+                      {device.notification_service_connected ? (
+                        <span className="flex items-center gap-1 text-green-600 font-medium">
+                          <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
+                          <span>Capturando</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-red-600 font-medium">
+                          <XCircle className="h-3 w-3" />
+                          <span>Desconectado</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Pending Notifications Warning */}
+                  {device.pending_notifications_count !== null && device.pending_notifications_count > 0 && (
+                    <div className="flex items-center justify-between text-sm bg-yellow-50 -mx-4 px-4 py-1">
+                      <span className="text-yellow-700 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        Pendientes locales:
+                      </span>
+                      <span className="text-yellow-700 font-medium">
+                        {device.pending_notifications_count}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Last Heartbeat */}
+                  {device.last_heartbeat && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Último heartbeat:</span>
+                      <span className="text-gray-700">
+                        {format(new Date(device.last_heartbeat), 'dd/MM/yyyy HH:mm')}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Last Seen */}
+                  {device.last_seen_at && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Última actividad:</span>
+                      <span className="text-gray-700" title={format(new Date(device.last_seen_at), 'dd/MM/yyyy HH:mm:ss')}>
+                        {getRelativeTime(device.last_seen_at)}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Last Notification */}
+                  {getLastNotificationInfo(device.id) && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Último evento:</span>
+                      <span className="text-gray-700 text-xs" title={lastNotifications[device.id]?.received_at ? format(new Date(lastNotifications[device.id]!.received_at), 'dd/MM/yyyy HH:mm:ss') : ''}>
+                        {getLastNotificationInfo(device.id)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Instancias de Apps */}
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => toggleDeviceExpanded(device.id)}
+                  className="w-full flex items-center justify-between text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    <span>
+                      Instancias de Apps
+                      {deviceInstances[device.id] && (
+                        <span className="ml-2 text-gray-500">
+                          ({deviceInstances[device.id].length})
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  {expandedDevices.has(device.id) ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                </button>
+
+                {expandedDevices.has(device.id) && (
+                  <div className="mt-3 space-y-2">
+                    {loadingInstances.has(device.id) ? (
+                      <div className="flex items-center justify-center py-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div>
+                      </div>
+                    ) : deviceInstances[device.id] && deviceInstances[device.id].length > 0 ? (
+                      <div className="space-y-2">
+                        {deviceInstances[device.id].map((instance) => (
+                          <div key={instance.id} className="bg-gray-50 rounded-lg p-3">
+                            <AppInstanceCard
+                              instance={instance}
+                              onUpdate={() => handleInstanceUpdate(device.id)}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 text-sm text-gray-500">
+                        <Package className="h-6 w-6 mx-auto mb-2 text-gray-400" />
+                        <p>No hay instancias de apps en este dispositivo</p>
+                        <button
+                          onClick={() => navigate('/app-instances')}
+                          className="mt-2 text-primary-600 hover:text-primary-700 text-sm font-medium"
+                        >
+                          Ver todas las instancias
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -179,9 +500,18 @@ export default function DevicesPage() {
         <div className="card text-center py-12">
           <Smartphone className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-500 mb-4">No hay dispositivos registrados</p>
-          <button onClick={handleCreate} className="btn btn-primary">
-            Crear primer dispositivo
-          </button>
+          <div className="flex gap-2 justify-center">
+            <button
+              onClick={() => navigate('/devices/add')}
+              className="btn btn-primary flex items-center gap-2"
+            >
+              <QrCode className="h-4 w-4" />
+              Agregar Dispositivo
+            </button>
+            <button onClick={handleCreate} className="btn btn-secondary">
+              Crear Dispositivo
+            </button>
+          </div>
         </div>
       )}
 
@@ -193,29 +523,48 @@ export default function DevicesPage() {
               {editingDevice ? 'Editar Dispositivo' : 'Nuevo Dispositivo'}
             </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {editingDevice && (
+                <div>
+                  <label htmlFor="device-model" className="block text-sm font-medium text-gray-700 mb-2">
+                    Modelo del dispositivo
+                  </label>
+                  <input
+                    id="device-model"
+                    type="text"
+                    value={editingDevice.name}
+                    disabled
+                    className="input bg-gray-100"
+                  />
+                </div>
+              )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nombre
+                <label htmlFor="device-alias" className="block text-sm font-medium text-gray-700 mb-2">
+                  Nombre personalizado
                 </label>
                 <input
+                  id="device-alias"
                   type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required={!editingDevice}
+                  value={formData.alias}
+                  onChange={(e) => setFormData({ ...formData, alias: e.target.value })}
                   className="input"
                   placeholder="Ej: Caja 1 - Yape"
                 />
+                <p className="mt-1 text-xs text-gray-500">
+                  Este nombre te ayudará a identificar el dispositivo fácilmente
+                </p>
               </div>
               {editingDevice && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="device-uuid" className="block text-sm font-medium text-gray-700 mb-2">
                     UUID
                   </label>
                   <input
+                    id="device-uuid"
                     type="text"
                     value={editingDevice.uuid}
                     disabled
-                    className="input"
+                    className="input bg-gray-100 font-mono text-xs"
                   />
                 </div>
               )}

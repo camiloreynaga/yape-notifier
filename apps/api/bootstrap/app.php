@@ -9,6 +9,7 @@ return Application::configure(basePath: dirname(__DIR__))
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
+        channels: __DIR__.'/../routes/channels.php',
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
@@ -17,12 +18,18 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Middleware\HandleCors::class,
         ]);
         
-        $middleware->api(prepend: [
-            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-        ]);
+        // NOTA: EnsureFrontendRequestsAreStateful NO se aplica a rutas API
+        // Las rutas API usan tokens Bearer (stateless), no cookies (stateful)
+        // Si en el futuro necesitas cookies para alguna ruta específica, aplica el middleware solo a esa ruta
+        // $middleware->api(prepend: [
+        //     \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+        // ]);
 
         $middleware->alias([
-            'verified' => \App\Http\Middleware\EnsureEmailIsVerified::class,
+            'verified'         => \App\Http\Middleware\EnsureEmailIsVerified::class,
+            'super_admin'      => \App\Http\Middleware\RequireSuperAdmin::class,
+            'commerce.active'  => \App\Http\Middleware\EnsureCommerceActive::class,
+            'require_admin'    => \App\Http\Middleware\RequireAdmin::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

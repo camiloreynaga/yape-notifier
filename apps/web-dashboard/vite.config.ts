@@ -20,5 +20,11 @@ export default defineConfig({
       },
     },
   },
+  // Vitest configuration is in vitest.config.ts
+  test: {
+    // This is handled by vitest.config.ts, but we keep it here for IDE support
+    globals: true,
+    environment: 'jsdom',
+  },
 })
 

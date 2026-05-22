@@ -4,26 +4,56 @@ help: ## Mostrar esta ayuda
 	@echo "Comandos disponibles:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-install: ## Instalar dependencias de todas las apps
-	@echo "📦 Instalando dependencias..."
+install: ## Instalar dependencias (para desarrollo local sin Docker)
+	@echo "📦 Instalando dependencias localmente..."
+	@echo "⚠️  Nota: En desarrollo se recomienda usar Docker. Ver docs/DEVELOPMENT_WORKFLOW.md"
 	@cd apps/api && composer install
 	@cd apps/web-dashboard && npm install
 	@echo "✅ Dependencias instaladas"
 
-dev: ## Iniciar entorno de desarrollo
-	@echo "🚀 Iniciando entorno de desarrollo..."
+composer:update: ## Actualizar dependencias de Composer usando Docker (PHP 8.2 LTS)
+	@echo "🔄 Actualizando dependencias de Composer usando PHP 8.2 LTS (mismo que Dockerfile)..."
+	@cd apps/api && docker run --rm -v "$(PWD):/app" -w /app php:8.2-cli sh -c "curl -sS https://getcomposer.org/installer | php && php composer.phar update --no-interaction"
+	@echo "✅ Dependencias actualizadas. Revisa cambios con: git diff apps/api/composer.lock"
+
+composer:require: ## Agregar nueva dependencia usando Docker (ej: make composer:require PACKAGE=laravel/sanctum)
+	@if [ -z "$(PACKAGE)" ]; then \
+		echo "❌ Error: Especifica el paquete con PACKAGE=nombre/paquete"; \
+		exit 1; \
+	fi
+	@echo "➕ Agregando dependencia $(PACKAGE) usando PHP 8.2 LTS..."
+	@cd apps/api && docker run --rm -v "$(PWD):/app" -w /app php:8.2-cli sh -c "curl -sS https://getcomposer.org/installer | php && php composer.phar require $(PACKAGE) --no-interaction"
+	@echo "✅ Dependencia agregada. Revisa cambios con: git diff apps/api/composer.json apps/api/composer.lock"
+
+composer:validate: ## Validar que composer.lock sea compatible con PHP 8.2 LTS
+	@echo "🔍 Validando compatibilidad de composer.lock con PHP 8.2 LTS..."
+	@cd apps/api && docker run --rm -v "$(PWD):/app" -w /app php:8.2-cli sh -c "curl -sS https://getcomposer.org/installer | php && php composer.phar install --dry-run --no-dev --no-interaction" > /dev/null 2>&1 && echo "✅ composer.lock es compatible con PHP 8.2 LTS" || (echo "❌ composer.lock NO es compatible con PHP 8.2 LTS. Ejecuta: make composer:update" && exit 1)
+
+install:docker: ## Instalar dependencias en contenedores Docker
+	@echo "📦 Instalando dependencias en contenedores Docker..."
+	@cd infra/docker/environments/development && docker compose --env-file .env build
+	@echo "✅ Dependencias instaladas en contenedores"
+
+dev: ## Iniciar entorno de desarrollo con Docker
+	@echo "🚀 Iniciando entorno de desarrollo con Docker..."
 	@echo "Backend: http://localhost:8000"
 	@echo "Dashboard: http://localhost:3000"
-	@cd apps/api && php artisan serve &
-	@cd apps/web-dashboard && npm run dev
+	@cd infra/docker/environments/development && docker compose --env-file .env up -d
+	@echo "✅ Servicios iniciados. Ver logs con: docker compose --env-file .env logs -f"
 
-dev:api: ## Iniciar solo el backend
-	@echo "🚀 Iniciando backend..."
-	@cd apps/api && php artisan serve
+dev:api: ## Iniciar solo el backend (Docker)
+	@echo "🚀 Iniciando backend con Docker..."
+	@cd infra/docker/environments/development && docker compose --env-file .env up -d php-fpm nginx-api db
 
-dev:dashboard: ## Iniciar solo el dashboard
-	@echo "🚀 Iniciando dashboard..."
-	@cd apps/web-dashboard && npm run dev
+dev:dashboard: ## Iniciar solo el dashboard (Docker)
+	@echo "🚀 Iniciando dashboard con Docker..."
+	@cd infra/docker/environments/development && docker compose --env-file .env up -d dashboard
+
+dev:logs: ## Ver logs del entorno de desarrollo
+	@cd infra/docker/environments/development && docker compose --env-file .env logs -f
+
+dev:down: ## Detener entorno de desarrollo
+	@cd infra/docker/environments/development && docker compose --env-file .env down
 
 test: ## Ejecutar todos los tests
 	@echo "🧪 Ejecutando tests..."
@@ -36,6 +66,26 @@ test:api: ## Ejecutar tests del backend
 
 test:android: ## Ejecutar tests de Android
 	@cd apps/android-client && ./gradlew test
+
+test:prod: ## Ejecutar todos los tests usando Docker de producción
+	@echo "🧪 Ejecutando tests con Docker de producción..."
+	@cd infra/docker/environments/production && bash run-tests.sh all
+
+test:prod:api: ## Ejecutar tests de API usando Docker de producción
+	@echo "🧪 Ejecutando tests de API con Docker de producción..."
+	@cd infra/docker/environments/production && bash run-tests.sh api
+
+test:prod:dashboard: ## Ejecutar tests de Dashboard usando Docker de producción
+	@echo "🧪 Ejecutando tests de Dashboard con Docker de producción..."
+	@cd infra/docker/environments/production && bash run-tests.sh dashboard
+
+test:prod:build: ## Construir imágenes de prueba de producción
+	@echo "🔨 Construyendo imágenes de prueba de producción..."
+	@cd infra/docker/environments/production && bash run-tests.sh build
+
+test:prod:cleanup: ## Limpiar contenedores y volúmenes de pruebas de producción
+	@echo "🧹 Limpiando contenedores de prueba de producción..."
+	@cd infra/docker/environments/production && bash run-tests.sh cleanup
 
 build: ## Build de todas las apps
 	@echo "🔨 Building apps..."

@@ -1,16 +1,47 @@
 package com.yapenotifier.android.data.api
 
 import com.yapenotifier.android.data.model.AuthResponse
+import com.yapenotifier.android.data.model.CommerceCheckResponse
+import com.yapenotifier.android.data.model.CommerceResponse
+import com.yapenotifier.android.data.model.CreateCommerceRequest
 import com.yapenotifier.android.data.model.CreateDeviceRequest
+import com.yapenotifier.android.data.model.Device
+import com.yapenotifier.android.data.model.DeviceMonitoredAppsResponse
 import com.yapenotifier.android.data.model.DeviceResponse
+import com.yapenotifier.android.data.model.AppInstancesResponse
+import com.yapenotifier.android.data.model.LinkCodeValidationResponse
+import com.yapenotifier.android.data.model.LinkDeviceRequest
+import com.yapenotifier.android.data.model.LinkDeviceResponse
 import com.yapenotifier.android.data.model.LoginRequest
+import com.yapenotifier.android.data.model.LoginPinRequest
+import com.yapenotifier.android.data.model.LoginPinResponse
 import com.yapenotifier.android.data.model.MonitoredPackagesResponse
 import com.yapenotifier.android.data.model.NotificationData
 import com.yapenotifier.android.data.model.RegisterRequest
+import com.yapenotifier.android.data.model.UpdateAppInstanceLabelRequest
+import com.yapenotifier.android.data.model.UpdateAppInstanceLabelResponse
+import com.yapenotifier.android.data.model.UpdateDeviceMonitoredAppsRequest
+import com.yapenotifier.android.data.model.DeviceHealthData
+import com.yapenotifier.android.data.model.DeviceLogEntry
+import com.yapenotifier.android.data.model.DeviceLogsSummaryResponse
+import com.yapenotifier.android.data.model.Notification
+import com.yapenotifier.android.data.model.PaginatedResponse
+import com.yapenotifier.android.data.model.LinkCodeGenerateRequest
+import com.yapenotifier.android.data.model.LinkCodeGenerateResponse
+import com.yapenotifier.android.data.model.DevicesResponse
+import com.yapenotifier.android.data.model.MonitorPackage
+import com.yapenotifier.android.data.model.MonitorPackagesResponse
+import com.yapenotifier.android.data.model.NotificationStatistics
+import com.yapenotifier.android.data.model.User
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.PUT
+import retrofit2.http.Path
+import retrofit2.http.Query
 
 interface ApiService {
     // --- Auth ---
@@ -20,12 +51,37 @@ interface ApiService {
     @POST("api/login")
     suspend fun login(@Body request: LoginRequest): Response<AuthResponse>
 
+    @POST("api/auth/login-pin")
+    suspend fun loginWithPin(@Body request: LoginPinRequest): Response<LoginPinResponse>
+
     @POST("api/logout")
     suspend fun logout(): Response<Unit>
+
+    @GET("api/auth/user")
+    suspend fun getCurrentUser(): Response<User>
 
     // --- Devices ---
     @POST("api/devices")
     suspend fun createDevice(@Body request: CreateDeviceRequest): Response<DeviceResponse>
+
+    @GET("api/devices/{deviceId}/monitored-apps")
+    suspend fun getDeviceMonitoredApps(@Path("deviceId") deviceId: String): Response<DeviceMonitoredAppsResponse>
+
+    @POST("api/devices/{deviceId}/monitored-apps")
+    suspend fun updateDeviceMonitoredApps(
+        @Path("deviceId") deviceId: String,
+        @Body request: UpdateDeviceMonitoredAppsRequest
+    ): Response<Unit>
+
+    // --- Commerce ---
+    @POST("api/commerces")
+    suspend fun createCommerce(@Body request: CreateCommerceRequest): Response<CommerceResponse>
+
+    @GET("api/commerces/me")
+    suspend fun getCommerce(): Response<CommerceResponse>
+
+    @GET("api/commerces/check")
+    suspend fun checkCommerce(): Response<CommerceCheckResponse>
 
     // --- Notifications ---
     @POST("api/notifications")
@@ -34,4 +90,145 @@ interface ApiService {
     // --- Settings ---
     @GET("api/settings/monitored-packages")
     suspend fun getMonitoredPackages(): Response<MonitoredPackagesResponse>
+
+    // --- Device Linking ---
+    @GET("api/devices/link-code/{code}")
+    suspend fun validateLinkCode(@Path("code") code: String): Response<LinkCodeValidationResponse>
+
+    @POST("api/devices/link-by-code")
+    suspend fun linkDeviceByCode(@Body request: LinkDeviceRequest): Response<LinkDeviceResponse>
+
+    // --- App Instances ---
+    @GET("api/devices/{deviceId}/app-instances")
+    suspend fun getDeviceAppInstances(@Path("deviceId") deviceId: Long): Response<AppInstancesResponse>
+
+    @PATCH("api/app-instances/{instanceId}/label")
+    suspend fun updateAppInstanceLabel(
+        @Path("instanceId") instanceId: Long,
+        @Body request: UpdateAppInstanceLabelRequest
+    ): Response<UpdateAppInstanceLabelResponse>
+
+    // --- Device Health ---
+    @POST("api/devices/{deviceId}/health")
+    suspend fun updateDeviceHealth(
+        @Path("deviceId") deviceId: String,
+        @Body data: DeviceHealthData
+    ): Response<Unit>
+
+    // --- Admin: Notifications ---
+    @GET("api/notifications")
+    suspend fun getNotifications(
+        @Query("device_id") deviceId: Long? = null,
+        @Query("source_app") sourceApp: String? = null,
+        @Query("package_name") packageName: String? = null,
+        @Query("app_instance_id") appInstanceId: Long? = null,
+        @Query("start_date") startDate: String? = null,
+        @Query("end_date") endDate: String? = null,
+        @Query("status") status: String? = null,
+        @Query("exclude_duplicates") excludeDuplicates: Boolean? = null,
+        @Query("per_page") perPage: Int? = null,
+        @Query("page") page: Int? = null
+    ): Response<PaginatedResponse<Notification>>
+
+    @GET("api/notifications/{id}")
+    suspend fun getNotification(@Path("id") id: Long): Response<Notification>
+
+    @PATCH("api/notifications/{id}/status")
+    suspend fun updateNotificationStatus(
+        @Path("id") id: Long,
+        @Body status: Map<String, String>
+    ): Response<Unit>
+
+    // --- Admin: Devices ---
+    @GET("api/devices")
+    suspend fun getDevices(@Query("active_only") activeOnly: Boolean? = null): Response<DevicesResponse>
+
+    @GET("api/devices/{id}")
+    suspend fun getDevice(@Path("id") id: Long): Response<DeviceResponse>
+
+    @DELETE("api/devices/{id}")
+    suspend fun deleteDevice(@Path("id") id: Long): Response<Unit>
+
+    @PATCH("api/devices/{id}")
+    suspend fun updateDevice(
+        @Path("id") id: Long,
+        @Body request: Map<String, String>
+    ): Response<DeviceResponse>
+
+    @POST("api/devices/{id}/unlink")
+    suspend fun unlinkDevice(@Path("id") id: Long): Response<DeviceResponse>
+
+    // --- Admin: Link Codes ---
+    @POST("api/devices/generate-link-code")
+    suspend fun generateLinkCode(@Body request: LinkCodeGenerateRequest): Response<LinkCodeGenerateResponse>
+
+    @GET("api/devices/link-codes")
+    suspend fun getActiveLinkCodes(): Response<List<LinkCodeGenerateResponse>>
+
+    // --- Monitor Packages ---
+    @GET("api/monitor-packages")
+    suspend fun getMonitorPackages(
+        @Query("active_only") activeOnly: Boolean? = null
+    ): Response<MonitorPackagesResponse>
+
+    @POST("api/monitor-packages/{id}/toggle-status")
+    suspend fun toggleMonitorPackageStatus(
+        @Path("id") id: Long,
+        @Body request: Map<String, Boolean>
+    ): Response<MonitorPackage>
+
+    @POST("api/monitor-packages")
+    suspend fun createMonitorPackage(@Body request: Map<String, Any>): Response<MonitorPackage>
+
+    @PUT("api/monitor-packages/{id}")
+    suspend fun updateMonitorPackage(
+        @Path("id") id: Long,
+        @Body request: Map<String, Any>
+    ): Response<MonitorPackage>
+
+    @DELETE("api/monitor-packages/{id}")
+    suspend fun deleteMonitorPackage(@Path("id") id: Long): Response<Unit>
+
+    @POST("api/monitor-packages/bulk-create")
+    suspend fun bulkCreateMonitorPackages(@Body request: Map<String, Any>): Response<List<MonitorPackage>>
+
+    // --- Statistics ---
+    @GET("api/notifications/statistics")
+    suspend fun getNotificationStatistics(
+        @Query("start_date") startDate: String? = null,
+        @Query("end_date") endDate: String? = null
+    ): Response<NotificationStatistics>
+
+    // --- App Instances (Admin) ---
+    @GET("api/app-instances")
+    suspend fun getAppInstances(
+        @Query("device_id") deviceId: Long? = null
+    ): Response<AppInstancesResponse>
+
+    // --- Device Logs (Debug) ---
+    @POST("api/device-logs")
+    suspend fun sendDeviceLogs(@Body body: Map<String, Any>): Response<Unit>
+
+    @GET("api/devices/{deviceId}/logs")
+    suspend fun getDeviceLogs(
+        @Path("deviceId") deviceId: Long,
+        @Query("category") category: String? = null,
+        @Query("level") level: String? = null,
+        @Query("hours") hours: Int? = null,
+        @Query("per_page") perPage: Int? = null
+    ): Response<PaginatedResponse<DeviceLogEntry>>
+
+    @GET("api/device-logs/commerce")
+    suspend fun getCommerceLogs(
+        @Query("category") category: String? = null,
+        @Query("level") level: String? = null,
+        @Query("critical_only") criticalOnly: Boolean? = null,
+        @Query("hours") hours: Int? = null,
+        @Query("per_page") perPage: Int? = null
+    ): Response<PaginatedResponse<DeviceLogEntry>>
+
+    @GET("api/device-logs/summary")
+    suspend fun getDeviceLogsSummary(
+        @Query("hours") hours: Int? = null
+    ): Response<DeviceLogsSummaryResponse>
 }

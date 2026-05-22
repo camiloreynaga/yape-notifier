@@ -3,21 +3,23 @@ package com.yapenotifier.android.ui
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.ViewModelProvider
 import com.yapenotifier.android.databinding.ActivityRegisterBinding
 import com.yapenotifier.android.ui.viewmodel.RegisterViewModel
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class RegisterActivity : AppCompatActivity() {
     private lateinit var binding: ActivityRegisterBinding
-    private lateinit var viewModel: RegisterViewModel
+    private val viewModel: RegisterViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityRegisterBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        viewModel = ViewModelProvider(this, ViewModelProvider.AndroidViewModelFactory.getInstance(application))[RegisterViewModel::class.java]
+        // ViewModel inyectado automáticamente por Hilt
 
         setupObservers()
         setupClickListeners()
@@ -28,7 +30,11 @@ class RegisterActivity : AppCompatActivity() {
             result?.let {
                 if (it.success) {
                     Toast.makeText(this, "Registro exitoso", Toast.LENGTH_SHORT).show()
-                    navigateToMain()
+                    if (it.needsCommerceCreation) {
+                        navigateToCreateCommerce()
+                    } else {
+                        navigateToMain()
+                    }
                 } else {
                     Toast.makeText(this, it.message ?: "Error al registrarse", Toast.LENGTH_LONG).show()
                 }
@@ -88,6 +94,13 @@ class RegisterActivity : AppCompatActivity() {
 
     private fun navigateToMain() {
         val intent = Intent(this, MainActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
+    }
+
+    private fun navigateToCreateCommerce() {
+        val intent = Intent(this, CreateCommerceActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
         finish()

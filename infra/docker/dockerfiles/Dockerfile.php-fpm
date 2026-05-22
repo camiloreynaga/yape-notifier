@@ -1,5 +1,37 @@
 # Dockerfile para PHP-FPM (Laravel API)
 # Ubicación: infra/docker/dockerfiles/Dockerfile.php-fpm
+# PHP 8.2 LTS (Long Term Support hasta diciembre 2026)
+# Usa multi-stage build para optimizar cache de dependencias
+
+# ============================================
+# Stage 1: Dependencies
+# Instala dependencias de Composer en etapa separada para mejor cache
+# ============================================
+FROM php:8.2-fpm-alpine AS dependencies
+
+WORKDIR /var/www
+
+# Install system dependencies needed for composer
+RUN apk add --no-cache git unzip
+
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Copy only composer files (layer caching optimization)
+# Esta capa se cachea y solo se reconstruye cuando composer.json o composer.lock cambian
+COPY composer.json composer.lock* ./
+
+# Install PHP dependencies with BuildKit cache mount
+# Cache mount acelera builds subsecuentes cacheando paquetes descargados
+# El composer.lock DEBE estar sincronizado con composer.json y ser compatible con PHP 8.2 LTS
+# IMPORTANTE: composer.lock debe generarse usando PHP 8.2 para mantener consistencia
+RUN --mount=type=cache,target=/root/.composer/cache \
+    composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts
+
+# ============================================
+# Stage 2: Production
+# Imagen final con dependencias y código de aplicación
+# ============================================
 FROM php:8.2-fpm-alpine
 
 WORKDIR /var/www
@@ -54,40 +86,59 @@ RUN echo "pm = dynamic" >> /usr/local/etc/php-fpm.d/www.conf \
     && echo "php_admin_value[error_log] = /var/log/php-fpm-error.log" >> /usr/local/etc/php-fpm.d/www.conf \
     && echo "php_admin_flag[log_errors] = on" >> /usr/local/etc/php-fpm.d/www.conf
 
-# Install Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+# Copy vendor directory from dependencies stage
+# Esto copia las dependencias ya instaladas, evitando reinstalarlas
+COPY --from=dependencies /var/www/vendor /var/www/vendor
 
-# Copy composer files first for better caching
-COPY composer.json composer.lock* ./
-
-# Install PHP dependencies (production only, without scripts first)
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts
+# Copy composer files (needed for composer scripts and autoloader)
+COPY --from=dependencies /var/www/composer.json /var/www/composer.lock* ./
 
 # Copy application files
 COPY . /var/www
 
+# Install Composer for running scripts (lightweight, only binary)
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
 # Create necessary directories with proper structure
+# IMPORTANTE: Crear directorios ANTES de ejecutar composer para evitar problemas de permisos
 RUN mkdir -p /var/www/storage/framework/sessions \
     && mkdir -p /var/www/storage/framework/views \
     && mkdir -p /var/www/storage/framework/cache/data \
     && mkdir -p /var/www/storage/logs \
     && mkdir -p /var/www/bootstrap/cache
 
+# Optimize autoloader for production
+# Ejecutar ANTES de cambiar permisos para que los archivos generados tengan permisos correctos
+# Usamos --no-scripts para evitar ejecutar scripts de Laravel que requieren variables de entorno
+# Los scripts se ejecutarán después cuando el contenedor esté corriendo con .env configurado
+RUN composer dump-autoload --optimize --classmap-authoritative --no-scripts
+
 # Set ownership and permissions for Laravel directories
 # www-data is the default user for PHP-FPM in Alpine
+# IMPORTANTE: Cambiar permisos DESPUÉS de composer dump-autoload para asegurar que todos los archivos
+# generados tengan el propietario correcto
 RUN chown -R www-data:www-data /var/www \
     && chmod -R 755 /var/www \
     && chmod -R 775 /var/www/storage \
     && chmod -R 775 /var/www/bootstrap/cache
 
-# Run composer scripts after copy (post-install scripts like optimize, key:generate, etc.)
-RUN composer run-script post-install-cmd --no-interaction || true
-
-# Optimize autoloader for production
-RUN composer dump-autoload --optimize --classmap-authoritative
+# Create entrypoint script inline (verifica permisos al iniciar)
+# Útil para asegurar permisos correctos, especialmente si hay volúmenes montados
+RUN echo '#!/bin/sh' > /usr/local/bin/docker-entrypoint.sh \
+    && echo 'set -e' >> /usr/local/bin/docker-entrypoint.sh \
+    && echo 'echo "🔧 Verificando permisos de Laravel..."' >> /usr/local/bin/docker-entrypoint.sh \
+    && echo 'mkdir -p /var/www/storage/framework/{sessions,views,cache/data} /var/www/storage/logs /var/www/bootstrap/cache' >> /usr/local/bin/docker-entrypoint.sh \
+    && echo 'if [ "$(stat -c "%U" /var/www/storage 2>/dev/null || echo "www-data")" != "www-data" ]; then' >> /usr/local/bin/docker-entrypoint.sh \
+    && echo '  echo "📝 Ajustando permisos de storage y bootstrap/cache..."' >> /usr/local/bin/docker-entrypoint.sh \
+    && echo '  chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache 2>/dev/null || true' >> /usr/local/bin/docker-entrypoint.sh \
+    && echo '  chmod -R 775 /var/www/storage /var/www/bootstrap/cache 2>/dev/null || true' >> /usr/local/bin/docker-entrypoint.sh \
+    && echo 'fi' >> /usr/local/bin/docker-entrypoint.sh \
+    && echo 'echo "✅ Verificación de permisos completada"' >> /usr/local/bin/docker-entrypoint.sh \
+    && echo 'exec "$@"' >> /usr/local/bin/docker-entrypoint.sh \
+    && chmod +x /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 9000
 
+# Usar entrypoint para verificar permisos antes de iniciar PHP-FPM
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["php-fpm", "-F"]
-
-

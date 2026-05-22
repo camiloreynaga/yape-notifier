@@ -19,7 +19,13 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'phone',
         'password',
+        'password_visible',
+        'pin',
+        'commerce_id',
+        'role',
+        'is_active',
     ];
 
     /**
@@ -29,6 +35,8 @@ class User extends Authenticatable
      */
     protected $hidden = [
         'password',
+        'password_visible',
+        'pin',
         'remember_token',
     ];
 
@@ -59,5 +67,57 @@ class User extends Authenticatable
     public function notifications()
     {
         return $this->hasMany(Notification::class);
+    }
+
+    /**
+     * Get the commerce for this user.
+     */
+    public function commerce()
+    {
+        return $this->belongsTo(Commerce::class);
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    public function isCaptador(): bool
+    {
+        return $this->role === 'captador';
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === 'super_admin';
+    }
+
+    /**
+     * Validate PIN.
+     * 
+     * @param string $pin
+     * @return bool
+     */
+    public function validatePin(string $pin): bool
+    {
+        return $this->pin === $pin;
+    }
+
+    /**
+     * Generate unique PIN.
+     * 
+     * @param int $length
+     * @return string
+     */
+    public static function generateUniquePin(int $length = 4): string
+    {
+        $max = (int) str_repeat('9', $length);
+        $min = (int) str_pad('1', $length, '0', STR_PAD_LEFT);
+        
+        do {
+            $pin = str_pad((string) random_int($min, $max), $length, '0', STR_PAD_LEFT);
+        } while (self::where('pin', $pin)->exists());
+        
+        return $pin;
     }
 }

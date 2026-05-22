@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="16dp"
+    android:layout_marginVertical="6dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="2dp"
+    app:strokeWidth="0dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp">
+
+        <!-- Left indicator shimmer -->
+        <View
+            android:layout_width="4dp"
+            android:layout_height="56dp"
+            android:layout_marginEnd="12dp"
+            android:background="@drawable/bg_skeleton_shimmer" />
+
+        <!-- Content area -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <!-- Title shimmer -->
+            <View
+                android:layout_width="180dp"
+                android:layout_height="16dp"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/bg_skeleton_shimmer" />
+
+            <!-- Subtitle shimmer -->
+            <View
+                android:layout_width="120dp"
+                android:layout_height="12dp"
+                android:layout_marginBottom="6dp"
+                android:background="@drawable/bg_skeleton_shimmer" />
+
+            <!-- Date shimmer -->
+            <View
+                android:layout_width="80dp"
+                android:layout_height="10dp"
+                android:background="@drawable/bg_skeleton_shimmer" />
+
+        </LinearLayout>
+
+        <!-- Amount shimmer -->
+        <View
+            android:layout_width="72dp"
+            android:layout_height="20dp"
+            android:layout_gravity="center_vertical"
+            android:background="@drawable/bg_skeleton_shimmer" />
+
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

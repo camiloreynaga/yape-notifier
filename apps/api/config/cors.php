@@ -23,6 +23,7 @@ return [
 
     'allowed_origins_patterns' => [
         '/^https:\/\/.*\.notificaciones\.space$/',
+        '/^http:\/\/localhost:\d+$/', // Para desarrollo local con cualquier puerto
     ],
 
     'allowed_headers' => ['*'],

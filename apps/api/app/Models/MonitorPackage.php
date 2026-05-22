@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MonitorPackage extends Model
 {
@@ -15,10 +16,12 @@ class MonitorPackage extends Model
      * @var array<int, string>
      */
     protected $fillable = [
+        'commerce_id',
         'package_name',
         'app_name',
         'description',
         'is_active',
+        'enabled_default',
         'priority',
     ];
 
@@ -31,6 +34,7 @@ class MonitorPackage extends Model
     {
         return [
             'is_active' => 'boolean',
+            'enabled_default' => 'boolean',
             'priority' => 'integer',
         ];
     }
@@ -49,6 +53,14 @@ class MonitorPackage extends Model
     public function scopeOrdered($query)
     {
         return $query->orderBy('priority', 'desc')->orderBy('package_name', 'asc');
+    }
+
+    /**
+     * Get the commerce for this monitor package.
+     */
+    public function commerce(): BelongsTo
+    {
+        return $this->belongsTo(Commerce::class);
     }
 }
 

@@ -1,23 +1,39 @@
 # Dockerfile para Dashboard (React/Vite)
 # Ubicación: infra/docker/dockerfiles/Dockerfile.dashboard
-# Multi-stage build for production
+# Multi-stage build optimizado con BuildKit cache
 
 FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files first for better layer caching
 COPY package*.json ./
 
-# Install dependencies (using npm install if package-lock.json doesn't exist)
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+# Install dependencies with BuildKit cache mount
+# Cache mount acelera builds subsecuentes cacheando node_modules entre builds
+# Solo reinstala cuando package-lock.json cambia
+RUN --mount=type=cache,target=/root/.npm \
+    if [ -f package-lock.json ]; then npm ci --prefer-offline --no-audit; else npm install --prefer-offline --no-audit; fi
 
 # Copy source code
 COPY . .
 
-# Build argument for API URL
+# Build arguments for environment variables
+# These are injected at build time and baked into the bundle
 ARG VITE_API_BASE_URL=https://api.notificaciones.space
+ARG VITE_API_URL=${VITE_API_BASE_URL}
+ARG VITE_REVERB_APP_KEY=
+ARG VITE_REVERB_HOST=api.notificaciones.space
+ARG VITE_REVERB_PORT=8080
+ARG VITE_REVERB_SCHEME=https
+
+# Set environment variables for build
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+ENV VITE_API_URL=${VITE_API_URL}
+ENV VITE_REVERB_APP_KEY=${VITE_REVERB_APP_KEY}
+ENV VITE_REVERB_HOST=${VITE_REVERB_HOST}
+ENV VITE_REVERB_PORT=${VITE_REVERB_PORT}
+ENV VITE_REVERB_SCHEME=${VITE_REVERB_SCHEME}
 
 # Build the application
 RUN npm run build
