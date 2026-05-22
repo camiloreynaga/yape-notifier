@@ -59,12 +59,11 @@ class AdminPanelActivity : AppCompatActivity() {
 
     private fun setupRecyclerView() {
         adapter = NotificationAdapter(
-            onItemClick = { notification ->
-                // Navigate to detail
-                val intent = Intent(this, AdminNotificationDetailActivity::class.java)
-                intent.putExtra("notification_id", notification.id)
-                startActivity(intent)
-            },
+            // Tap on the card is intentionally a no-op. All actions (Validar /
+            // Inconsistente / Pendiente) are available inline via the VALIDAR button
+            // and the 3-dot menu — the previous "Detalle de Notificación" screen
+            // was redundant and broken (Recurso no encontrado), and has been removed.
+            onItemClick = { /* no-op */ },
             onValidateClick = { notification ->
                 // Validate notification (quick action)
                 viewModel.validateNotification(notification.id)

@@ -68,6 +68,22 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Dedicated launcher for the silent boot-time request of POST_NOTIFICATIONS.
+     * Does NOT send a test notification — just logs the outcome so we know whether
+     * the AuthSessionManager "Sesión expirada" notification will actually be visible.
+     */
+    private val postNotificationsBootLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        Log.i("MainActivity", "POST_NOTIFICATIONS (boot request): granted=$isGranted")
+        com.yapenotifier.android.util.FileLogger.log(
+            "AUTH",
+            "POST_NOTIFICATIONS permission: granted=$isGranted",
+            if (isGranted) "info" else "warning",
+        )
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
@@ -85,6 +101,24 @@ class MainActivity : AppCompatActivity() {
         loadUserInfo()
         updateAllPermissionStatus()
         createNotificationChannel()
+        ensurePostNotificationsPermission()
+    }
+
+    /**
+     * Android 13+ (TIRAMISU) requires runtime POST_NOTIFICATIONS to post any notification.
+     * Without it, AuthSessionManager.showLoginRequiredNotification + the watchdog's
+     * actionable notifications are silent no-ops — the user never finds out they need
+     * to re-login. Request it once at startup so the channel works.
+     */
+    private fun ensurePostNotificationsPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val granted = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) {
+            postNotificationsBootLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
     }
 
     private fun setupRecoveryCard() {
@@ -112,6 +146,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun checkServiceStatus() {
         lifecycleScope.launch {
+            // Si el token está expirado, el observer de viewModel.appStatus ya escribió
+            // "⚠️ Sesión expirada" en el banner. No pisemos ese estado con "Capturando OK".
+            if (preferencesManager.awaitingLogin.first()) {
+                return@launch
+            }
+
             val hasPermission = withContext(Dispatchers.IO) {
                 NotificationAccessChecker.isNotificationAccessEnabled(this@MainActivity)
             }
@@ -357,26 +397,33 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadUserInfo() {
+        // REACTIVO: observa los flows de DataStore continuamente.
+        // Cuando AuthSessionManager.handleTokenExpired() borra el authToken, este
+        // bloque recibe la emisión nueva y refresca el TextView automáticamente.
+        // Antes era .first() snapshot y quedaba congelado en "Autenticado" tras un 401.
         lifecycleScope.launch {
-            val email = preferencesManager.userEmail.first()
-            val authToken = preferencesManager.authToken.first()
-            val commerceId = preferencesManager.commerceId.first()
-            
-            // Professional Architecture: Authentication is OPTIONAL
-            // Device linking (commerce_id) is what matters for sending notifications
-            
-            if (commerceId.isNullOrBlank()) {
-                // Device not linked - this is critical
-                binding.tvUserInfo.text = "⚠️ Dispositivo no vinculado - Escanea código QR"
-                binding.tvUserInfo.setTextColor(Color.parseColor("#F44336"))
-            } else if (authToken.isNullOrBlank()) {
-                // Device linked but no user session (capturer mode)
-                binding.tvUserInfo.text = "✅ Modo Capturador (sin usuario)"
-                binding.tvUserInfo.setTextColor(Color.parseColor("#FF9800")) // Orange
-            } else {
-                // Device linked AND user authenticated (full mode)
-                binding.tvUserInfo.text = "✅ Usuario: ${email ?: "Autenticado"}"
-                binding.tvUserInfo.setTextColor(Color.parseColor("#4CAF50")) // Green
+            kotlinx.coroutines.flow.combine(
+                preferencesManager.userEmail,
+                preferencesManager.authToken,
+                preferencesManager.commerceId,
+            ) { email, authToken, commerceId ->
+                Triple(email, authToken, commerceId)
+            }.collectLatest { (email, authToken, commerceId) ->
+                when {
+                    commerceId.isNullOrBlank() -> {
+                        binding.tvUserInfo.text = "⚠️ Dispositivo no vinculado - Escanea código QR"
+                        binding.tvUserInfo.setTextColor(Color.parseColor("#F44336"))
+                    }
+                    authToken.isNullOrBlank() -> {
+                        // Token borrado tras 401 — sesión expirada, captador debe re-loguearse
+                        binding.tvUserInfo.text = "⚠️ Sesión expirada — toca para iniciar sesión"
+                        binding.tvUserInfo.setTextColor(Color.parseColor("#F44336"))
+                    }
+                    else -> {
+                        binding.tvUserInfo.text = "✅ Usuario: ${email ?: "Autenticado"}"
+                        binding.tvUserInfo.setTextColor(Color.parseColor("#4CAF50"))
+                    }
+                }
             }
         }
     }

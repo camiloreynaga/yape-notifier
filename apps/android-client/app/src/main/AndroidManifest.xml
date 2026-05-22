@@ -143,12 +143,6 @@
             android:theme="@style/Theme.YapeNotifier.NoActionBar" />
         
         <activity
-            android:name=".ui.admin.AdminNotificationDetailActivity"
-            android:exported="false"
-            android:label="Detalle de Notificación"
-            android:theme="@style/Theme.YapeNotifier" />
-        
-        <activity
             android:name=".ui.admin.AdminSettingsActivity"
             android:exported="false"
             android:label="Configuración"
